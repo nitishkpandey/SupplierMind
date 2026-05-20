@@ -1,0 +1,56 @@
+# ============================================================
+# SUPPLIERMIND .gitignore
+# ============================================================
+
+# --- SECRETS (NEVER commit these) ---
+.env
+.env.local
+*.pem
+*.key
+secrets/
+
+# --- PYTHON ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- ALEMBIC ---
+alembic/__pycache__/
+
+# --- NODE.JS / FRONTEND ---
+node_modules/
+dist/
+*.tsbuildinfo
+.eslintcache
+
+# --- DOCKER ---
+docker-compose.override.yml
+
+# --- VECTOR DB LOCAL DATA ---
+chroma_db/
+milvus_data/
+
+# --- IDE ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- LOGS ---
+logs/
+*.log
+
+# --- TESTING ---
+coverage/
