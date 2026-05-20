@@ -1,0 +1,3547 @@
+[
+  {
+    "id": "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
+    "name": "Berlin Metals Ltd.",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "9 Industriestraße, Berlin, Germany",
+    "latitude": 52.263249,
+    "longitude": 13.283394,
+    "certifications": [
+      "ISO 27001",
+      "RoHS",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-04-28"
+      },
+      "RoHS": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-09-28"
+      },
+      "CE": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-04-28"
+      }
+    },
+    "capacity_value": 29939.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 82,
+    "website": "https://www.example-supplier-796ea31a.com",
+    "contact_email": "procurement@example-ff15e01c.com",
+    "is_active": true
+  },
+  {
+    "id": "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
+    "name": "Dortmund Metals AG",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Dortmund",
+    "address": "56 Industriestraße, Dortmund, Germany",
+    "latitude": 51.68086,
+    "longitude": 7.198543,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "IATF 16949",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-02-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-06-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-01-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-07-28"
+      }
+    },
+    "capacity_value": 5664.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 77,
+    "website": "https://www.example-supplier-55ad27b5.com",
+    "contact_email": "procurement@example-bd57033a.com",
+    "is_active": true
+  },
+  {
+    "id": "5c5c0820-ebd9-4f16-af85-279282909442",
+    "name": "Hannover Metals AG",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Hannover",
+    "address": "198 Industriestraße, Hannover, Germany",
+    "latitude": 52.553957,
+    "longitude": 9.796065,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "ISO 27001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-04-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-05-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-04-28"
+      }
+    },
+    "capacity_value": 44420.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 41,
+    "website": "https://www.example-supplier-a9ee01e3.com",
+    "contact_email": "procurement@example-8c747241.com",
+    "is_active": true
+  },
+  {
+    "id": "fd3498de-43a5-4270-a181-380f826233fa",
+    "name": "Munich Metals Ltd.",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Munich",
+    "address": "70 Industriestraße, Munich, Germany",
+    "latitude": 48.19409,
+    "longitude": 11.404237,
+    "certifications": [
+      "ISO 9001",
+      "REACH"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-11-28"
+      },
+      "REACH": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-04-28"
+      }
+    },
+    "capacity_value": 2603.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 47,
+    "website": "https://www.example-supplier-f3421454.com",
+    "contact_email": "procurement@example-84746ff1.com",
+    "is_active": true
+  },
+  {
+    "id": "d4a8a6c7-048d-42ee-964c-1ef6c0fad060",
+    "name": "Warsaw Metals Ltd.",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Poland",
+    "city": "Warsaw",
+    "address": "102 Industriestraße, Warsaw, Poland",
+    "latitude": 52.104155,
+    "longitude": 20.855975,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949",
+      "ISO 22000",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-05-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-12-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-12-28"
+      },
+      "RoHS": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-10-28"
+      }
+    },
+    "capacity_value": 26675.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 53,
+    "website": "https://www.example-supplier-9cd92184.com",
+    "contact_email": "procurement@example-d4d465b1.com",
+    "is_active": true
+  },
+  {
+    "id": "9f19a23a-f386-4265-9aca-e7b469b23f3d",
+    "name": "Duesseldorf Metals AG",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "161 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.490525,
+    "longitude": 6.580704,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-10-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-07-28"
+      }
+    },
+    "capacity_value": 39552.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 66,
+    "website": "https://www.example-supplier-6ae146c9.com",
+    "contact_email": "procurement@example-760147cd.com",
+    "is_active": true
+  },
+  {
+    "id": "7bb662e0-a74e-4b2a-9ec5-9cbadd051486",
+    "name": "Paris Metals S.A.",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "France",
+    "city": "Paris",
+    "address": "29 Industriestraße, Paris, France",
+    "latitude": 48.722229,
+    "longitude": 2.380971,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001",
+      "CE",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-03-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-12-28"
+      },
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-09-28"
+      },
+      "AS9100": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-11-28"
+      }
+    },
+    "capacity_value": 33770.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 84,
+    "website": "https://www.example-supplier-0a10c749.com",
+    "contact_email": "procurement@example-d11cb6f0.com",
+    "is_active": true
+  },
+  {
+    "id": "65f4255f-ca23-479c-84cd-0279e17515a3",
+    "name": "Stuttgart Metals GmbH",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "29 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.588146,
+    "longitude": 9.324798,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "IATF 16949",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-04-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-10-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-12-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-09-28"
+      }
+    },
+    "capacity_value": 8741.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 23,
+    "website": "https://www.example-supplier-404f2561.com",
+    "contact_email": "procurement@example-f72c5450.com",
+    "is_active": true
+  },
+  {
+    "id": "62b4ccc4-e934-4f85-a7b2-22b1483d40f3",
+    "name": "Vienna Metals AG",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "183 Industriestraße, Vienna, Austria",
+    "latitude": 48.44974,
+    "longitude": 16.192788,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "ISO 22000",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-11-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-09-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-04-28"
+      },
+      "CE": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-06-28"
+      }
+    },
+    "capacity_value": 1878.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 82,
+    "website": "https://www.example-supplier-92423a6a.com",
+    "contact_email": "procurement@example-c092b08a.com",
+    "is_active": true
+  },
+  {
+    "id": "47cb73e0-d0c0-44c2-8c43-dac509ef99f0",
+    "name": "Lyon Metals GmbH",
+    "description": "Specializes in precision metal components including steel, aluminum, and copper alloys. State-of-the-art CNC machining facility with 20 years of experience in automotive and aerospace.",
+    "category": "metals",
+    "country": "France",
+    "city": "Lyon",
+    "address": "85 Industriestraße, Lyon, France",
+    "latitude": 45.618116,
+    "longitude": 4.684466,
+    "certifications": [
+      "ISO 14001",
+      "ISO 22000",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-05-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-09-28"
+      },
+      "RoHS": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-04-28"
+      }
+    },
+    "capacity_value": 31496.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 59,
+    "website": "https://www.example-supplier-1e4d54eb.com",
+    "contact_email": "procurement@example-7441a115.com",
+    "is_active": true
+  },
+  {
+    "id": "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
+    "name": "Stuttgart Electronics GmbH",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "16 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.556517,
+    "longitude": 9.268837,
+    "certifications": [
+      "ISO 9001",
+      "REACH",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-02-28"
+      },
+      "REACH": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-04-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-03-28"
+      }
+    },
+    "capacity_value": 56296.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 30,
+    "website": "https://www.example-supplier-5d9edf15.com",
+    "contact_email": "procurement@example-72d723d5.com",
+    "is_active": true
+  },
+  {
+    "id": "7b497246-8067-4f34-9b8e-dc5d02575bc1",
+    "name": "Dortmund Electronics B.V.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Dortmund",
+    "address": "4 Industriestraße, Dortmund, Germany",
+    "latitude": 51.493399,
+    "longitude": 7.667725,
+    "certifications": [
+      "ISO 27001",
+      "ISO 14001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-08-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-01-28"
+      }
+    },
+    "capacity_value": 22579.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 55,
+    "website": "https://www.example-supplier-63401dd9.com",
+    "contact_email": "procurement@example-356cd8a3.com",
+    "is_active": true
+  },
+  {
+    "id": "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
+    "name": "Bremen Electronics B.V.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Bremen",
+    "address": "170 Industriestraße, Bremen, Germany",
+    "latitude": 53.341629,
+    "longitude": 8.674783,
+    "certifications": [
+      "ISO 9001",
+      "CE",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-04-28"
+      },
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-01-28"
+      },
+      "AS9100": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-12-28"
+      }
+    },
+    "capacity_value": 42104.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 14,
+    "website": "https://www.example-supplier-3d73a684.com",
+    "contact_email": "procurement@example-1a9cb53b.com",
+    "is_active": true
+  },
+  {
+    "id": "8b444bda-1e28-4c18-bc73-87dba8ff1122",
+    "name": "Hamburg Electronics B.V.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Hamburg",
+    "address": "21 Industriestraße, Hamburg, Germany",
+    "latitude": 53.596601,
+    "longitude": 9.995241,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-10-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-07-28"
+      }
+    },
+    "capacity_value": 16713.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 79,
+    "website": "https://www.example-supplier-dd6b9005.com",
+    "contact_email": "procurement@example-a5551921.com",
+    "is_active": true
+  },
+  {
+    "id": "0cd55def-98ca-4bf8-a9d3-1588a43a68c6",
+    "name": "Duesseldorf Electronics AG",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "172 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.264359,
+    "longitude": 6.527412,
+    "certifications": [
+      "RoHS",
+      "IATF 16949",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "RoHS": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-05-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-11-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-06-28"
+      }
+    },
+    "capacity_value": 99548.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 16,
+    "website": "https://www.example-supplier-d9cc88a8.com",
+    "contact_email": "procurement@example-a9fb1113.com",
+    "is_active": true
+  },
+  {
+    "id": "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
+    "name": "Bremen Electronics AG",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Bremen",
+    "address": "130 Industriestraße, Bremen, Germany",
+    "latitude": 53.056752,
+    "longitude": 9.071135,
+    "certifications": [
+      "ISO 9001",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-06-28"
+      },
+      "RoHS": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-06-28"
+      }
+    },
+    "capacity_value": 38353.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 27,
+    "website": "https://www.example-supplier-abecc5fd.com",
+    "contact_email": "procurement@example-00c553b1.com",
+    "is_active": true
+  },
+  {
+    "id": "784e8080-5315-4006-a50d-879bb6afdfad",
+    "name": "Prague Electronics B.V.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "77 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.255903,
+    "longitude": 14.547822,
+    "certifications": [
+      "ISO 9001",
+      "RoHS",
+      "ISO 14001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-05-28"
+      },
+      "RoHS": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-12-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-05-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-12-28"
+      }
+    },
+    "capacity_value": 45942.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 33,
+    "website": "https://www.example-supplier-5527b604.com",
+    "contact_email": "procurement@example-de67c527.com",
+    "is_active": true
+  },
+  {
+    "id": "f648e34a-f875-42e8-b12d-33a4fea8f8b0",
+    "name": "Dortmund Electronics Ltd.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Dortmund",
+    "address": "71 Industriestraße, Dortmund, Germany",
+    "latitude": 51.516524,
+    "longitude": 7.330771,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-06-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-03-28"
+      }
+    },
+    "capacity_value": 98154.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 63,
+    "website": "https://www.example-supplier-53b3ce64.com",
+    "contact_email": "procurement@example-6eaa97c6.com",
+    "is_active": true
+  },
+  {
+    "id": "9ac203de-545f-4704-bf79-bee914a4740d",
+    "name": "Lyon Electronics S.A.",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "France",
+    "city": "Lyon",
+    "address": "150 Industriestraße, Lyon, France",
+    "latitude": 45.875172,
+    "longitude": 4.868623,
+    "certifications": [
+      "ISO 45001",
+      "ISO 14001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 45001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-07-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-05-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-06-28"
+      }
+    },
+    "capacity_value": 28535.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 38,
+    "website": "https://www.example-supplier-c799be9c.com",
+    "contact_email": "procurement@example-0fdd05ca.com",
+    "is_active": true
+  },
+  {
+    "id": "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
+    "name": "Berlin Electronics AG",
+    "description": "Distributor and manufacturer of electronic components including PCBs, sensors, and microcontrollers. Serves automotive, industrial automation, and consumer electronics markets.",
+    "category": "electronics",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "46 Industriestraße, Berlin, Germany",
+    "latitude": 52.440907,
+    "longitude": 13.437369,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "ISO 22000",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-11-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-03-28"
+      },
+      "AS9100": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-01-28"
+      }
+    },
+    "capacity_value": 62694.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 35,
+    "website": "https://www.example-supplier-2bc0b028.com",
+    "contact_email": "procurement@example-f4c6c78f.com",
+    "is_active": true
+  },
+  {
+    "id": "2f0932e3-3a00-4496-bcad-2e7d9d652a8f",
+    "name": "Stuttgart Logistics GmbH",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "169 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.946928,
+    "longitude": 9.161442,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-06-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-05-28"
+      }
+    },
+    "capacity_value": 369.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 89,
+    "website": "https://www.example-supplier-a9ccdffb.com",
+    "contact_email": "procurement@example-26d015ff.com",
+    "is_active": true
+  },
+  {
+    "id": "6437c778-0288-440c-b015-c842becb2c63",
+    "name": "Paris Logistics S.A.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "France",
+    "city": "Paris",
+    "address": "46 Industriestraße, Paris, France",
+    "latitude": 48.802372,
+    "longitude": 2.612281,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-01-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-06-28"
+      }
+    },
+    "capacity_value": 756.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 47,
+    "website": "https://www.example-supplier-15e72731.com",
+    "contact_email": "procurement@example-71325a88.com",
+    "is_active": true
+  },
+  {
+    "id": "febbaf95-7bf8-4b37-95f5-388d2c13fd49",
+    "name": "Krakow Logistics Ltd.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "1 Industriestraße, Krakow, Poland",
+    "latitude": 50.12211,
+    "longitude": 19.951175,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "CE",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-06-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-11-28"
+      },
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-11-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-09-28"
+      }
+    },
+    "capacity_value": 326.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 59,
+    "website": "https://www.example-supplier-5520dafc.com",
+    "contact_email": "procurement@example-708ed32a.com",
+    "is_active": true
+  },
+  {
+    "id": "439a36c1-54a0-411d-a26a-edce4aecbb04",
+    "name": "Amsterdam Logistics B.V.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Netherlands",
+    "city": "Amsterdam",
+    "address": "146 Industriestraße, Amsterdam, Netherlands",
+    "latitude": 52.314843,
+    "longitude": 4.793643,
+    "certifications": [
+      "AS9100",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-09-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-05-28"
+      }
+    },
+    "capacity_value": 225.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 62,
+    "website": "https://www.example-supplier-b4495b46.com",
+    "contact_email": "procurement@example-a4893e80.com",
+    "is_active": true
+  },
+  {
+    "id": "4e5fcf38-bade-4e91-a449-120fc600836c",
+    "name": "Brussels Logistics AG",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Belgium",
+    "city": "Brussels",
+    "address": "169 Industriestraße, Brussels, Belgium",
+    "latitude": 50.907955,
+    "longitude": 4.255619,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "REACH",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-09-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-02-28"
+      },
+      "REACH": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-04-28"
+      },
+      "AS9100": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-01-28"
+      }
+    },
+    "capacity_value": 57.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 38,
+    "website": "https://www.example-supplier-336da0e1.com",
+    "contact_email": "procurement@example-05de4e05.com",
+    "is_active": true
+  },
+  {
+    "id": "dd789599-1457-44fa-84a6-d271b0bd8c80",
+    "name": "Vienna Logistics Ltd.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "63 Industriestraße, Vienna, Austria",
+    "latitude": 48.268348,
+    "longitude": 16.518929,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "AS9100",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-02-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-03-28"
+      },
+      "AS9100": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-01-28"
+      },
+      "RoHS": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-02-28"
+      }
+    },
+    "capacity_value": 477.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 24,
+    "website": "https://www.example-supplier-66f6599f.com",
+    "contact_email": "procurement@example-fd595a25.com",
+    "is_active": true
+  },
+  {
+    "id": "8b0e0745-ac99-49c7-ac2f-bf34b53b3522",
+    "name": "Prague Logistics B.V.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "115 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.166083,
+    "longitude": 14.701526,
+    "certifications": [
+      "ISO 9001",
+      "RoHS",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-08-28"
+      },
+      "RoHS": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-11-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-11-28"
+      }
+    },
+    "capacity_value": 254.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 42,
+    "website": "https://www.example-supplier-1fed251c.com",
+    "contact_email": "procurement@example-b328c4ae.com",
+    "is_active": true
+  },
+  {
+    "id": "f3e175a3-1215-4b50-aee0-f93bbd3360d7",
+    "name": "Prague Logistics AG",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "39 Industriestraße, Prague, Czech Republic",
+    "latitude": 49.847113,
+    "longitude": 14.321977,
+    "certifications": [
+      "ISO 9001",
+      "RoHS",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-12-28"
+      },
+      "RoHS": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-02-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-06-28"
+      }
+    },
+    "capacity_value": 565.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 66,
+    "website": "https://www.example-supplier-efb10633.com",
+    "contact_email": "procurement@example-4568b655.com",
+    "is_active": true
+  },
+  {
+    "id": "3b50815b-9357-4950-bbb6-bbcd85aa0d9d",
+    "name": "Krakow Logistics GmbH",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "91 Industriestraße, Krakow, Poland",
+    "latitude": 49.828087,
+    "longitude": 20.124941,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "AS9100",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-07-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-08-28"
+      },
+      "AS9100": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-07-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-07-28"
+      }
+    },
+    "capacity_value": 354.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 58,
+    "website": "https://www.example-supplier-3bb6d8be.com",
+    "contact_email": "procurement@example-14a31b77.com",
+    "is_active": true
+  },
+  {
+    "id": "147165d6-e689-48c9-bb2d-b8ce3c542dec",
+    "name": "Cologne Logistics B.V.",
+    "description": "Full-service logistics provider offering road, rail, and multimodal freight solutions across Europe. Temperature-controlled and hazardous goods transport available.",
+    "category": "logistics",
+    "country": "Germany",
+    "city": "Cologne",
+    "address": "170 Industriestraße, Cologne, Germany",
+    "latitude": 51.117357,
+    "longitude": 7.176779,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "AS9100",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-11-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-08-28"
+      },
+      "AS9100": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-05-28"
+      },
+      "CE": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-04-28"
+      }
+    },
+    "capacity_value": 475.0,
+    "capacity_unit": "shipments/day",
+    "lead_time_days": 48,
+    "website": "https://www.example-supplier-b186a485.com",
+    "contact_email": "procurement@example-3d97ca2f.com",
+    "is_active": true
+  },
+  {
+    "id": "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+    "name": "Amsterdam Textiles Ltd.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Netherlands",
+    "city": "Amsterdam",
+    "address": "5 Industriestraße, Amsterdam, Netherlands",
+    "latitude": 52.508805,
+    "longitude": 4.838763,
+    "certifications": [
+      "ISO 9001",
+      "CE",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-06-28"
+      },
+      "CE": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-11-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-04-28"
+      }
+    },
+    "capacity_value": 14065.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 9,
+    "website": "https://www.example-supplier-7944a304.com",
+    "contact_email": "procurement@example-0c61d372.com",
+    "is_active": true
+  },
+  {
+    "id": "2c48e14c-bff6-41d1-83f1-c5222eababc6",
+    "name": "Stockholm Textiles S.A.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Sweden",
+    "city": "Stockholm",
+    "address": "197 Industriestraße, Stockholm, Sweden",
+    "latitude": 59.141399,
+    "longitude": 17.866557,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "REACH",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-10-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-03-28"
+      },
+      "REACH": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-10-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-10-28"
+      }
+    },
+    "capacity_value": 45390.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 55,
+    "website": "https://www.example-supplier-872aabc3.com",
+    "contact_email": "procurement@example-8591afcb.com",
+    "is_active": true
+  },
+  {
+    "id": "ad47c787-e8b7-4bd0-9bb4-7cfb280c129d",
+    "name": "Warsaw Textiles S.A.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Poland",
+    "city": "Warsaw",
+    "address": "176 Industriestraße, Warsaw, Poland",
+    "latitude": 52.468333,
+    "longitude": 20.849135,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "ISO 27001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-10-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-09-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-02-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-01-28"
+      }
+    },
+    "capacity_value": 28528.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 69,
+    "website": "https://www.example-supplier-b810bd83.com",
+    "contact_email": "procurement@example-1ee1b8ef.com",
+    "is_active": true
+  },
+  {
+    "id": "e1b6df47-c58b-4925-a88b-41f00ce03654",
+    "name": "Berlin Textiles AG",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "188 Industriestraße, Berlin, Germany",
+    "latitude": 52.484067,
+    "longitude": 13.330507,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-10-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-08-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-06-28"
+      }
+    },
+    "capacity_value": 17088.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 18,
+    "website": "https://www.example-supplier-118fcc3b.com",
+    "contact_email": "procurement@example-01664b79.com",
+    "is_active": true
+  },
+  {
+    "id": "ad147739-bf60-4304-9b49-02586fb9cbdf",
+    "name": "Dortmund Textiles Ltd.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Germany",
+    "city": "Dortmund",
+    "address": "84 Industriestraße, Dortmund, Germany",
+    "latitude": 51.719887,
+    "longitude": 7.326848,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "IATF 16949",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-04-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-06-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-09-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-02-28"
+      }
+    },
+    "capacity_value": 16817.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 59,
+    "website": "https://www.example-supplier-9219e577.com",
+    "contact_email": "procurement@example-c87a9835.com",
+    "is_active": true
+  },
+  {
+    "id": "62d8810d-1ef8-4dbe-8b79-df010abf4e4e",
+    "name": "Vienna Textiles GmbH",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "24 Industriestraße, Vienna, Austria",
+    "latitude": 48.238025,
+    "longitude": 16.233435,
+    "certifications": [
+      "ISO 9001",
+      "REACH",
+      "RoHS",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-07-28"
+      },
+      "REACH": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-11-28"
+      },
+      "RoHS": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-08-28"
+      },
+      "AS9100": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-07-28"
+      }
+    },
+    "capacity_value": 49885.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 77,
+    "website": "https://www.example-supplier-20c06520.com",
+    "contact_email": "procurement@example-e3ea1b89.com",
+    "is_active": true
+  },
+  {
+    "id": "d2857430-4c7c-435f-a498-94acd47ec8c7",
+    "name": "Amsterdam Textiles AG",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Netherlands",
+    "city": "Amsterdam",
+    "address": "81 Industriestraße, Amsterdam, Netherlands",
+    "latitude": 52.287498,
+    "longitude": 4.879097,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-04-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-05-28"
+      }
+    },
+    "capacity_value": 48486.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 82,
+    "website": "https://www.example-supplier-74d21b8c.com",
+    "contact_email": "procurement@example-1142f839.com",
+    "is_active": true
+  },
+  {
+    "id": "a70b691b-40dc-4e83-9603-d94812af925a",
+    "name": "Paris Textiles AG",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "France",
+    "city": "Paris",
+    "address": "78 Industriestraße, Paris, France",
+    "latitude": 48.908919,
+    "longitude": 2.611935,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-05-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-09-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-11-28"
+      }
+    },
+    "capacity_value": 33170.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 20,
+    "website": "https://www.example-supplier-024a4a5c.com",
+    "contact_email": "procurement@example-fc17c5b7.com",
+    "is_active": true
+  },
+  {
+    "id": "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
+    "name": "Bremen Textiles S.A.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Germany",
+    "city": "Bremen",
+    "address": "123 Industriestraße, Bremen, Germany",
+    "latitude": 53.119335,
+    "longitude": 8.785158,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-07-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-10-28"
+      }
+    },
+    "capacity_value": 42251.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 13,
+    "website": "https://www.example-supplier-00c5dba2.com",
+    "contact_email": "procurement@example-97d820bf.com",
+    "is_active": true
+  },
+  {
+    "id": "daf3bbc3-d8c8-4e7f-ba4c-f1a2aac28652",
+    "name": "Frankfurt Textiles B.V.",
+    "description": "Technical textile manufacturer producing industrial fabrics, filtration media, and protective materials. Custom weaving and finishing to specification with OEKO-TEX certified production.",
+    "category": "textiles",
+    "country": "Germany",
+    "city": "Frankfurt",
+    "address": "196 Industriestraße, Frankfurt, Germany",
+    "latitude": 49.921277,
+    "longitude": 8.716067,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-09-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-08-28"
+      }
+    },
+    "capacity_value": 20487.0,
+    "capacity_unit": "meters/month",
+    "lead_time_days": 82,
+    "website": "https://www.example-supplier-1508e282.com",
+    "contact_email": "procurement@example-7cfc3790.com",
+    "is_active": true
+  },
+  {
+    "id": "b12d671f-f694-4387-8eb0-48b0660e3f73",
+    "name": "Krakow Chemicals AG",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "68 Industriestraße, Krakow, Poland",
+    "latitude": 49.9595,
+    "longitude": 20.01042,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001",
+      "ISO 22000",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-04-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-08-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-05-28"
+      }
+    },
+    "capacity_value": 634.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 36,
+    "website": "https://www.example-supplier-616343fe.com",
+    "contact_email": "procurement@example-236d9dc4.com",
+    "is_active": true
+  },
+  {
+    "id": "67c00429-8e4c-4715-b639-080cd91794ce",
+    "name": "Hannover Chemicals B.V.",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Germany",
+    "city": "Hannover",
+    "address": "170 Industriestraße, Hannover, Germany",
+    "latitude": 52.487768,
+    "longitude": 9.841723,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "CE",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-02-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-11-28"
+      },
+      "CE": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-03-28"
+      },
+      "AS9100": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-03-28"
+      }
+    },
+    "capacity_value": 5139.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 83,
+    "website": "https://www.example-supplier-0bc93fc5.com",
+    "contact_email": "procurement@example-576ca248.com",
+    "is_active": true
+  },
+  {
+    "id": "c2f971fb-efe9-4817-873c-3200c1ca156e",
+    "name": "Brussels Chemicals B.V.",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Belgium",
+    "city": "Brussels",
+    "address": "139 Industriestraße, Brussels, Belgium",
+    "latitude": 51.077972,
+    "longitude": 4.31881,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-02-28"
+      },
+      "AS9100": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-07-28"
+      },
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-01-28"
+      }
+    },
+    "capacity_value": 1596.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 36,
+    "website": "https://www.example-supplier-80cbe636.com",
+    "contact_email": "procurement@example-a5693a2e.com",
+    "is_active": true
+  },
+  {
+    "id": "04e17e78-ab0a-4c0e-a37a-81272633365d",
+    "name": "Brussels Chemicals Ltd.",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Belgium",
+    "city": "Brussels",
+    "address": "133 Industriestraße, Brussels, Belgium",
+    "latitude": 50.897393,
+    "longitude": 4.092643,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-11-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-08-28"
+      }
+    },
+    "capacity_value": 5800.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 59,
+    "website": "https://www.example-supplier-4d507d0e.com",
+    "contact_email": "procurement@example-f33fc9f8.com",
+    "is_active": true
+  },
+  {
+    "id": "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+    "name": "Amsterdam Chemicals Ltd.",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Netherlands",
+    "city": "Amsterdam",
+    "address": "195 Industriestraße, Amsterdam, Netherlands",
+    "latitude": 52.270875,
+    "longitude": 4.69037,
+    "certifications": [
+      "REACH",
+      "CE"
+    ],
+    "certification_details": {
+      "REACH": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-08-28"
+      },
+      "CE": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-05-28"
+      }
+    },
+    "capacity_value": 5396.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 21,
+    "website": "https://www.example-supplier-0582a361.com",
+    "contact_email": "procurement@example-b3da966b.com",
+    "is_active": true
+  },
+  {
+    "id": "82eda191-bf69-45eb-aedb-a73b797c76a2",
+    "name": "Warsaw Chemicals AG",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Poland",
+    "city": "Warsaw",
+    "address": "133 Industriestraße, Warsaw, Poland",
+    "latitude": 52.426949,
+    "longitude": 21.187836,
+    "certifications": [
+      "REACH",
+      "AS9100",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "REACH": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-11-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-04-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-05-28"
+      }
+    },
+    "capacity_value": 7278.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 69,
+    "website": "https://www.example-supplier-824e30c7.com",
+    "contact_email": "procurement@example-8937aad4.com",
+    "is_active": true
+  },
+  {
+    "id": "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+    "name": "Berlin Chemicals GmbH",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "142 Industriestraße, Berlin, Germany",
+    "latitude": 52.265335,
+    "longitude": 13.475282,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "CE",
+      "REACH"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-04-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-02-28"
+      },
+      "CE": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-12-28"
+      },
+      "REACH": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-07-28"
+      }
+    },
+    "capacity_value": 8005.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 67,
+    "website": "https://www.example-supplier-a2fc7f6d.com",
+    "contact_email": "procurement@example-2a610302.com",
+    "is_active": true
+  },
+  {
+    "id": "b951915b-64f8-4d8c-93e6-b508f687c142",
+    "name": "Duesseldorf Chemicals GmbH",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "71 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.198341,
+    "longitude": 6.584115,
+    "certifications": [
+      "RoHS",
+      "ISO 45001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "RoHS": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-09-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-05-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-03-28"
+      }
+    },
+    "capacity_value": 7416.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 75,
+    "website": "https://www.example-supplier-e220b9ad.com",
+    "contact_email": "procurement@example-80e84329.com",
+    "is_active": true
+  },
+  {
+    "id": "ccf09f30-333d-4a93-b8e3-0e279214b232",
+    "name": "Vienna Chemicals AG",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "147 Industriestraße, Vienna, Austria",
+    "latitude": 48.124483,
+    "longitude": 16.401863,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-07-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-12-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-07-28"
+      }
+    },
+    "capacity_value": 2592.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 70,
+    "website": "https://www.example-supplier-91c0b0be.com",
+    "contact_email": "procurement@example-11846ed2.com",
+    "is_active": true
+  },
+  {
+    "id": "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+    "name": "Hamburg Chemicals GmbH",
+    "description": "Producer of specialty chemicals, solvents, and reagents for industrial and laboratory applications. Full REACH compliance and SDS documentation provided for all products.",
+    "category": "chemicals",
+    "country": "Germany",
+    "city": "Hamburg",
+    "address": "135 Industriestraße, Hamburg, Germany",
+    "latitude": 53.349071,
+    "longitude": 10.245242,
+    "certifications": [
+      "ISO 9001",
+      "REACH"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-12-28"
+      },
+      "REACH": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-11-28"
+      }
+    },
+    "capacity_value": 2629.0,
+    "capacity_unit": "liters/month",
+    "lead_time_days": 16,
+    "website": "https://www.example-supplier-4f54d245.com",
+    "contact_email": "procurement@example-732d1dc6.com",
+    "is_active": true
+  },
+  {
+    "id": "683f010d-7074-425d-9e4a-82a5eeac36be",
+    "name": "Vienna Machinery B.V.",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "98 Industriestraße, Vienna, Austria",
+    "latitude": 48.360376,
+    "longitude": 16.246785,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-09-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-04-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-12-28"
+      }
+    },
+    "capacity_value": 16.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 62,
+    "website": "https://www.example-supplier-b08fe87f.com",
+    "contact_email": "procurement@example-5520686b.com",
+    "is_active": true
+  },
+  {
+    "id": "d72bfeaf-030c-4a96-8b84-68c0d6e31dfd",
+    "name": "Berlin Machinery GmbH",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "12 Industriestraße, Berlin, Germany",
+    "latitude": 52.66074,
+    "longitude": 13.515211,
+    "certifications": [
+      "CE"
+    ],
+    "certification_details": {
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-05-28"
+      }
+    },
+    "capacity_value": 50.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 54,
+    "website": "https://www.example-supplier-a8ff1ac6.com",
+    "contact_email": "procurement@example-fe95456e.com",
+    "is_active": true
+  },
+  {
+    "id": "57b1a891-574f-47a7-b72d-f1612368d3d8",
+    "name": "Krakow Machinery AG",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "21 Industriestraße, Krakow, Poland",
+    "latitude": 49.873116,
+    "longitude": 19.961847,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-10-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-10-28"
+      }
+    },
+    "capacity_value": 23.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 36,
+    "website": "https://www.example-supplier-8b1e9362.com",
+    "contact_email": "procurement@example-06acd340.com",
+    "is_active": true
+  },
+  {
+    "id": "f477ad7d-a786-422b-8788-a142831f9a00",
+    "name": "Prague Machinery GmbH",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "114 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.150043,
+    "longitude": 14.415946,
+    "certifications": [
+      "ISO 9001",
+      "CE",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-11-28"
+      },
+      "CE": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-08-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-07-28"
+      }
+    },
+    "capacity_value": 66.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 20,
+    "website": "https://www.example-supplier-8667ee69.com",
+    "contact_email": "procurement@example-258cfe65.com",
+    "is_active": true
+  },
+  {
+    "id": "e32b1919-1652-44ed-9f94-30eafb3704a2",
+    "name": "Duesseldorf Machinery Ltd.",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "71 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.157573,
+    "longitude": 6.699962,
+    "certifications": [
+      "ISO 9001",
+      "CE",
+      "ISO 14001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-10-28"
+      },
+      "CE": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-04-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-04-28"
+      },
+      "AS9100": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-11-28"
+      }
+    },
+    "capacity_value": 97.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 24,
+    "website": "https://www.example-supplier-627c404e.com",
+    "contact_email": "procurement@example-0b417215.com",
+    "is_active": true
+  },
+  {
+    "id": "3dbd0b9e-a251-41ea-b45c-857c7b548925",
+    "name": "Berlin Machinery AG",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "24 Industriestraße, Berlin, Germany",
+    "latitude": 52.738056,
+    "longitude": 13.484103,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-12-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-04-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-09-28"
+      }
+    },
+    "capacity_value": 69.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 41,
+    "website": "https://www.example-supplier-792a8074.com",
+    "contact_email": "procurement@example-8913e29d.com",
+    "is_active": true
+  },
+  {
+    "id": "ef6c83c9-f556-4f0f-87a4-8ea8346bf9df",
+    "name": "Cologne Machinery Ltd.",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Germany",
+    "city": "Cologne",
+    "address": "20 Industriestraße, Cologne, Germany",
+    "latitude": 50.801932,
+    "longitude": 7.125508,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-11-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-02-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-05-28"
+      }
+    },
+    "capacity_value": 73.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 22,
+    "website": "https://www.example-supplier-82830409.com",
+    "contact_email": "procurement@example-e8ff997b.com",
+    "is_active": true
+  },
+  {
+    "id": "be8321a4-22ba-4c10-b92c-96ecc783af5b",
+    "name": "Prague Machinery AG",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "121 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.004465,
+    "longitude": 14.572401,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-10-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-11-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-11-28"
+      }
+    },
+    "capacity_value": 57.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 21,
+    "website": "https://www.example-supplier-1aece8e5.com",
+    "contact_email": "procurement@example-b3e19587.com",
+    "is_active": true
+  },
+  {
+    "id": "a1dc83c6-b0d0-4351-895c-fcad1090d620",
+    "name": "Frankfurt Machinery AG",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Germany",
+    "city": "Frankfurt",
+    "address": "138 Industriestraße, Frankfurt, Germany",
+    "latitude": 49.865142,
+    "longitude": 8.431944,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-08-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-10-28"
+      }
+    },
+    "capacity_value": 100.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 26,
+    "website": "https://www.example-supplier-621bb13a.com",
+    "contact_email": "procurement@example-52a11d33.com",
+    "is_active": true
+  },
+  {
+    "id": "92bb5c8b-88fb-4347-aa71-fb58bc746767",
+    "name": "Krakow Machinery AG",
+    "description": "Manufacturer of industrial automation equipment, conveyor systems, and material handling machinery. CE marked and EU Machinery Directive compliant. Full installation and maintenance services.",
+    "category": "machinery",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "114 Industriestraße, Krakow, Poland",
+    "latitude": 50.148442,
+    "longitude": 20.125375,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-06-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-09-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-07-28"
+      }
+    },
+    "capacity_value": 40.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 31,
+    "website": "https://www.example-supplier-f61a5c21.com",
+    "contact_email": "procurement@example-b121fa53.com",
+    "is_active": true
+  },
+  {
+    "id": "634d2152-4f52-4fac-a036-6aab159d1c8e",
+    "name": "Berlin Packaging GmbH",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "86 Industriestraße, Berlin, Germany",
+    "latitude": 52.762709,
+    "longitude": 13.580238,
+    "certifications": [
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 14001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-10-28"
+      }
+    },
+    "capacity_value": 117586.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 15,
+    "website": "https://www.example-supplier-c348d8bf.com",
+    "contact_email": "procurement@example-ff108652.com",
+    "is_active": true
+  },
+  {
+    "id": "7b3884c1-bda9-422d-be24-6873f0d1e69c",
+    "name": "Lyon Packaging S.A.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "France",
+    "city": "Lyon",
+    "address": "38 Industriestraße, Lyon, France",
+    "latitude": 45.605707,
+    "longitude": 4.68216,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-03-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-04-28"
+      }
+    },
+    "capacity_value": 318728.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 48,
+    "website": "https://www.example-supplier-a2f4a0b2.com",
+    "contact_email": "procurement@example-9f35fd8f.com",
+    "is_active": true
+  },
+  {
+    "id": "05822af5-cd3e-4c92-b26b-9fb4b6de5d06",
+    "name": "Bremen Packaging Ltd.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Germany",
+    "city": "Bremen",
+    "address": "200 Industriestraße, Bremen, Germany",
+    "latitude": 52.903217,
+    "longitude": 8.559754,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001",
+      "RoHS",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-08-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-10-28"
+      },
+      "RoHS": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-08-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-08-28"
+      }
+    },
+    "capacity_value": 454228.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 58,
+    "website": "https://www.example-supplier-2e1c4326.com",
+    "contact_email": "procurement@example-83529811.com",
+    "is_active": true
+  },
+  {
+    "id": "d1ede31e-5cf4-4530-ab7e-fd1c8fd764cd",
+    "name": "Krakow Packaging S.A.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "156 Industriestraße, Krakow, Poland",
+    "latitude": 50.165293,
+    "longitude": 19.93974,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-07-28"
+      }
+    },
+    "capacity_value": 323205.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 74,
+    "website": "https://www.example-supplier-621a49fd.com",
+    "contact_email": "procurement@example-6ba9e4ac.com",
+    "is_active": true
+  },
+  {
+    "id": "5d512ab6-0fe4-4173-9fc3-e78124eb07ca",
+    "name": "Hannover Packaging Ltd.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Germany",
+    "city": "Hannover",
+    "address": "59 Industriestraße, Hannover, Germany",
+    "latitude": 52.350881,
+    "longitude": 9.788987,
+    "certifications": [
+      "ISO 27001",
+      "ISO 22000",
+      "REACH"
+    ],
+    "certification_details": {
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-08-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-12-28"
+      },
+      "REACH": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-07-28"
+      }
+    },
+    "capacity_value": 173852.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 39,
+    "website": "https://www.example-supplier-fa7274d9.com",
+    "contact_email": "procurement@example-00758d0d.com",
+    "is_active": true
+  },
+  {
+    "id": "362a4e57-37b3-40f7-b9d0-5288d40b9bca",
+    "name": "Rotterdam Packaging GmbH",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Netherlands",
+    "city": "Rotterdam",
+    "address": "111 Industriestraße, Rotterdam, Netherlands",
+    "latitude": 52.169585,
+    "longitude": 4.578684,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-03-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-10-28"
+      }
+    },
+    "capacity_value": 304433.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 78,
+    "website": "https://www.example-supplier-60fa8c59.com",
+    "contact_email": "procurement@example-ec9b79f6.com",
+    "is_active": true
+  },
+  {
+    "id": "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+    "name": "Amsterdam Packaging B.V.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Netherlands",
+    "city": "Amsterdam",
+    "address": "80 Industriestraße, Amsterdam, Netherlands",
+    "latitude": 52.459499,
+    "longitude": 4.855888,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-10-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-03-28"
+      },
+      "CE": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-02-28"
+      }
+    },
+    "capacity_value": 193560.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 78,
+    "website": "https://www.example-supplier-429ff703.com",
+    "contact_email": "procurement@example-3b7a904b.com",
+    "is_active": true
+  },
+  {
+    "id": "1541359a-bcd9-4a21-8883-fa9b1708a442",
+    "name": "Rotterdam Packaging B.V.",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Netherlands",
+    "city": "Rotterdam",
+    "address": "169 Industriestraße, Rotterdam, Netherlands",
+    "latitude": 51.71623,
+    "longitude": 4.358007,
+    "certifications": [
+      "RoHS",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "RoHS": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-06-28"
+      }
+    },
+    "capacity_value": 194037.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 7,
+    "website": "https://www.example-supplier-141cadba.com",
+    "contact_email": "procurement@example-b37fa5cb.com",
+    "is_active": true
+  },
+  {
+    "id": "cdba8421-08ff-4c9b-861d-1c53173c9027",
+    "name": "Cologne Packaging GmbH",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Germany",
+    "city": "Cologne",
+    "address": "192 Industriestraße, Cologne, Germany",
+    "latitude": 51.133226,
+    "longitude": 6.985849,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-07-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-06-28"
+      }
+    },
+    "capacity_value": 92527.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 54,
+    "website": "https://www.example-supplier-0384180f.com",
+    "contact_email": "procurement@example-70d5ef75.com",
+    "is_active": true
+  },
+  {
+    "id": "d9adce9e-a8f4-448f-bd14-f89ed7480b93",
+    "name": "Hannover Packaging AG",
+    "description": "Manufacturer of cardboard, corrugated, and sustainable packaging for industrial and consumer goods. Custom design services available with FSC certified paper sourcing.",
+    "category": "packaging",
+    "country": "Germany",
+    "city": "Hannover",
+    "address": "41 Industriestraße, Hannover, Germany",
+    "latitude": 52.495682,
+    "longitude": 9.881641,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-11-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-08-28"
+      }
+    },
+    "capacity_value": 357046.0,
+    "capacity_unit": "units/month",
+    "lead_time_days": 61,
+    "website": "https://www.example-supplier-4ab19bc2.com",
+    "contact_email": "procurement@example-e0cf4c4a.com",
+    "is_active": true
+  },
+  {
+    "id": "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3",
+    "name": "Vienna Food Ingredients GmbH",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Austria",
+    "city": "Vienna",
+    "address": "73 Industriestraße, Vienna, Austria",
+    "latitude": 48.266079,
+    "longitude": 16.327413,
+    "certifications": [
+      "ISO 27001",
+      "IATF 16949",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 27001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-09-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-04-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-01-28"
+      }
+    },
+    "capacity_value": 7198.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 45,
+    "website": "https://www.example-supplier-f1f3ddae.com",
+    "contact_email": "procurement@example-e5dd8cb1.com",
+    "is_active": true
+  },
+  {
+    "id": "6d4a5922-cc85-48ee-b9f4-4b407be0044e",
+    "name": "Stuttgart Food Ingredients Ltd.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "192 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.920313,
+    "longitude": 9.32569,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-03-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-09-28"
+      }
+    },
+    "capacity_value": 18808.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 52,
+    "website": "https://www.example-supplier-246ec362.com",
+    "contact_email": "procurement@example-6fcb6752.com",
+    "is_active": true
+  },
+  {
+    "id": "f8bf516d-7639-49bc-baf3-668b470ca97d",
+    "name": "Munich Food Ingredients B.V.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Germany",
+    "city": "Munich",
+    "address": "110 Industriestraße, Munich, Germany",
+    "latitude": 48.079463,
+    "longitude": 11.712833,
+    "certifications": [
+      "ISO 9001",
+      "ISO 27001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-12-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-02-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-06-28"
+      }
+    },
+    "capacity_value": 6131.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 86,
+    "website": "https://www.example-supplier-756a16d4.com",
+    "contact_email": "procurement@example-ac048b8c.com",
+    "is_active": true
+  },
+  {
+    "id": "65110852-08e4-464c-a613-29ad4cad8a1d",
+    "name": "Prague Food Ingredients Ltd.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "151 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.254973,
+    "longitude": 14.664703,
+    "certifications": [
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 22000": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-07-28"
+      }
+    },
+    "capacity_value": 10667.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 50,
+    "website": "https://www.example-supplier-694b0ec8.com",
+    "contact_email": "procurement@example-22e3f417.com",
+    "is_active": true
+  },
+  {
+    "id": "89d0ea9c-c1ce-4313-aafd-737921119fca",
+    "name": "Duesseldorf Food Ingredients B.V.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "50 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.131467,
+    "longitude": 6.596812,
+    "certifications": [
+      "ISO 9001",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-12-28"
+      },
+      "RoHS": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-02-28"
+      }
+    },
+    "capacity_value": 5298.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 39,
+    "website": "https://www.example-supplier-dce0aa26.com",
+    "contact_email": "procurement@example-17725f8b.com",
+    "is_active": true
+  },
+  {
+    "id": "4930025c-c05a-4677-a863-14b2decf71e1",
+    "name": "Stuttgart Food Ingredients Ltd.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "119 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.599313,
+    "longitude": 8.995262,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-11-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-11-28"
+      }
+    },
+    "capacity_value": 10859.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 26,
+    "website": "https://www.example-supplier-baff81a0.com",
+    "contact_email": "procurement@example-56cc0d80.com",
+    "is_active": true
+  },
+  {
+    "id": "adc56d71-779c-40b4-9049-e9421b5ada25",
+    "name": "Prague Food Ingredients B.V.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "19 Industriestraße, Prague, Czech Republic",
+    "latitude": 49.842141,
+    "longitude": 14.406561,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-08-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-06-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-11-28"
+      }
+    },
+    "capacity_value": 3458.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 85,
+    "website": "https://www.example-supplier-18cb9058.com",
+    "contact_email": "procurement@example-b1a0aca4.com",
+    "is_active": true
+  },
+  {
+    "id": "41e5860a-fa54-46e3-977a-bf2cfdbd97c0",
+    "name": "Stockholm Food Ingredients B.V.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Sweden",
+    "city": "Stockholm",
+    "address": "167 Industriestraße, Stockholm, Sweden",
+    "latitude": 59.33312,
+    "longitude": 18.048444,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001",
+      "REACH",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-10-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-01-28"
+      },
+      "REACH": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-06-28"
+      },
+      "AS9100": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-01-28"
+      }
+    },
+    "capacity_value": 8618.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 63,
+    "website": "https://www.example-supplier-3c3a9e78.com",
+    "contact_email": "procurement@example-4c791d89.com",
+    "is_active": true
+  },
+  {
+    "id": "1dd58d6b-7752-4560-9810-c968ff756a24",
+    "name": "Prague Food Ingredients S.A.",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "174 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.08851,
+    "longitude": 14.497154,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-11-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-06-28"
+      },
+      "RoHS": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-05-28"
+      }
+    },
+    "capacity_value": 8757.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 84,
+    "website": "https://www.example-supplier-e705e7ab.com",
+    "contact_email": "procurement@example-d3b7fb0c.com",
+    "is_active": true
+  },
+  {
+    "id": "18300dba-b4e6-495b-80d1-0b4c79e1370c",
+    "name": "Frankfurt Food Ingredients AG",
+    "description": "Supplier of food-grade ingredients including flavor enhancers, stabilizers, and preservatives. HACCP certified and fully compliant with EU food law regulations.",
+    "category": "food_ingredients",
+    "country": "Germany",
+    "city": "Frankfurt",
+    "address": "153 Industriestraße, Frankfurt, Germany",
+    "latitude": 50.020825,
+    "longitude": 8.726824,
+    "certifications": [
+      "CE",
+      "AS9100"
+    ],
+    "certification_details": {
+      "CE": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-09-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-03-28"
+      }
+    },
+    "capacity_value": 17748.0,
+    "capacity_unit": "kg/month",
+    "lead_time_days": 18,
+    "website": "https://www.example-supplier-a4a7ef39.com",
+    "contact_email": "procurement@example-743b7955.com",
+    "is_active": true
+  },
+  {
+    "id": "89fd4b4f-1884-4487-8fad-6d4dcfbc51e1",
+    "name": "Krakow Software Services Ltd.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "50 Industriestraße, Krakow, Poland",
+    "latitude": 50.069288,
+    "longitude": 19.684584,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-03-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-02-28"
+      }
+    },
+    "capacity_value": 33.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 76,
+    "website": "https://www.example-supplier-14b077cd.com",
+    "contact_email": "procurement@example-5f5e3ee9.com",
+    "is_active": true
+  },
+  {
+    "id": "37df563e-5aaa-47d7-885c-c5140b611bc8",
+    "name": "Paris Software Services AG",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "France",
+    "city": "Paris",
+    "address": "42 Industriestraße, Paris, France",
+    "latitude": 48.606734,
+    "longitude": 2.263965,
+    "certifications": [
+      "ISO 9001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-12-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-07-28"
+      }
+    },
+    "capacity_value": 24.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 37,
+    "website": "https://www.example-supplier-fa2d7ab1.com",
+    "contact_email": "procurement@example-62e4282b.com",
+    "is_active": true
+  },
+  {
+    "id": "5c63b9cb-b9f6-497e-b410-5d01159f004b",
+    "name": "Prague Software Services AG",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Czech Republic",
+    "city": "Prague",
+    "address": "80 Industriestraße, Prague, Czech Republic",
+    "latitude": 50.135281,
+    "longitude": 14.574228,
+    "certifications": [
+      "ISO 9001",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-06-28"
+      },
+      "RoHS": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-08-28"
+      }
+    },
+    "capacity_value": 50.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 43,
+    "website": "https://www.example-supplier-04b8066a.com",
+    "contact_email": "procurement@example-82465279.com",
+    "is_active": true
+  },
+  {
+    "id": "d67f83c7-0a34-4248-a5dd-873e4c81051e",
+    "name": "Warsaw Software Services S.A.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Poland",
+    "city": "Warsaw",
+    "address": "14 Industriestraße, Warsaw, Poland",
+    "latitude": 52.231271,
+    "longitude": 20.968233,
+    "certifications": [
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 45001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-09-28"
+      }
+    },
+    "capacity_value": 7.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 73,
+    "website": "https://www.example-supplier-81eb2fbb.com",
+    "contact_email": "procurement@example-5df7b893.com",
+    "is_active": true
+  },
+  {
+    "id": "7b0fb172-c804-4515-9065-44068ab5f43c",
+    "name": "Berlin Software Services AG",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "116 Industriestraße, Berlin, Germany",
+    "latitude": 52.403818,
+    "longitude": 13.547225,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "AS9100",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-07-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-09-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-07-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-04-28"
+      }
+    },
+    "capacity_value": 2.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 47,
+    "website": "https://www.example-supplier-0b191f8c.com",
+    "contact_email": "procurement@example-719a02a7.com",
+    "is_active": true
+  },
+  {
+    "id": "dd59e57d-0ec7-43b3-8b36-42baa6402357",
+    "name": "Berlin Software Services S.A.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "121 Industriestraße, Berlin, Germany",
+    "latitude": 52.703339,
+    "longitude": 13.48606,
+    "certifications": [
+      "ISO 9001",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-08-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-02-28"
+      }
+    },
+    "capacity_value": 2.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 39,
+    "website": "https://www.example-supplier-d3412189.com",
+    "contact_email": "procurement@example-5a6d9477.com",
+    "is_active": true
+  },
+  {
+    "id": "463b41fd-f240-48e7-8705-533ece222521",
+    "name": "Stuttgart Software Services S.A.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "61 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.956861,
+    "longitude": 9.209281,
+    "certifications": [
+      "ISO 9001",
+      "AS9100",
+      "ISO 27001",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-01-28"
+      },
+      "AS9100": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-11-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-02-28"
+      },
+      "RoHS": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2029-10-28"
+      }
+    },
+    "capacity_value": 35.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 9,
+    "website": "https://www.example-supplier-3eb6b280.com",
+    "contact_email": "procurement@example-2b05028e.com",
+    "is_active": true
+  },
+  {
+    "id": "5a25bda3-d90f-4bc0-8182-9bc1c73ad6fd",
+    "name": "Paris Software Services AG",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "France",
+    "city": "Paris",
+    "address": "147 Industriestraße, Paris, France",
+    "latitude": 48.897166,
+    "longitude": 2.470332,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-11-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-02-28"
+      }
+    },
+    "capacity_value": 34.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 76,
+    "website": "https://www.example-supplier-a964263b.com",
+    "contact_email": "procurement@example-6373ad67.com",
+    "is_active": true
+  },
+  {
+    "id": "aa05054c-ce34-4b0a-a554-6719f7ee9d6f",
+    "name": "Paris Software Services S.A.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "France",
+    "city": "Paris",
+    "address": "65 Industriestraße, Paris, France",
+    "latitude": 49.011417,
+    "longitude": 2.35632,
+    "certifications": [
+      "ISO 14001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-02-28"
+      },
+      "AS9100": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-12-28"
+      }
+    },
+    "capacity_value": 43.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 87,
+    "website": "https://www.example-supplier-88f808c7.com",
+    "contact_email": "procurement@example-259be409.com",
+    "is_active": true
+  },
+  {
+    "id": "1402f74a-4e32-4737-ae56-1f09942157dd",
+    "name": "Berlin Software Services B.V.",
+    "description": "Provider of enterprise software development, ERP integration, and digital transformation services. ISO 27001 certified information security management with 99.9% SLA.",
+    "category": "software_services",
+    "country": "Germany",
+    "city": "Berlin",
+    "address": "87 Industriestraße, Berlin, Germany",
+    "latitude": 52.666757,
+    "longitude": 13.532128,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-12-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2027-03-28"
+      }
+    },
+    "capacity_value": 5.0,
+    "capacity_unit": "projects/month",
+    "lead_time_days": 65,
+    "website": "https://www.example-supplier-b7b0ff1f.com",
+    "contact_email": "procurement@example-8c73e3ae.com",
+    "is_active": true
+  },
+  {
+    "id": "dedd49e0-8a2d-4ed7-bbeb-1a9c3c23d6b7",
+    "name": "Hamburg Construction Materials S.A.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Hamburg",
+    "address": "132 Industriestraße, Hamburg, Germany",
+    "latitude": 53.439447,
+    "longitude": 9.747109,
+    "certifications": [
+      "IATF 16949"
+    ],
+    "certification_details": {
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-05-28"
+      }
+    },
+    "capacity_value": 399.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 89,
+    "website": "https://www.example-supplier-c424c9f8.com",
+    "contact_email": "procurement@example-081849b6.com",
+    "is_active": true
+  },
+  {
+    "id": "99fc65a4-fb6f-48e8-a337-34098fda6bb1",
+    "name": "Stuttgart Construction Materials S.A.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "112 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.660184,
+    "longitude": 9.378651,
+    "certifications": [
+      "IATF 16949",
+      "CE",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-07-28"
+      },
+      "CE": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2027-08-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-09-28"
+      }
+    },
+    "capacity_value": 2284.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 17,
+    "website": "https://www.example-supplier-90795f3e.com",
+    "contact_email": "procurement@example-8295f07e.com",
+    "is_active": true
+  },
+  {
+    "id": "ffae009d-40d2-4754-8629-8f32c4acaa88",
+    "name": "Krakow Construction Materials GmbH",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Poland",
+    "city": "Krakow",
+    "address": "84 Industriestraße, Krakow, Poland",
+    "latitude": 49.837093,
+    "longitude": 20.00038,
+    "certifications": [
+      "ISO 9001",
+      "CE",
+      "IATF 16949",
+      "ISO 14001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-08-28"
+      },
+      "CE": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2029-03-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-08-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-10-28"
+      }
+    },
+    "capacity_value": 3663.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 42,
+    "website": "https://www.example-supplier-1bf4482b.com",
+    "contact_email": "procurement@example-5285fe64.com",
+    "is_active": true
+  },
+  {
+    "id": "fc24e6ef-2c7b-4df4-bc0e-d00481e69d61",
+    "name": "Hamburg Construction Materials B.V.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Hamburg",
+    "address": "174 Industriestraße, Hamburg, Germany",
+    "latitude": 53.321393,
+    "longitude": 10.068031,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "ISO 14001",
+      "ISO 27001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-03-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-11-28"
+      },
+      "ISO 14001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2028-07-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-10-28"
+      }
+    },
+    "capacity_value": 1356.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 64,
+    "website": "https://www.example-supplier-36dbdc39.com",
+    "contact_email": "procurement@example-141ea7ac.com",
+    "is_active": true
+  },
+  {
+    "id": "2545520d-dd35-4305-a82c-51a6459ee499",
+    "name": "Rotterdam Construction Materials S.A.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Netherlands",
+    "city": "Rotterdam",
+    "address": "64 Industriestraße, Rotterdam, Netherlands",
+    "latitude": 51.855218,
+    "longitude": 4.619908,
+    "certifications": [
+      "ISO 9001",
+      "IATF 16949",
+      "AS9100",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-12-28"
+      },
+      "IATF 16949": {
+        "issuing_body": "SGS",
+        "valid_until": "2029-09-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2026-05-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-04-28"
+      }
+    },
+    "capacity_value": 2439.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 69,
+    "website": "https://www.example-supplier-005eab7e.com",
+    "contact_email": "procurement@example-19556985.com",
+    "is_active": true
+  },
+  {
+    "id": "7700e0d2-cd3d-45e5-8633-3b8c118f2c3f",
+    "name": "Stuttgart Construction Materials S.A.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Stuttgart",
+    "address": "171 Industriestraße, Stuttgart, Germany",
+    "latitude": 48.57182,
+    "longitude": 9.373617,
+    "certifications": [
+      "ISO 9001",
+      "REACH",
+      "ISO 27001",
+      "AS9100"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-09-28"
+      },
+      "REACH": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-05-28"
+      },
+      "ISO 27001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-06-28"
+      },
+      "AS9100": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-02-28"
+      }
+    },
+    "capacity_value": 1746.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 24,
+    "website": "https://www.example-supplier-6f0d4d71.com",
+    "contact_email": "procurement@example-7f2d206c.com",
+    "is_active": true
+  },
+  {
+    "id": "ffb743db-d034-4b17-85c4-59648f022843",
+    "name": "Duesseldorf Construction Materials B.V.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Düsseldorf",
+    "address": "23 Industriestraße, Düsseldorf, Germany",
+    "latitude": 51.378658,
+    "longitude": 6.520137,
+    "certifications": [
+      "ISO 9001",
+      "REACH",
+      "ISO 45001"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2028-07-28"
+      },
+      "REACH": {
+        "issuing_body": "DNV",
+        "valid_until": "2029-07-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2026-03-28"
+      }
+    },
+    "capacity_value": 2697.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 89,
+    "website": "https://www.example-supplier-629bd8ba.com",
+    "contact_email": "procurement@example-1a318ed7.com",
+    "is_active": true
+  },
+  {
+    "id": "cee0f212-fb28-44b3-a974-e9162bc2caa7",
+    "name": "Munich Construction Materials B.V.",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Munich",
+    "address": "15 Industriestraße, Munich, Germany",
+    "latitude": 48.108059,
+    "longitude": 11.679356,
+    "certifications": [
+      "ISO 9001",
+      "ISO 45001",
+      "RoHS",
+      "ISO 22000"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2027-05-28"
+      },
+      "ISO 45001": {
+        "issuing_body": "SGS",
+        "valid_until": "2027-06-28"
+      },
+      "RoHS": {
+        "issuing_body": "SGS",
+        "valid_until": "2028-09-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2026-05-28"
+      }
+    },
+    "capacity_value": 1708.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 88,
+    "website": "https://www.example-supplier-9538021d.com",
+    "contact_email": "procurement@example-3865fa3f.com",
+    "is_active": true
+  },
+  {
+    "id": "a9190241-095f-4308-bbbd-fdfe53daa1e7",
+    "name": "Lyon Construction Materials AG",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "France",
+    "city": "Lyon",
+    "address": "152 Industriestraße, Lyon, France",
+    "latitude": 45.642082,
+    "longitude": 4.90328,
+    "certifications": [
+      "ISO 9001",
+      "RoHS"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2027-03-28"
+      },
+      "RoHS": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-10-28"
+      }
+    },
+    "capacity_value": 437.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 10,
+    "website": "https://www.example-supplier-3c3ea9ea.com",
+    "contact_email": "procurement@example-20699439.com",
+    "is_active": true
+  },
+  {
+    "id": "51b10a2a-e16e-4bac-a1f4-d996f2ec78e4",
+    "name": "Munich Construction Materials GmbH",
+    "description": "Producer of structural concrete elements, precast components, and thermal insulation materials. CE marked products compliant with EU Construction Products Regulation.",
+    "category": "construction_materials",
+    "country": "Germany",
+    "city": "Munich",
+    "address": "128 Industriestraße, Munich, Germany",
+    "latitude": 47.889404,
+    "longitude": 11.658461,
+    "certifications": [
+      "ISO 9001",
+      "ISO 22000",
+      "AS9100",
+      "CE"
+    ],
+    "certification_details": {
+      "ISO 9001": {
+        "issuing_body": "Lloyd's Register",
+        "valid_until": "2028-11-28"
+      },
+      "ISO 22000": {
+        "issuing_body": "Bureau Veritas",
+        "valid_until": "2029-04-28"
+      },
+      "AS9100": {
+        "issuing_body": "DNV",
+        "valid_until": "2028-08-28"
+      },
+      "CE": {
+        "issuing_body": "TÜV Rheinland",
+        "valid_until": "2026-03-28"
+      }
+    },
+    "capacity_value": 3701.0,
+    "capacity_unit": "tons/month",
+    "lead_time_days": 60,
+    "website": "https://www.example-supplier-35b07f0e.com",
+    "contact_email": "procurement@example-5b43c803.com",
+    "is_active": true
+  }
+]
