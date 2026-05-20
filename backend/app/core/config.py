@@ -36,13 +36,13 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────
     DATABASE_URL: str = (
-        "postgresql+asyncpg://suppliermind:suppliermind_dev@localhost:5432/suppliermind"
+        "postgresql+asyncpg://suppliermind:suppliermind_dev@localhost:5433/suppliermind"
     )
     POSTGRES_USER: str = "suppliermind"
     POSTGRES_PASSWORD: str = "suppliermind_dev"
     POSTGRES_DB: str = "suppliermind"
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
+    POSTGRES_PORT: int = 5433
 
     # ── LLM ──────────────────────────────────────────────────────────
     LLM_PROVIDER: Literal["groq", "anthropic", "openai"] = "groq"

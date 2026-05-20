@@ -4,6 +4,7 @@ app/main.py — FastAPI application factory.
 This file creates the app. Uvicorn imports it to start the server:
     uvicorn app.main:app --reload
 """
+import logging
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -24,16 +25,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     In Phase 1 we'll add database/vector DB initialization here.
     """
     # STARTUP
-    print(f"\n🚀 {settings.APP_NAME} v{settings.APP_VERSION}")
-    print(f"   Environment : {settings.APP_ENV}")
-    print(f"   Vector DB   : {settings.effective_vector_db}")
-    print(f"   Lite Mode   : {settings.LITE_MODE}")
-    print(f"   API Docs    : http://localhost:8000/docs\n")
+    logger = logging.getLogger(__name__)
+    logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} starting...")
+    logger.info(f"  Environment : {settings.APP_ENV}")
+    logger.info(f"  Vector DB   : {settings.effective_vector_db}")
+    logger.info(f"  Lite Mode   : {settings.LITE_MODE}")
+    logger.info(f"  API Docs    : http://localhost:8000/docs")
 
     yield  # Server handles requests here
 
     # SHUTDOWN
-    print(f"\n🛑 {settings.APP_NAME} shutting down")
+    logger.info(f"{settings.APP_NAME} shutting down")
 
 
 def create_app() -> FastAPI:
