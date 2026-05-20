@@ -1,0 +1,49 @@
+# ============================================================
+# SupplierMind Backend Dependencies
+# Install: pip install -r requirements.txt
+# ============================================================
+
+# Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+
+# Data Validation
+pydantic==2.7.1
+pydantic-settings==2.3.0
+
+# Database
+sqlalchemy==2.0.30
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Agent Framework
+langgraph==0.2.4
+langchain-core==0.2.27
+
+# LLM
+groq==0.9.0
+
+# Embeddings
+voyageai==0.2.3
+
+# Vector Database
+pymilvus==3.0.0
+chromadb==0.5.3
+
+# Cache
+redis==5.0.6
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+authlib==1.3.1
+httpx==0.27.0
+
+# Geocoding
+geopy==2.4.1
+
+# Utilities
+python-dotenv==1.0.1
+orjson==3.10.15
+aiohttp==3.9.5
