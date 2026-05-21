@@ -1,11 +1,14 @@
 """
-app/main.py — FastAPI application factory.
+app/main.py — FastAPI application factory. (Phase 1 update)
 
-This file creates the app. Uvicorn imports it to start the server:
-    uvicorn app.main:app --reload
+Changes from Phase 0:
+- Added vector store initialization at startup
+- Added Redis cache initialization
+- Added auth router
+- Replaced print() with proper logging (fixes Windows cp1252 encoding)
 """
-import logging
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -13,51 +16,65 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.v1 import health
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """
-    Code before yield: runs at server startup
-    Code after yield: runs at server shutdown
+    """Initialize all services at startup, clean up at shutdown."""
 
-    In Phase 1 we'll add database/vector DB initialization here.
-    """
-    # STARTUP
-    logger = logging.getLogger(__name__)
-    logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} starting...")
-    logger.info(f"  Environment : {settings.APP_ENV}")
-    logger.info(f"  Vector DB   : {settings.effective_vector_db}")
-    logger.info(f"  Lite Mode   : {settings.LITE_MODE}")
-    logger.info(f"  API Docs    : http://localhost:8000/docs")
+    # ── STARTUP ──────────────────────────────────────────────────────
+    logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
+    logger.info("Environment : %s", settings.APP_ENV)
+    logger.info("Vector DB   : %s", settings.effective_vector_db)
+    logger.info("Lite Mode   : %s", settings.LITE_MODE)
 
-    yield  # Server handles requests here
+    # Initialize cache
+    from app.core.cache import InMemoryCache, RedisCache, set_cache_instance
+    if settings.LITE_MODE:
+        set_cache_instance(InMemoryCache())
+    else:
+        try:
+            import redis.asyncio as aioredis
+            redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
+            await redis_client.ping()
+            set_cache_instance(RedisCache(redis_client))
+            logger.info("Redis cache connected")
+        except Exception as e:
+            logger.warning("Redis unavailable (%s), using in-memory cache", e)
+            set_cache_instance(InMemoryCache())
 
-    # SHUTDOWN
-    logger.info(f"{settings.APP_NAME} shutting down")
+    # Initialize vector store
+    from app.core.vector_store import create_vector_store, set_vector_store_instance
+    try:
+        vector_store = create_vector_store()
+        set_vector_store_instance(vector_store)
+        logger.info("Vector store initialized: %d suppliers indexed", vector_store.count())
+    except Exception as e:
+        logger.warning("Vector store unavailable at startup: %s", e)
+        logger.warning("Run ingestion after starting: python scripts/ingest_suppliers.py")
+
+    logger.info("API docs available at: http://localhost:8000/docs")
+
+    yield  # Server handles requests
+
+    # ── SHUTDOWN ─────────────────────────────────────────────────────
+    logger.info("%s shutting down", settings.APP_NAME)
 
 
 def create_app() -> FastAPI:
-    """
-    Creates and configures the FastAPI application.
-    Called once at startup.
-    """
+    """Creates and configures the FastAPI application."""
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
-        description=(
-            "Multi-Agent LLM-Based Supplier Discovery for Procurement "
-            "Under Multi-Constraint Requirements — Master's Thesis"
-        ),
-        # /docs only in development — exposes full API in production (security risk)
+        description="Multi-Agent LLM-Based Supplier Discovery — Master's Thesis",
         docs_url="/docs" if settings.is_development else None,
         redoc_url="/redoc" if settings.is_development else None,
         openapi_url="/openapi.json" if settings.is_development else None,
         lifespan=lifespan,
     )
 
-    # CORS — allows React frontend to call this API
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.FRONTEND_URL],
@@ -66,18 +83,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Register route groups
-    # prefix="" means health is at /health (not /api/v1/health)
-    # Infrastructure tools (K8s, Docker) need a stable health URL
-    app.include_router(health.router, tags=["Health"])
+    # Register routers
+    from app.api.v1 import health
+    from app.api.v1 import auth
 
-    # More routers added in Phase 1 and 2:
-    # app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-    # app.include_router(queries.router, prefix="/api/v1/queries", tags=["Queries"])
-    # app.include_router(suppliers.router, prefix="/api/v1/suppliers", tags=["Suppliers"])
+    app.include_router(health.router, tags=["Health"])
+    app.include_router(
+        auth.router,
+        prefix="/api/v1/auth",
+        tags=["Authentication"],
+    )
 
     return app
 
 
-# Create the app instance — uvicorn imports this
 app = create_app()
