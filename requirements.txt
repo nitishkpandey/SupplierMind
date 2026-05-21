@@ -1,16 +1,18 @@
 # ============================================================
-# SupplierMind Backend Dependencies
-# Install: pip install -r requirements.txt
+# SupplierMind Backend Dependencies v1.1
+# Phase 1 additions: email-validator, starlette session support
 # ============================================================
 
 # Web Framework
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
+starlette==0.37.2
 
 # Data Validation
 pydantic==2.7.1
 pydantic-settings==2.3.0
+email-validator==2.1.1
 
 # Database
 sqlalchemy==2.0.30
@@ -28,7 +30,7 @@ groq==0.9.0
 voyageai==0.2.3
 
 # Vector Database
-pymilvus==3.0.0
+pymilvus==2.4.9
 chromadb==0.5.3
 
 # Cache
@@ -39,11 +41,13 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 authlib==1.3.1
 httpx==0.27.0
+itsdangerous==2.2.0
 
 # Geocoding
 geopy==2.4.1
 
 # Utilities
 python-dotenv==1.0.1
-orjson==3.10.15
+orjson==3.10.3
 aiohttp==3.9.5
+tenacity==8.3.0
