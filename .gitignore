@@ -2,6 +2,9 @@
 # SUPPLIERMIND .gitignore
 # ============================================================
 
+# --- THESIS DOCUMENTS (local only) ---
+Documents/
+
 # --- SECRETS (NEVER commit these) ---
 .env
 .env.local

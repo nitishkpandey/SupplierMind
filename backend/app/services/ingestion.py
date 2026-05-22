@@ -16,7 +16,7 @@ They must stay in sync:
 - When a supplier is updated → update PostgreSQL, re-embed, update Milvus
 - When a supplier is deleted → soft-delete in PostgreSQL, delete from Milvus
 """
-
+import time
 import json
 import logging
 import uuid
@@ -143,6 +143,9 @@ async def ingest_suppliers_from_json(
             logger.error("Milvus indexing failed for batch: %s", e)
             # Still count as inserted (PostgreSQL worked, Milvus can be re-indexed)
             stats["inserted"] += len(inserted_suppliers)
+
+        # Wait 20 seconds between batches (3 RPM = 1 req per 20s)
+        time.sleep(20)
 
     await db.commit()
     logger.info(
