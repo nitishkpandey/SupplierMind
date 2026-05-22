@@ -88,10 +88,11 @@ class SupplierRepository(BaseRepository[Supplier]):
             conditions.append(Supplier.country == country)
 
         if required_certifications:
-            # Check each certification with JSON contains operator
+            from sqlalchemy import cast, String
+            # Check each certification by casting JSON to text for the LIKE operator
             for cert in required_certifications:
                 conditions.append(
-                    Supplier.certifications.contains([cert])  # type: ignore[arg-type]
+                    cast(Supplier.certifications, String).contains(cert)
                 )
 
         if min_capacity and capacity_unit:

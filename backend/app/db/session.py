@@ -21,13 +21,13 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import settings
 
+from sqlalchemy.pool import NullPool
+
 # The engine manages the actual database connections
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.is_development,  # Print SQL queries in development
-    pool_pre_ping=True,            # Test connection before using it
-    pool_size=10,                  # Keep 10 connections open
-    max_overflow=20,               # Allow 20 more under heavy load
+    poolclass=NullPool,            # Disable pooling to fix multi-loop agentic DB access
 )
 
 # Factory that creates new session objects
