@@ -62,8 +62,8 @@ class LLMClient:
 
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIStatusError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=2, max=15),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
@@ -105,8 +105,8 @@ class LLMClient:
 
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIStatusError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=2, max=15),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )

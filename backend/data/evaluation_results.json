@@ -1,912 +1,10 @@
 {
-  "run_id": "4068c821-58a1-4320-83aa-e2a6c84a4a29",
-  "timestamp": "2026-05-23T12:24:35.286200+00:00",
-  "query_count": 5,
+  "run_id": "14228a39-762e-40d9-b0c3-48ba72d26698",
+  "timestamp": "2026-05-23T19:15:48.215244+00:00",
+  "query_count": 25,
   "benchmark_file": "D:\\Nitish - Projects\\SupplierMind\\backend\\data\\queries_benchmark.json",
   "per_query_metrics": {
-    "suppliermind": [
-      {
-        "query_id": "7adc9011-e6e4-45ae-a685-0ccafe896c4c",
-        "query_number": 1,
-        "difficulty": "simple",
-        "system_name": "suppliermind",
-        "retrieved_ids": [],
-        "ground_truth_ids": [
-          "5c5c0820-ebd9-4f16-af85-279282909442",
-          "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
-          "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
-          "9f19a23a-f386-4265-9aca-e7b469b23f3d",
-          "fd3498de-43a5-4270-a181-380f826233fa"
-        ],
-        "precision_at_5": 0.0,
-        "reciprocal_rank": 0.0,
-        "constraint_satisfaction_rate": 0.0,
-        "execution_time_ms": 1491,
-        "compliance_data": []
-      },
-      {
-        "query_id": "5cdce424-c0a0-4155-9ff0-dc4ea2b93f4c",
-        "query_number": 2,
-        "difficulty": "simple",
-        "system_name": "suppliermind",
-        "retrieved_ids": [
-          "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
-          "784e8080-5315-4006-a50d-879bb6afdfad",
-          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
-          "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
-          "f648e34a-f875-42e8-b12d-33a4fea8f8b0"
-        ],
-        "ground_truth_ids": [
-          "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
-          "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
-          "784e8080-5315-4006-a50d-879bb6afdfad",
-          "8b444bda-1e28-4c18-bc73-87dba8ff1122",
-          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9"
-        ],
-        "precision_at_5": 0.6,
-        "reciprocal_rank": 0.5,
-        "constraint_satisfaction_rate": 1.0,
-        "execution_time_ms": 12825,
-        "compliance_data": [
-          {
-            "supplier_id": "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "784e8080-5315-4006-a50d-879bb6afdfad",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "8b444bda-1e28-4c18-bc73-87dba8ff1122",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "f648e34a-f875-42e8-b12d-33a4fea8f8b0",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "0cd55def-98ca-4bf8-a9d3-1588a43a68c6",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PARTIAL",
-                "reason": "The supplier holds IATF 16949 certification, which is related to quality management in the automotive industry, but not a direct equivalent to ISO 9001.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "7b497246-8067-4f34-9b8e-dc5d02575bc1",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PARTIAL",
-                "reason": "IATF 16949 is related to ISO 9001 but has additional automotive industry requirements",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "9ac203de-545f-4704-bf79-bee914a4740d",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'electronics' matches required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PARTIAL",
-                "reason": "The supplier holds AS9100 certification, which is related to quality management but specific to the aerospace industry, not equivalent to ISO 9001.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "1402f74a-4e32-4737-ae56-1f09942157dd",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "37df563e-5aaa-47d7-885c-c5140b611bc8",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "463b41fd-f240-48e7-8705-533ece222521",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "5a25bda3-d90f-4bc0-8182-9bc1c73ad6fd",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "5c63b9cb-b9f6-497e-b410-5d01159f004b",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "7b0fb172-c804-4515-9065-44068ab5f43c",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "89fd4b4f-1884-4487-8fad-6d4dcfbc51e1",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "dd59e57d-0ec7-43b3-8b36-42baa6402357",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 9001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "aa05054c-ce34-4b0a-a554-6719f7ee9d6f",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PARTIAL",
-                "reason": "The supplier has ISO 14001 and AS9100 certifications, but no direct equivalent to ISO 9001, which certifies quality management systems.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": true,
-            "pass_rate": 0.0
-          },
-          {
-            "supplier_id": "d67f83c7-0a34-4248-a5dd-873e4c81051e",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'electronics'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 9001",
-                "status": "PARTIAL",
-                "reason": "The supplier has ISO 27001 and ISO 45001 certifications, which are related to quality management but not equivalent to ISO 9001.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": true,
-            "pass_rate": 0.0
-          }
-        ]
-      },
-      {
-        "query_id": "be306e3d-adc3-437f-80a6-314639049c8b",
-        "query_number": 3,
-        "difficulty": "simple",
-        "system_name": "suppliermind",
-        "retrieved_ids": [],
-        "ground_truth_ids": [
-          "439a36c1-54a0-411d-a26a-edce4aecbb04"
-        ],
-        "precision_at_5": 0.0,
-        "reciprocal_rank": 0.0,
-        "constraint_satisfaction_rate": 0.0,
-        "execution_time_ms": 2500,
-        "compliance_data": []
-      },
-      {
-        "query_id": "47eb284a-7377-4afd-a3ad-79ef628614cd",
-        "query_number": 4,
-        "difficulty": "simple",
-        "system_name": "suppliermind",
-        "retrieved_ids": [],
-        "ground_truth_ids": [
-          "1402f74a-4e32-4737-ae56-1f09942157dd",
-          "7b0fb172-c804-4515-9065-44068ab5f43c",
-          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
-          "463b41fd-f240-48e7-8705-533ece222521"
-        ],
-        "precision_at_5": 0.0,
-        "reciprocal_rank": 0.0,
-        "constraint_satisfaction_rate": 0.0,
-        "execution_time_ms": 3569,
-        "compliance_data": []
-      },
-      {
-        "query_id": "93d1649d-c862-49ae-987a-6f8cf9f5253b",
-        "query_number": 5,
-        "difficulty": "simple",
-        "system_name": "suppliermind",
-        "retrieved_ids": [
-          "ad147739-bf60-4304-9b49-02586fb9cbdf",
-          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
-          "a70b691b-40dc-4e83-9603-d94812af925a",
-          "2c48e14c-bff6-41d1-83f1-c5222eababc6",
-          "62d8810d-1ef8-4dbe-8b79-df010abf4e4e"
-        ],
-        "ground_truth_ids": [
-          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
-          "ad147739-bf60-4304-9b49-02586fb9cbdf"
-        ],
-        "precision_at_5": 0.4,
-        "reciprocal_rank": 1.0,
-        "constraint_satisfaction_rate": 0.85,
-        "execution_time_ms": 27829,
-        "compliance_data": [
-          {
-            "supplier_id": "ad147739-bf60-4304-9b49-02586fb9cbdf",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": false,
-            "pass_rate": 1.0
-          },
-          {
-            "supplier_id": "2c48e14c-bff6-41d1-83f1-c5222eababc6",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has REACH certification which is related to environmental protection but not equivalent to ISO 14001",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has OEKO-TEX certified production which is related to environmental standards but not equivalent to ISO 14001 certification.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "62d8810d-1ef8-4dbe-8b79-df010abf4e4e",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no direct equivalent to ISO 14001, but their OEKO-TEX certified production indicates some level of environmental responsibility.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "a70b691b-40dc-4e83-9603-d94812af925a",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no direct equivalent to ISO 14001, but their OEKO-TEX certified production indicates some level of environmental responsibility.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "ad47c787-e8b7-4bd0-9bb4-7cfb280c129d",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no direct equivalent to ISO 14001, but their OEKO-TEX certified production indicates some level of environmental responsibility.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "d2857430-4c7c-435f-a498-94acd47ec8c7",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no ISO 14001 certification but has other certifications and OEKO-TEX certified production, which is related to environmental and safety standards.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "daf3bbc3-d8c8-4e7f-ba4c-f1a2aac28652",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no ISO 14001 certification but has other certifications and OEKO-TEX certified production, which is related to environmental and safety standards.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "e1b6df47-c58b-4925-a88b-41f00ce03654",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "PASS",
-                "reason": "Supplier category 'textiles' matches required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has no ISO 14001 certification but has other certifications like ISO 45001 which is related to environmental and occupational health and safety management",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": true,
-            "has_partial": true,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "92bb5c8b-88fb-4347-aa71-fb58bc746767",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'machinery' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "e32b1919-1652-44ed-9f94-30eafb3704a2",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'machinery' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "7b3884c1-bda9-422d-be24-6873f0d1e69c",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'packaging' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "cdba8421-08ff-4c9b-861d-1c53173c9027",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'packaging' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "99fc65a4-fb6f-48e8-a337-34098fda6bb1",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'construction_materials' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "aa05054c-ce34-4b0a-a554-6719f7ee9d6f",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PASS",
-                "reason": "Supplier holds ISO 14001 certification",
-                "confidence": 1.0
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.5
-          },
-          {
-            "supplier_id": "ef6c83c9-f556-4f0f-87a4-8ea8346bf9df",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'machinery' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "FAIL",
-                "reason": "The supplier does not have ISO 14001 or any directly equivalent environmental management certification.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.0
-          },
-          {
-            "supplier_id": "05822af5-cd3e-4c92-b26b-9fb4b6de5d06",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'packaging' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "PARTIAL",
-                "reason": "The supplier has ISO 9001 and ISO 22000 certifications which are related to quality and environmental management but not equivalent to ISO 14001",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": true,
-            "pass_rate": 0.0
-          },
-          {
-            "supplier_id": "463b41fd-f240-48e7-8705-533ece222521",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'software_services' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "FAIL",
-                "reason": "The supplier does not have ISO 14001 or any directly equivalent environmental management certification.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.0
-          },
-          {
-            "supplier_id": "7700e0d2-cd3d-45e5-8633-3b8c118f2c3f",
-            "compliance_results": [
-              {
-                "constraint_name": "category",
-                "status": "FAIL",
-                "reason": "Supplier category 'construction_materials' does not match required 'textiles'",
-                "confidence": 1.0
-              },
-              {
-                "constraint_name": "ISO 14001",
-                "status": "FAIL",
-                "reason": "The supplier does not have ISO 14001 or any directly equivalent environmental management certification.",
-                "confidence": 0.8
-              }
-            ],
-            "overall_pass": false,
-            "has_partial": false,
-            "pass_rate": 0.0
-          }
-        ]
-      }
-    ],
+    "suppliermind": [],
     "keyword_sql": [
       {
         "query_id": "7adc9011-e6e4-45ae-a685-0ccafe896c4c",
@@ -921,16 +19,16 @@
           "bba34b9e-bfa4-41b1-9692-e1858db65b5b"
         ],
         "ground_truth_ids": [
-          "5c5c0820-ebd9-4f16-af85-279282909442",
-          "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
+          "fd3498de-43a5-4270-a181-380f826233fa",
           "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
+          "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
           "9f19a23a-f386-4265-9aca-e7b469b23f3d",
-          "fd3498de-43a5-4270-a181-380f826233fa"
+          "5c5c0820-ebd9-4f16-af85-279282909442"
         ],
         "precision_at_5": 0.2,
         "reciprocal_rank": 0.2,
         "constraint_satisfaction_rate": 0.2,
-        "execution_time_ms": 181,
+        "execution_time_ms": 88,
         "compliance_data": null
       },
       {
@@ -947,15 +45,15 @@
         ],
         "ground_truth_ids": [
           "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
+          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
           "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
-          "784e8080-5315-4006-a50d-879bb6afdfad",
           "8b444bda-1e28-4c18-bc73-87dba8ff1122",
-          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9"
+          "784e8080-5315-4006-a50d-879bb6afdfad"
         ],
         "precision_at_5": 0.0,
         "reciprocal_rank": 0.0,
         "constraint_satisfaction_rate": 0.5,
-        "execution_time_ms": 110,
+        "execution_time_ms": 77,
         "compliance_data": null
       },
       {
@@ -976,7 +74,7 @@
         "precision_at_5": 0.2,
         "reciprocal_rank": 0.5,
         "constraint_satisfaction_rate": 0.2,
-        "execution_time_ms": 91,
+        "execution_time_ms": 106,
         "compliance_data": null
       },
       {
@@ -992,15 +90,15 @@
           "3dbd0b9e-a251-41ea-b45c-857c7b548925"
         ],
         "ground_truth_ids": [
-          "1402f74a-4e32-4737-ae56-1f09942157dd",
           "7b0fb172-c804-4515-9065-44068ab5f43c",
-          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
-          "463b41fd-f240-48e7-8705-533ece222521"
+          "1402f74a-4e32-4737-ae56-1f09942157dd",
+          "463b41fd-f240-48e7-8705-533ece222521",
+          "dd59e57d-0ec7-43b3-8b36-42baa6402357"
         ],
         "precision_at_5": 0.0,
         "reciprocal_rank": 0.0,
         "constraint_satisfaction_rate": 0.0,
-        "execution_time_ms": 89,
+        "execution_time_ms": 104,
         "compliance_data": null
       },
       {
@@ -1016,13 +114,435 @@
           "634d2152-4f52-4fac-a036-6aab159d1c8e"
         ],
         "ground_truth_ids": [
-          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
-          "ad147739-bf60-4304-9b49-02586fb9cbdf"
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a"
         ],
         "precision_at_5": 0.0,
         "reciprocal_rank": 0.0,
         "constraint_satisfaction_rate": 0.4,
-        "execution_time_ms": 212,
+        "execution_time_ms": 100,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6c5c4034-fe34-4b25-8457-7dfbb44c609f",
+        "query_number": 6,
+        "difficulty": "simple",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [
+          "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "82eda191-bf69-45eb-aedb-a73b797c76a2"
+        ],
+        "precision_at_5": 0.2,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 0.2,
+        "execution_time_ms": 111,
+        "compliance_data": null
+      },
+      {
+        "query_id": "f388fd14-bba6-4c7d-b655-20de71b02534",
+        "query_number": 7,
+        "difficulty": "simple",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
+          "3dbd0b9e-a251-41ea-b45c-857c7b548925",
+          "d72bfeaf-030c-4a96-8b84-68c0d6e31dfd"
+        ],
+        "ground_truth_ids": [
+          "05822af5-cd3e-4c92-b26b-9fb4b6de5d06",
+          "5d512ab6-0fe4-4173-9fc3-e78124eb07ca",
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "cdba8421-08ff-4c9b-861d-1c53173c9027",
+          "d9adce9e-a8f4-448f-bd14-f89ed7480b93"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.2,
+        "execution_time_ms": 99,
+        "compliance_data": null
+      },
+      {
+        "query_id": "47e55aa7-71c5-4cd6-9030-732f3be9f8f0",
+        "query_number": 8,
+        "difficulty": "simple",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "7b0fb172-c804-4515-9065-44068ab5f43c"
+        ],
+        "ground_truth_ids": [
+          "65110852-08e4-464c-a613-29ad4cad8a1d",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 95,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6eec3051-216e-49c2-b9e6-89bffbb8623d",
+        "query_number": 9,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94"
+        ],
+        "ground_truth_ids": [
+          "fd3498de-43a5-4270-a181-380f826233fa",
+          "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
+          "65f4255f-ca23-479c-84cd-0279e17515a3",
+          "9f19a23a-f386-4265-9aca-e7b469b23f3d",
+          "5c5c0820-ebd9-4f16-af85-279282909442"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.5,
+        "execution_time_ms": 95,
+        "compliance_data": null
+      },
+      {
+        "query_id": "9d17696b-8f71-421e-b4b5-43123f951af5",
+        "query_number": 10,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [
+          "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.25,
+        "execution_time_ms": 104,
+        "compliance_data": null
+      },
+      {
+        "query_id": "d8c54fcb-97c8-46a3-8a54-94dc79f0593b",
+        "query_number": 11,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
+          "3dbd0b9e-a251-41ea-b45c-857c7b548925"
+        ],
+        "ground_truth_ids": [
+          "2f0932e3-3a00-4496-bcad-2e7d9d652a8f",
+          "147165d6-e689-48c9-bb2d-b8ce3c542dec"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.4,
+        "execution_time_ms": 107,
+        "compliance_data": null
+      },
+      {
+        "query_id": "cced36c8-ec7c-42dc-92b7-23a785210347",
+        "query_number": 12,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94"
+        ],
+        "ground_truth_ids": [
+          "463b41fd-f240-48e7-8705-533ece222521"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.2,
+        "execution_time_ms": 104,
+        "compliance_data": null
+      },
+      {
+        "query_id": "1b9cd7a0-534f-4df7-8fa3-1ca59829f99c",
+        "query_number": 13,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.3,
+        "execution_time_ms": 84,
+        "compliance_data": null
+      },
+      {
+        "query_id": "96ff9107-24d1-443d-959c-d1c9e4559a57",
+        "query_number": 14,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [
+          "1541359a-bcd9-4a21-8883-fa9b1708a442",
+          "362a4e57-37b3-40f7-b9d0-5288d40b9bca",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385"
+        ],
+        "precision_at_5": 0.2,
+        "reciprocal_rank": 0.3333333333333333,
+        "constraint_satisfaction_rate": 0.4,
+        "execution_time_ms": 94,
+        "compliance_data": null
+      },
+      {
+        "query_id": "538fc5be-f869-4fbd-9e33-dc2ce70f5f62",
+        "query_number": 15,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94"
+        ],
+        "ground_truth_ids": [
+          "e32b1919-1652-44ed-9f94-30eafb3704a2"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.3333333333333333,
+        "execution_time_ms": 126,
+        "compliance_data": null
+      },
+      {
+        "query_id": "d6e82e95-7726-4446-94f1-057e4a038de7",
+        "query_number": 16,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.39999999999999997,
+        "execution_time_ms": 102,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6cfd94b7-93be-48b5-b4c4-467ce7c195da",
+        "query_number": 17,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "bba34b9e-bfa4-41b1-9692-e1858db65b5b"
+        ],
+        "ground_truth_ids": [
+          "65110852-08e4-464c-a613-29ad4cad8a1d",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.19999999999999998,
+        "execution_time_ms": 110,
+        "compliance_data": null
+      },
+      {
+        "query_id": "e23a30ad-f04d-404f-bdf1-c2168a84e1e4",
+        "query_number": 18,
+        "difficulty": "medium",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
+          "3dbd0b9e-a251-41ea-b45c-857c7b548925"
+        ],
+        "ground_truth_ids": [
+          "99fc65a4-fb6f-48e8-a337-34098fda6bb1",
+          "51b10a2a-e16e-4bac-a1f4-d996f2ec78e4"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.3,
+        "execution_time_ms": 106,
+        "compliance_data": null
+      },
+      {
+        "query_id": "1adbf5b5-3a92-4b69-af0e-08a1f6ee6fbd",
+        "query_number": 19,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9",
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "7b0fb172-c804-4515-9065-44068ab5f43c"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.425,
+        "execution_time_ms": 103,
+        "compliance_data": null
+      },
+      {
+        "query_id": "fafab217-48cd-46de-bf61-ddce771450f9",
+        "query_number": 20,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.28,
+        "execution_time_ms": 103,
+        "compliance_data": null
+      },
+      {
+        "query_id": "e35b98bc-bb3a-4fe3-b476-f5c7325df1e3",
+        "query_number": 21,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "3dbd0b9e-a251-41ea-b45c-857c7b548925",
+          "d72bfeaf-030c-4a96-8b84-68c0d6e31dfd",
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "7b0fb172-c804-4515-9065-44068ab5f43c"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.13333333333333333,
+        "execution_time_ms": 116,
+        "compliance_data": null
+      },
+      {
+        "query_id": "ab3717fa-b7d5-4e90-9adb-1e4904aee1fe",
+        "query_number": 22,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.3,
+        "execution_time_ms": 301,
+        "compliance_data": null
+      },
+      {
+        "query_id": "60ffb9a6-bd12-483e-8815-374f5ab88dbc",
+        "query_number": 23,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94",
+          "3dbd0b9e-a251-41ea-b45c-857c7b548925",
+          "d72bfeaf-030c-4a96-8b84-68c0d6e31dfd"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.325,
+        "execution_time_ms": 168,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6961a328-fde5-4214-9638-700131da1fa1",
+        "query_number": 24,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "439a36c1-54a0-411d-a26a-edce4aecbb04",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385",
+          "d2857430-4c7c-435f-a498-94acd47ec8c7",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.475,
+        "execution_time_ms": 120,
+        "compliance_data": null
+      },
+      {
+        "query_id": "18699965-3d4c-4a11-8365-97a2d73725ea",
+        "query_number": 25,
+        "difficulty": "hard",
+        "system_name": "keyword_sql",
+        "retrieved_ids": [
+          "7b0fb172-c804-4515-9065-44068ab5f43c",
+          "1402f74a-4e32-4737-ae56-1f09942157dd",
+          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
+          "89d0ea9c-c1ce-4313-aafd-737921119fca",
+          "18300dba-b4e6-495b-80d1-0b4c79e1370c"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.275,
+        "execution_time_ms": 118,
         "compliance_data": null
       }
     ],
@@ -1040,16 +560,16 @@
           "e95a8d65-c251-4e0b-993e-4ed7dbe8964c"
         ],
         "ground_truth_ids": [
-          "5c5c0820-ebd9-4f16-af85-279282909442",
-          "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
+          "fd3498de-43a5-4270-a181-380f826233fa",
           "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
+          "bba34b9e-bfa4-41b1-9692-e1858db65b5b",
           "9f19a23a-f386-4265-9aca-e7b469b23f3d",
-          "fd3498de-43a5-4270-a181-380f826233fa"
+          "5c5c0820-ebd9-4f16-af85-279282909442"
         ],
         "precision_at_5": 0.8,
         "reciprocal_rank": 0.5,
         "constraint_satisfaction_rate": 1.0,
-        "execution_time_ms": 11,
+        "execution_time_ms": 10,
         "compliance_data": null
       },
       {
@@ -1066,15 +586,15 @@
         ],
         "ground_truth_ids": [
           "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
+          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
           "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
-          "784e8080-5315-4006-a50d-879bb6afdfad",
           "8b444bda-1e28-4c18-bc73-87dba8ff1122",
-          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9"
+          "784e8080-5315-4006-a50d-879bb6afdfad"
         ],
         "precision_at_5": 0.8,
         "reciprocal_rank": 1.0,
         "constraint_satisfaction_rate": 0.9,
-        "execution_time_ms": 11,
+        "execution_time_ms": 14,
         "compliance_data": null
       },
       {
@@ -1091,7 +611,7 @@
         "precision_at_5": 0.2,
         "reciprocal_rank": 1.0,
         "constraint_satisfaction_rate": 1.0,
-        "execution_time_ms": 9,
+        "execution_time_ms": 1,
         "compliance_data": null
       },
       {
@@ -1106,15 +626,15 @@
           "1402f74a-4e32-4737-ae56-1f09942157dd"
         ],
         "ground_truth_ids": [
-          "1402f74a-4e32-4737-ae56-1f09942157dd",
           "7b0fb172-c804-4515-9065-44068ab5f43c",
-          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
-          "463b41fd-f240-48e7-8705-533ece222521"
+          "1402f74a-4e32-4737-ae56-1f09942157dd",
+          "463b41fd-f240-48e7-8705-533ece222521",
+          "dd59e57d-0ec7-43b3-8b36-42baa6402357"
         ],
         "precision_at_5": 0.8,
         "reciprocal_rank": 1.0,
         "constraint_satisfaction_rate": 1.0,
-        "execution_time_ms": 4,
+        "execution_time_ms": 0,
         "compliance_data": null
       },
       {
@@ -1130,61 +650,433 @@
           "2c48e14c-bff6-41d1-83f1-c5222eababc6"
         ],
         "ground_truth_ids": [
-          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
-          "ad147739-bf60-4304-9b49-02586fb9cbdf"
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a"
         ],
         "precision_at_5": 0.2,
         "reciprocal_rank": 0.5,
         "constraint_satisfaction_rate": 0.6,
+        "execution_time_ms": 4,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6c5c4034-fe34-4b25-8457-7dfbb44c609f",
+        "query_number": 6,
+        "difficulty": "simple",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "b12d671f-f694-4387-8eb0-48b0660e3f73",
+          "c2f971fb-efe9-4817-873c-3200c1ca156e",
+          "04e17e78-ab0a-4c0e-a37a-81272633365d"
+        ],
+        "ground_truth_ids": [
+          "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "82eda191-bf69-45eb-aedb-a73b797c76a2"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 0.7,
         "execution_time_ms": 8,
+        "compliance_data": null
+      },
+      {
+        "query_id": "f388fd14-bba6-4c7d-b655-20de71b02534",
+        "query_number": 7,
+        "difficulty": "simple",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "5d512ab6-0fe4-4173-9fc3-e78124eb07ca",
+          "cdba8421-08ff-4c9b-861d-1c53173c9027",
+          "05822af5-cd3e-4c92-b26b-9fb4b6de5d06",
+          "d9adce9e-a8f4-448f-bd14-f89ed7480b93"
+        ],
+        "ground_truth_ids": [
+          "05822af5-cd3e-4c92-b26b-9fb4b6de5d06",
+          "5d512ab6-0fe4-4173-9fc3-e78124eb07ca",
+          "634d2152-4f52-4fac-a036-6aab159d1c8e",
+          "cdba8421-08ff-4c9b-861d-1c53173c9027",
+          "d9adce9e-a8f4-448f-bd14-f89ed7480b93"
+        ],
+        "precision_at_5": 1.0,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 1.0,
+        "execution_time_ms": 5,
+        "compliance_data": null
+      },
+      {
+        "query_id": "47e55aa7-71c5-4cd6-9030-732f3be9f8f0",
+        "query_number": 8,
+        "difficulty": "simple",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "18300dba-b4e6-495b-80d1-0b4c79e1370c",
+          "4930025c-c05a-4677-a863-14b2decf71e1",
+          "89d0ea9c-c1ce-4313-aafd-737921119fca",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3",
+          "65110852-08e4-464c-a613-29ad4cad8a1d"
+        ],
+        "ground_truth_ids": [
+          "65110852-08e4-464c-a613-29ad4cad8a1d",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 0.25,
+        "constraint_satisfaction_rate": 0.7,
+        "execution_time_ms": 7,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6eec3051-216e-49c2-b9e6-89bffbb8623d",
+        "query_number": 9,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "65f4255f-ca23-479c-84cd-0279e17515a3",
+          "5c5c0820-ebd9-4f16-af85-279282909442",
+          "fd3498de-43a5-4270-a181-380f826233fa",
+          "9f19a23a-f386-4265-9aca-e7b469b23f3d",
+          "e95a8d65-c251-4e0b-993e-4ed7dbe8964c"
+        ],
+        "ground_truth_ids": [
+          "fd3498de-43a5-4270-a181-380f826233fa",
+          "e95a8d65-c251-4e0b-993e-4ed7dbe8964c",
+          "65f4255f-ca23-479c-84cd-0279e17515a3",
+          "9f19a23a-f386-4265-9aca-e7b469b23f3d",
+          "5c5c0820-ebd9-4f16-af85-279282909442"
+        ],
+        "precision_at_5": 1.0,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 1.0,
+        "execution_time_ms": 0,
+        "compliance_data": null
+      },
+      {
+        "query_id": "9d17696b-8f71-421e-b4b5-43123f951af5",
+        "query_number": 10,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
+          "0cd55def-98ca-4bf8-a9d3-1588a43a68c6",
+          "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
+          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
+          "11e17e66-3915-4a79-bea3-8e7ba95dbb94"
+        ],
+        "ground_truth_ids": [
+          "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c"
+        ],
+        "precision_at_5": 0.2,
+        "reciprocal_rank": 0.3333333333333333,
+        "constraint_satisfaction_rate": 0.75,
+        "execution_time_ms": 10,
+        "compliance_data": null
+      },
+      {
+        "query_id": "d8c54fcb-97c8-46a3-8a54-94dc79f0593b",
+        "query_number": 11,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "147165d6-e689-48c9-bb2d-b8ce3c542dec",
+          "2f0932e3-3a00-4496-bcad-2e7d9d652a8f"
+        ],
+        "ground_truth_ids": [
+          "2f0932e3-3a00-4496-bcad-2e7d9d652a8f",
+          "147165d6-e689-48c9-bb2d-b8ce3c542dec"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 1.0,
+        "execution_time_ms": 9,
+        "compliance_data": null
+      },
+      {
+        "query_id": "cced36c8-ec7c-42dc-92b7-23a785210347",
+        "query_number": 12,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "463b41fd-f240-48e7-8705-533ece222521",
+          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
+          "7b0fb172-c804-4515-9065-44068ab5f43c",
+          "1402f74a-4e32-4737-ae56-1f09942157dd"
+        ],
+        "ground_truth_ids": [
+          "463b41fd-f240-48e7-8705-533ece222521"
+        ],
+        "precision_at_5": 0.2,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 0.625,
+        "execution_time_ms": 0,
+        "compliance_data": null
+      },
+      {
+        "query_id": "1b9cd7a0-534f-4df7-8fa3-1ca59829f99c",
+        "query_number": 13,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+          "5cab9d8f-5c14-4dce-8e63-b5a3b0d6ed76",
+          "b951915b-64f8-4d8c-93e6-b508f687c142",
+          "67c00429-8e4c-4715-b639-080cd91794ce"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.625,
+        "execution_time_ms": 17,
+        "compliance_data": null
+      },
+      {
+        "query_id": "96ff9107-24d1-443d-959c-d1c9e4559a57",
+        "query_number": 14,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "1541359a-bcd9-4a21-8883-fa9b1708a442",
+          "362a4e57-37b3-40f7-b9d0-5288d40b9bca",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385"
+        ],
+        "ground_truth_ids": [
+          "1541359a-bcd9-4a21-8883-fa9b1708a442",
+          "362a4e57-37b3-40f7-b9d0-5288d40b9bca",
+          "4dc45e0c-bc45-43ff-8534-c3ac0aedc385"
+        ],
+        "precision_at_5": 0.6,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 1.0,
+        "execution_time_ms": 4,
+        "compliance_data": null
+      },
+      {
+        "query_id": "538fc5be-f869-4fbd-9e33-dc2ce70f5f62",
+        "query_number": 15,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "147165d6-e689-48c9-bb2d-b8ce3c542dec",
+          "2f0932e3-3a00-4496-bcad-2e7d9d652a8f"
+        ],
+        "ground_truth_ids": [
+          "e32b1919-1652-44ed-9f94-30eafb3704a2"
+        ],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.16666666666666666,
+        "execution_time_ms": 6,
+        "compliance_data": null
+      },
+      {
+        "query_id": "d6e82e95-7726-4446-94f1-057e4a038de7",
+        "query_number": 16,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
+          "e1b6df47-c58b-4925-a88b-41f00ce03654",
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "daf3bbc3-d8c8-4e7f-ba4c-f1a2aac28652"
+        ],
+        "ground_truth_ids": [
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 0.8333333333333333,
+        "execution_time_ms": 5,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6cfd94b7-93be-48b5-b4c4-467ce7c195da",
+        "query_number": 17,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "18300dba-b4e6-495b-80d1-0b4c79e1370c",
+          "4930025c-c05a-4677-a863-14b2decf71e1",
+          "89d0ea9c-c1ce-4313-aafd-737921119fca",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3",
+          "65110852-08e4-464c-a613-29ad4cad8a1d"
+        ],
+        "ground_truth_ids": [
+          "65110852-08e4-464c-a613-29ad4cad8a1d",
+          "81d8dd89-8ea1-4dbd-9273-f6d82def3ce3"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 0.25,
+        "constraint_satisfaction_rate": 0.7999999999999999,
+        "execution_time_ms": 3,
+        "compliance_data": null
+      },
+      {
+        "query_id": "e23a30ad-f04d-404f-bdf1-c2168a84e1e4",
+        "query_number": 18,
+        "difficulty": "medium",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "99fc65a4-fb6f-48e8-a337-34098fda6bb1",
+          "7700e0d2-cd3d-45e5-8633-3b8c118f2c3f",
+          "51b10a2a-e16e-4bac-a1f4-d996f2ec78e4",
+          "fc24e6ef-2c7b-4df4-bc0e-d00481e69d61",
+          "cee0f212-fb28-44b3-a974-e9162bc2caa7"
+        ],
+        "ground_truth_ids": [
+          "99fc65a4-fb6f-48e8-a337-34098fda6bb1",
+          "51b10a2a-e16e-4bac-a1f4-d996f2ec78e4"
+        ],
+        "precision_at_5": 0.4,
+        "reciprocal_rank": 1.0,
+        "constraint_satisfaction_rate": 0.7999999999999999,
+        "execution_time_ms": 6,
+        "compliance_data": null
+      },
+      {
+        "query_id": "1adbf5b5-3a92-4b69-af0e-08a1f6ee6fbd",
+        "query_number": 19,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 5,
+        "compliance_data": null
+      },
+      {
+        "query_id": "fafab217-48cd-46de-bf61-ddce771450f9",
+        "query_number": 20,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "f1696ae7-2954-45a3-8cf3-0ec927a3a331",
+          "0cd55def-98ca-4bf8-a9d3-1588a43a68c6",
+          "e26fbbf0-a63d-4fa3-a584-1a6d109fb46c",
+          "097e20c2-6b40-432e-b4ce-ee1e1f3316f9",
+          "784e8080-5315-4006-a50d-879bb6afdfad"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.72,
+        "execution_time_ms": 7,
+        "compliance_data": null
+      },
+      {
+        "query_id": "e35b98bc-bb3a-4fe3-b476-f5c7325df1e3",
+        "query_number": 21,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "463b41fd-f240-48e7-8705-533ece222521",
+          "37df563e-5aaa-47d7-885c-c5140b611bc8",
+          "dd59e57d-0ec7-43b3-8b36-42baa6402357",
+          "5c63b9cb-b9f6-497e-b410-5d01159f004b",
+          "7b0fb172-c804-4515-9065-44068ab5f43c"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.4666666666666667,
+        "execution_time_ms": 9,
+        "compliance_data": null
+      },
+      {
+        "query_id": "ab3717fa-b7d5-4e90-9adb-1e4904aee1fe",
+        "query_number": 22,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [
+          "c9faf901-a1c2-4a44-bfec-aca7a8a0f28f",
+          "000e47ad-39e7-4549-ae55-27ec5337fc1a",
+          "b12d671f-f694-4387-8eb0-48b0660e3f73",
+          "c2f971fb-efe9-4817-873c-3200c1ca156e",
+          "04e17e78-ab0a-4c0e-a37a-81272633365d"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.6,
+        "execution_time_ms": 13,
+        "compliance_data": null
+      },
+      {
+        "query_id": "60ffb9a6-bd12-483e-8815-374f5ab88dbc",
+        "query_number": 23,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 5,
+        "compliance_data": null
+      },
+      {
+        "query_id": "6961a328-fde5-4214-9638-700131da1fa1",
+        "query_number": 24,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 4,
+        "compliance_data": null
+      },
+      {
+        "query_id": "18699965-3d4c-4a11-8365-97a2d73725ea",
+        "query_number": 25,
+        "difficulty": "hard",
+        "system_name": "manual_simulation",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 11,
         "compliance_data": null
       }
     ]
   },
   "aggregated": {
-    "suppliermind": {
-      "system_name": "suppliermind",
-      "query_count": 5,
-      "mean_precision_at_5": 0.2,
-      "std_precision_at_5": 0.282842712474619,
-      "mean_csr": 0.37,
-      "std_csr": 0.5094114250780012,
-      "mean_reciprocal_rank": 0.3,
-      "std_mrr": 0.4472135954999579,
-      "mean_execution_time_ms": 9642.8,
-      "std_execution_time_ms": 11126.845339088703,
-      "simple_p5": 0.2,
-      "medium_p5": 0.0,
-      "hard_p5": 0.0
-    },
     "keyword_sql": {
       "system_name": "keyword_sql",
-      "query_count": 5,
-      "mean_precision_at_5": 0.08,
-      "std_precision_at_5": 0.10954451150103323,
-      "mean_csr": 0.26,
-      "std_csr": 0.19493588689617927,
-      "mean_reciprocal_rank": 0.14,
-      "std_mrr": 0.21908902300206645,
-      "mean_execution_time_ms": 136.6,
-      "std_execution_time_ms": 56.36754385282367,
-      "simple_p5": 0.08,
-      "medium_p5": 0.0,
+      "query_count": 25,
+      "mean_precision_at_5": 0.032,
+      "std_precision_at_5": 0.07483314773547883,
+      "mean_csr": 0.28786666666666666,
+      "std_csr": 0.13472324169144628,
+      "mean_reciprocal_rank": 0.08133333333333333,
+      "std_mrr": 0.2269116323349001,
+      "mean_execution_time_ms": 113.64,
+      "std_execution_time_ms": 42.552790742793825,
+      "simple_p5": 0.07500000000000001,
+      "medium_p5": 0.02,
       "hard_p5": 0.0
     },
     "manual_simulation": {
       "system_name": "manual_simulation",
-      "query_count": 5,
-      "mean_precision_at_5": 0.56,
-      "std_precision_at_5": 0.3286335345030997,
-      "mean_csr": 0.9,
-      "std_csr": 0.17320508075688773,
-      "mean_reciprocal_rank": 0.8,
-      "std_mrr": 0.27386127875258304,
-      "mean_execution_time_ms": 8.6,
-      "std_execution_time_ms": 2.8809720581775866,
-      "simple_p5": 0.56,
-      "medium_p5": 0.0,
+      "query_count": 25,
+      "mean_precision_at_5": 0.328,
+      "std_precision_at_5": 0.33605555096342826,
+      "mean_csr": 0.6514666666666666,
+      "std_csr": 0.35248697112774935,
+      "mean_reciprocal_rank": 0.5133333333333333,
+      "std_mrr": 0.46315644105300846,
+      "mean_execution_time_ms": 6.52,
+      "std_execution_time_ms": 4.407569246950826,
+      "simple_p5": 0.5750000000000001,
+      "medium_p5": 0.36,
       "hard_p5": 0.0
     }
   }
