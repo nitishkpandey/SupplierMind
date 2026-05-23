@@ -1,0 +1,99 @@
+{
+  "app_name": "SupplierMind",
+  "tagline": "KI-gestützte Lieferantensuche",
+  "nav": {
+    "dashboard": "Dashboard",
+    "new_query": "Neue Suche",
+    "history": "Verlauf",
+    "suppliers": "Lieferanten",
+    "admin": "Admin",
+    "logout": "Abmelden"
+  },
+  "auth": {
+    "sign_in_title": "Bei SupplierMind anmelden",
+    "sign_in_subtitle": "KI-gestützte Lieferantensuche für Einkaufsteams",
+    "google": "Mit Google fortfahren",
+    "github": "Mit GitHub fortfahren",
+    "or": "oder"
+  },
+  "query": {
+    "placeholder": "Beschreiben Sie, was Sie suchen...",
+    "example_hint": "Beispiel: ISO 9001 zertifizierter Bronzelieferant im Umkreis von 25 km um Bremen, Kapazität 5.000 kg/Monat",
+    "submit": "Lieferanten finden",
+    "language_detected": "Erkannt: {{lang}}",
+    "validating": "Wird geprüft...",
+    "too_short": "Die Anfrage muss mindestens 10 Zeichen lang sein",
+    "too_long": "Die Anfrage darf 1.000 Zeichen nicht überschreiten"
+  },
+  "processing": {
+    "title": "Lieferanten werden gesucht...",
+    "connecting": "Verbindung zu Agenten...",
+    "parser": "Anforderungen werden extrahiert",
+    "discovery": "Lieferantendatenbank wird durchsucht",
+    "compliance": "Anforderungen werden validiert",
+    "ranking": "Ergebnisse werden bewertet",
+    "complete": "Fertig!",
+    "error": "Ein Fehler ist aufgetreten"
+  },
+  "results": {
+    "title": "Ergebnisse für",
+    "found": "{{count}} Lieferanten gefunden",
+    "execution_time": "Abgeschlossen in {{time}} s",
+    "export_csv": "CSV exportieren",
+    "show_map": "Kartenansicht",
+    "show_audit": "Agenten-Protokoll",
+    "no_results": "Keine Lieferanten gefunden",
+    "try_relaxing": "Versuchen Sie, Ihre Suchkriterien zu erweitern"
+  },
+  "supplier_card": {
+    "score": "Übereinstimmung",
+    "distance": "{{km}} km entfernt",
+    "lead_time": "{{days}} Tage Lieferzeit",
+    "capacity": "Kapazität: {{value}} {{unit}}",
+    "see_explanation": "Erklärung anzeigen",
+    "visit_website": "Website besuchen",
+    "save": "Zur Auswahlliste",
+    "not_relevant": "Nicht relevant"
+  },
+  "compliance": {
+    "PASS": "Erfüllt",
+    "FAIL": "Nicht erfüllt",
+    "PARTIAL": "Teilweise"
+  },
+  "audit": {
+    "title": "Agenten-Protokoll",
+    "agent": "Agent",
+    "action": "Aktion",
+    "reasoning": "Begründung",
+    "duration": "{{ms}} ms"
+  },
+  "dashboard": {
+    "welcome": "Willkommen zurück, {{name}}",
+    "total_suppliers": "Lieferanten gesamt",
+    "your_queries": "Ihre Anfragen",
+    "recent_queries": "Letzte Suchen",
+    "new_discovery": "Neue Suche"
+  },
+  "history": {
+    "title": "Suchverlauf",
+    "status_completed": "Abgeschlossen",
+    "status_failed": "Fehlgeschlagen",
+    "status_pending": "Ausstehend",
+    "no_history": "Noch keine Suchen. Starten Sie Ihre erste Suche!"
+  },
+  "admin": {
+    "title": "Admin-Bereich",
+    "suppliers_tab": "Lieferanten",
+    "evaluation_tab": "Evaluierung",
+    "run_eval": "Evaluierung starten",
+    "baselines_only": "Nur Baselines",
+    "eval_running": "Evaluierung läuft im Hintergrund (~15 min)...",
+    "eval_results": "Evaluierungsergebnisse"
+  },
+  "errors": {
+    "network": "Netzwerkfehler. Überprüfen Sie Ihre Verbindung.",
+    "unauthorized": "Sitzung abgelaufen. Bitte erneut anmelden.",
+    "server": "Serverfehler. Bitte versuchen Sie es erneut.",
+    "not_found": "Nicht gefunden."
+  }
+}

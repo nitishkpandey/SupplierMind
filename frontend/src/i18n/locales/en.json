@@ -1,0 +1,99 @@
+{
+  "app_name": "SupplierMind",
+  "tagline": "AI-Powered Supplier Discovery",
+  "nav": {
+    "dashboard": "Dashboard",
+    "new_query": "New Discovery",
+    "history": "History",
+    "suppliers": "Suppliers",
+    "admin": "Admin",
+    "logout": "Logout"
+  },
+  "auth": {
+    "sign_in_title": "Sign in to SupplierMind",
+    "sign_in_subtitle": "AI-powered supplier discovery for procurement teams",
+    "google": "Continue with Google",
+    "github": "Continue with GitHub",
+    "or": "or"
+  },
+  "query": {
+    "placeholder": "Describe what you're looking for...",
+    "example_hint": "Example: ISO 9001 certified bronze supplier within 25km of Bremen, capacity 5000 kg/month",
+    "submit": "Discover Suppliers",
+    "language_detected": "Detected: {{lang}}",
+    "validating": "Validating...",
+    "too_short": "Query must be at least 10 characters",
+    "too_long": "Query must be under 1000 characters"
+  },
+  "processing": {
+    "title": "Finding your suppliers...",
+    "connecting": "Connecting to agents...",
+    "parser": "Extracting constraints from your query",
+    "discovery": "Searching supplier database",
+    "compliance": "Validating against constraints",
+    "ranking": "Ranking and explaining results",
+    "complete": "Done!",
+    "error": "Something went wrong"
+  },
+  "results": {
+    "title": "Results for",
+    "found": "{{count}} suppliers found",
+    "execution_time": "Completed in {{time}}s",
+    "export_csv": "Export CSV",
+    "show_map": "Map View",
+    "show_audit": "Agent Audit Trail",
+    "no_results": "No suppliers found matching your constraints",
+    "try_relaxing": "Try broadening your search or removing some constraints"
+  },
+  "supplier_card": {
+    "score": "Match Score",
+    "distance": "{{km}} km away",
+    "lead_time": "{{days}} days lead time",
+    "capacity": "Capacity: {{value}} {{unit}}",
+    "see_explanation": "See explanation",
+    "visit_website": "Visit website",
+    "save": "Save to shortlist",
+    "not_relevant": "Not relevant"
+  },
+  "compliance": {
+    "PASS": "Pass",
+    "FAIL": "Fail",
+    "PARTIAL": "Partial"
+  },
+  "audit": {
+    "title": "Agent Audit Trail",
+    "agent": "Agent",
+    "action": "Action",
+    "reasoning": "Reasoning",
+    "duration": "{{ms}}ms"
+  },
+  "dashboard": {
+    "welcome": "Welcome back, {{name}}",
+    "total_suppliers": "Total Suppliers",
+    "your_queries": "Your Queries",
+    "recent_queries": "Recent Discoveries",
+    "new_discovery": "New Discovery"
+  },
+  "history": {
+    "title": "Discovery History",
+    "status_completed": "Completed",
+    "status_failed": "Failed",
+    "status_pending": "Pending",
+    "no_history": "No queries yet. Start your first discovery!"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "suppliers_tab": "Suppliers",
+    "evaluation_tab": "Evaluation",
+    "run_eval": "Run Evaluation",
+    "baselines_only": "Baselines only",
+    "eval_running": "Evaluation running in background (~15 min)...",
+    "eval_results": "Evaluation Results"
+  },
+  "errors": {
+    "network": "Network error. Check your connection.",
+    "unauthorized": "Session expired. Please log in again.",
+    "server": "Server error. Please try again.",
+    "not_found": "Not found."
+  }
+}

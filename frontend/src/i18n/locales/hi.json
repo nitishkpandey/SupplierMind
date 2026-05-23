@@ -1,0 +1,99 @@
+{
+  "app_name": "SupplierMind",
+  "tagline": "AI-संचालित आपूर्तिकर्ता खोज",
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "new_query": "नई खोज",
+    "history": "इतिहास",
+    "suppliers": "आपूर्तिकर्ता",
+    "admin": "व्यवस्थापक",
+    "logout": "लॉगआउट"
+  },
+  "auth": {
+    "sign_in_title": "SupplierMind में साइन इन करें",
+    "sign_in_subtitle": "खरीद टीमों के लिए AI-संचालित आपूर्तिकर्ता खोज",
+    "google": "Google से जारी रखें",
+    "github": "GitHub से जारी रखें",
+    "or": "या"
+  },
+  "query": {
+    "placeholder": "आप क्या खोज रहे हैं, विवरण दें...",
+    "example_hint": "उदाहरण: ब्रेमेन से 25 किमी के दायरे में ISO 9001 प्रमाणित कांस्य आपूर्तिकर्ता",
+    "submit": "आपूर्तिकर्ता खोजें",
+    "language_detected": "भाषा: {{lang}}",
+    "validating": "सत्यापित हो रहा है...",
+    "too_short": "क्वेरी कम से कम 10 अक्षरों की होनी चाहिए",
+    "too_long": "क्वेरी 1000 अक्षरों से कम होनी चाहिए"
+  },
+  "processing": {
+    "title": "आपूर्तिकर्ता खोजे जा रहे हैं...",
+    "connecting": "एजेंट से कनेक्ट हो रहा है...",
+    "parser": "क्वेरी से आवश्यकताएं निकाली जा रही हैं",
+    "discovery": "आपूर्तिकर्ता डेटाबेस में खोज हो रही है",
+    "compliance": "आवश्यकताओं के विरुद्ध सत्यापन",
+    "ranking": "परिणामों को रैंक किया जा रहा है",
+    "complete": "पूर्ण!",
+    "error": "कुछ गलत हुआ"
+  },
+  "results": {
+    "title": "परिणाम",
+    "found": "{{count}} आपूर्तिकर्ता मिले",
+    "execution_time": "{{time}} सेकंड में पूर्ण",
+    "export_csv": "CSV निर्यात करें",
+    "show_map": "मानचित्र दृश्य",
+    "show_audit": "एजेंट लॉग",
+    "no_results": "आपकी आवश्यकताओं से मेल खाने वाला कोई आपूर्तिकर्ता नहीं मिला",
+    "try_relaxing": "खोज मानदंड को थोड़ा ढीला करने का प्रयास करें"
+  },
+  "supplier_card": {
+    "score": "मिलान स्कोर",
+    "distance": "{{km}} किमी दूर",
+    "lead_time": "{{days}} दिन लीड टाइम",
+    "capacity": "क्षमता: {{value}} {{unit}}",
+    "see_explanation": "व्याख्या देखें",
+    "visit_website": "वेबसाइट पर जाएं",
+    "save": "शॉर्टलिस्ट में सेव करें",
+    "not_relevant": "प्रासंगिक नहीं"
+  },
+  "compliance": {
+    "PASS": "उत्तीर्ण",
+    "FAIL": "अनुत्तीर्ण",
+    "PARTIAL": "आंशिक"
+  },
+  "audit": {
+    "title": "एजेंट ऑडिट लॉग",
+    "agent": "एजेंट",
+    "action": "क्रिया",
+    "reasoning": "तर्क",
+    "duration": "{{ms}} ms"
+  },
+  "dashboard": {
+    "welcome": "वापस स्वागत है, {{name}}",
+    "total_suppliers": "कुल आपूर्तिकर्ता",
+    "your_queries": "आपकी क्वेरीज़",
+    "recent_queries": "हाल की खोजें",
+    "new_discovery": "नई खोज"
+  },
+  "history": {
+    "title": "खोज इतिहास",
+    "status_completed": "पूर्ण",
+    "status_failed": "विफल",
+    "status_pending": "लंबित",
+    "no_history": "अभी तक कोई खोज नहीं। अपनी पहली खोज शुरू करें!"
+  },
+  "admin": {
+    "title": "व्यवस्थापक पैनल",
+    "suppliers_tab": "आपूर्तिकर्ता",
+    "evaluation_tab": "मूल्यांकन",
+    "run_eval": "मूल्यांकन चलाएं",
+    "baselines_only": "केवल बेसलाइन",
+    "eval_running": "मूल्यांकन पृष्ठभूमि में चल रहा है...",
+    "eval_results": "मूल्यांकन परिणाम"
+  },
+  "errors": {
+    "network": "नेटवर्क त्रुटि। अपना कनेक्शन जांचें।",
+    "unauthorized": "सत्र समाप्त। कृपया फिर से लॉगिन करें।",
+    "server": "सर्वर त्रुटि। कृपया पुनः प्रयास करें।",
+    "not_found": "नहीं मिला।"
+  }
+}
