@@ -15,7 +15,7 @@ async def test_full_pipeline_metals_query():
     from app.agents.orchestrator import run_pipeline
 
     state = await run_pipeline(
-        raw_query="Find metal suppliers in Germany",
+        raw_query="Find ISO 9001 certified metal suppliers in Germany",
         query_id="test-query-001",
         user_id="test-user-001",
     )

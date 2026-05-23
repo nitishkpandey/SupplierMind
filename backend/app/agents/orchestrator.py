@@ -33,6 +33,7 @@ With them, the orchestrator can:
 This is the "dynamic routing" that makes SupplierMind agentic.
 """
 
+import asyncio
 import logging
 from typing import Literal
 
@@ -212,11 +213,18 @@ async def run_pipeline(
     initial_state = _create_initial_state(raw_query, query_id, user_id)
     pipeline = get_pipeline()
 
-    # LangGraph invoke — runs the full graph synchronously
-    # (we wrap it in async for FastAPI compatibility)
-    import asyncio
+    # Wrap pipeline.invoke to set a consistent event loop for the worker thread.
+    # This prevents SQLAlchemy pool errors caused by multiple asyncio.run() calls.
+    def _run_sync():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return pipeline.invoke(initial_state)
+        finally:
+            loop.close()
+
     final_state = await asyncio.get_event_loop().run_in_executor(
-        None, pipeline.invoke, initial_state
+        None, _run_sync
     )
 
     logger.info(
