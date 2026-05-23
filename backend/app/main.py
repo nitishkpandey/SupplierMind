@@ -87,6 +87,7 @@ def create_app() -> FastAPI:
     from app.api.v1 import health
     from app.api.v1 import auth
     from app.api.v1 import queries
+    from app.api.v1 import evaluation
 
     app.include_router(health.router, tags=["Health"])
     app.include_router(
@@ -98,6 +99,11 @@ def create_app() -> FastAPI:
         queries.router,
         prefix="/api/v1/queries",
         tags=["Queries"],
+    )
+    app.include_router(
+        evaluation.router,
+        prefix="/api/v1/eval",
+        tags=["Evaluation"],
     )
 
     return app
