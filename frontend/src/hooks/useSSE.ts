@@ -16,7 +16,7 @@ export function useSSE(queryId: string | null, accessToken: string | null) {
 
     // EventSource doesn't support custom headers — use URL param token for SSE
     // In production, use a short-lived SSE token. For prototype, this works.
-    const url = `http://localhost:8000/api/v1/queries/${queryId}/stream`;
+    const url = `http://localhost:8000/api/v1/queries/${queryId}/stream?token=${accessToken}`;
     const source = new EventSource(url);
 
     source.addEventListener("connected", (e) => {

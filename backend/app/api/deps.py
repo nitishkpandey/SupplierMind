@@ -22,7 +22,7 @@ import uuid
 import logging
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,12 +42,13 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[str | None, Query(description="JWT access token fallback")] = None,
 ) -> User:
     """
     Dependency: Extract and validate the JWT, return the current user.
 
     Flow:
-    1. Extract Bearer token from Authorization header
+    1. Extract Bearer token from Authorization header, or fallback to ?token= query param
     2. Decode and validate JWT signature + expiry
     3. Look up user in database (confirms user still exists and is active)
     4. Return User model instance
@@ -57,15 +58,21 @@ async def get_current_user(
     - Token is invalid or expired
     - User no longer exists or is deactivated
     """
-    if not credentials:
+    token_str: str | None = None
+    if credentials:
+        token_str = credentials.credentials
+    elif token:
+        token_str = token
+
+    if not token_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated. Include 'Authorization: Bearer <token>' header.",
+            detail="Not authenticated. Include 'Authorization: Bearer <token>' header or '?token=<token>' query parameter.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token_str)
     except JWTError as e:
         logger.warning("JWT validation failed: %s", e)
         raise HTTPException(
