@@ -5,7 +5,6 @@ import { supplierService } from "@/services/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
   ChevronDown,
@@ -20,7 +19,6 @@ import {
   Star,
 } from "lucide-react";
 import type { QueryResult } from "@/types";
-import { cn } from "@/lib/utils";
 
 interface SupplierCardProps {
   result: QueryResult;
@@ -60,7 +58,7 @@ function ScoreBar({ label, value, color = "bg-primary" }: { label: string; value
   );
 }
 
-export function SupplierCard({ result, hasProximity }: SupplierCardProps) {
+export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 

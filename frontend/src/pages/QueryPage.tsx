@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { queryService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Brain, Sparkles, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 

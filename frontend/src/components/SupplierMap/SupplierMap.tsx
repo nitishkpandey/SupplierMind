@@ -5,8 +5,6 @@
 
 import { useEffect, useRef } from "react";
 import type { QueryResult, ParsedConstraints } from "@/types";
-import { useQuery } from "@tanstack/react-query";
-import { supplierService } from "@/services/api";
 
 // Import Leaflet CSS
 import "leaflet/dist/leaflet.css";
@@ -16,7 +14,7 @@ interface SupplierMapProps {
   constraints?: ParsedConstraints | null;
 }
 
-export function SupplierMap({ results, constraints }: SupplierMapProps) {
+export function SupplierMap({ results: _, constraints }: SupplierMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 

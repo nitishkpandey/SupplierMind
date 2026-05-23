@@ -14,7 +14,8 @@
  * 3. If refresh fails: redirect to login
  */
 
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
+import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
 
 const BASE_URL = "/api/v1";

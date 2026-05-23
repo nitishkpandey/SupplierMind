@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Search,
   History,
-  Users,
   Settings,
   LogOut,
   Globe,
@@ -31,7 +30,7 @@ const LANGUAGES = [
 
 export function AppLayout() {
   const { t } = useTranslation();
-  const { user, clearAuth } = useAuthStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
   const handleLogout = () => {

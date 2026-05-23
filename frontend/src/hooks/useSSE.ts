@@ -3,7 +3,7 @@
  * Connects to /queries/{id}/stream and emits live agent progress.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import type { SSEEvent } from "@/types";
 
 export function useSSE(queryId: string | null, accessToken: string | null) {
@@ -30,7 +30,7 @@ export function useSSE(queryId: string | null, accessToken: string | null) {
 
     source.addEventListener("complete", (e) => {
       const data = JSON.parse(e.data) as SSEEvent;
-      setEvents((prev) => [...prev, { type: "complete", ...data }]);
+      setEvents((prev) => [...prev, { ...data, type: "complete" }]);
       setIsComplete(true);
       source.close();
     });
