@@ -1,55 +1,73 @@
 """
-app/db/session.py — Database connection pool and session factory.
+app/db/session.py — Database sessions for async (API routes) and sync (agents).
 
-WHY ASYNC?
-FastAPI is async. If database calls were synchronous, the entire server
-would FREEZE waiting for each query. Async lets the server handle other
-requests while waiting for database responses.
+WHY TWO SESSIONS?
+  - FastAPI routes are async → use AsyncSession + asyncpg driver
+  - LangGraph agent nodes are sync → use Session + psycopg2 driver
+  - Same ORM models, same repositories — only the driver differs
 
-WHY A POOL?
-Opening a new database connection for every request is slow (~50ms each).
-A pool keeps 10 connections always open and reuses them.
+IMPORTANT: Agents MUST use get_sync_db() or SyncSessionLocal.
+           API routes MUST use get_db().
+           Never mix them.
 """
 
-from collections.abc import AsyncGenerator
-
+from collections.abc import AsyncGenerator, Generator
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-from sqlalchemy.pool import NullPool
-
-# The engine manages the actual database connections
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.is_development,  # Print SQL queries in development
-    poolclass=NullPool,            # Disable pooling to fix multi-loop agentic DB access
+# ── Async engine (for FastAPI routes) ────────────────────────────────
+async_engine = create_async_engine(
+    settings.DATABASE_URL,              # postgresql+asyncpg://...
+    echo=settings.is_development,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
 )
 
-# Factory that creates new session objects
 AsyncSessionLocal = async_sessionmaker(
-    engine,
+    async_engine,
     class_=AsyncSession,
-    expire_on_commit=False,  # Keep objects accessible after commit
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# ── Sync engine (for LangGraph agent nodes) ───────────────────────────
+# Convert async URL to sync URL:
+#   postgresql+asyncpg://... → postgresql+psycopg2://...
+_sync_url = settings.DATABASE_URL.replace(
+    "postgresql+asyncpg://", "postgresql+psycopg2://"
+)
+
+sync_engine = create_engine(
+    _sync_url,
+    echo=False,                  # Don't log every agent SQL query
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+)
+
+SyncSessionLocal = sessionmaker(
+    sync_engine,
+    class_=Session,
+    expire_on_commit=False,
     autocommit=False,
     autoflush=False,
 )
 
 
+# ── FastAPI dependencies ───────────────────────────────────────────────
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI dependency — provides one database session per request.
-
-    Usage in any FastAPI route:
-        async def my_route(db: AsyncSession = Depends(get_db)):
-            ...
-
-    The 'async with' ensures the session is always closed,
-    even if an exception occurs (no connection leaks).
+    Async DB session for FastAPI routes.
+    Usage: db: AsyncSession = Depends(get_db)
     """
     async with AsyncSessionLocal() as session:
         try:
@@ -57,4 +75,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.commit()
         except Exception:
             await session.rollback()
+            raise
+
+
+def get_sync_db() -> Generator[Session, None, None]:
+    """
+    Sync DB session for agent nodes.
+    Usage: with get_sync_db() as db: ...
+    """
+    with SyncSessionLocal() as session:
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
             raise

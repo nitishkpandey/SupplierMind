@@ -8,7 +8,10 @@ The VectorStore handles SEMANTIC queries (similarity search).
 
 import math
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 from sqlalchemy import and_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -200,3 +203,87 @@ class SupplierRepository(BaseRepository[Supplier]):
         supplier.is_active = False  # type: ignore[assignment]
         await self.db.flush()
         return True
+
+    # ── SYNC METHODS (used by agent nodes) ───────────────────────────────
+    # These are identical in logic to the async methods above,
+    # but use a regular Session instead of AsyncSession.
+
+    @staticmethod
+    def filter_by_constraints_sync(
+        db: "Session",
+        category: Optional[str] = None,
+        country: Optional[str] = None,
+        required_certifications: Optional[list[str]] = None,
+        min_capacity: Optional[float] = None,
+        capacity_unit: Optional[str] = None,
+        max_lead_time_days: Optional[int] = None,
+        limit: int = 50,
+    ) -> list[Supplier]:
+        """Sync version for use inside LangGraph agent nodes."""
+        from sqlalchemy import and_
+        from sqlalchemy.orm import Session as SyncSession
+
+        conditions = [Supplier.is_active == True]  # noqa: E712
+
+        if category:
+            conditions.append(Supplier.category == category)
+        if country:
+            conditions.append(Supplier.country == country)
+        if required_certifications:
+            for cert in required_certifications:
+                conditions.append(Supplier.certifications.contains([cert]))  # type: ignore
+        if min_capacity and capacity_unit:
+            conditions.append(Supplier.capacity_value >= min_capacity)
+            conditions.append(Supplier.capacity_unit == capacity_unit)
+        if max_lead_time_days:
+            conditions.append(Supplier.lead_time_days <= max_lead_time_days)
+
+        result = db.execute(
+            select(Supplier).where(and_(*conditions)).limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    def filter_by_radius_sync(
+        db: "Session",
+        center_lat: float,
+        center_lng: float,
+        radius_km: float,
+    ) -> list[tuple[Supplier, float]]:
+        """Sync geospatial radius filter for use in agent nodes."""
+        result = db.execute(
+            select(Supplier).where(
+                Supplier.is_active == True,  # noqa: E712
+                Supplier.latitude.isnot(None),
+                Supplier.longitude.isnot(None),
+            )
+        )
+        all_suppliers = list(result.scalars().all())
+
+        nearby = []
+        for supplier in all_suppliers:
+            distance = SupplierRepository._haversine(
+                center_lat, center_lng,
+                supplier.latitude,  # type: ignore
+                supplier.longitude,  # type: ignore
+            )
+            if distance <= radius_km:
+                nearby.append((supplier, distance))
+
+        nearby.sort(key=lambda x: x[1])
+        return nearby
+
+    @staticmethod
+    def get_by_ids_sync(db: "Session", ids: list[str]) -> list[Supplier]:
+        """Sync bulk fetch by UUID strings."""
+        import uuid
+        uuid_ids = [uuid.UUID(i) for i in ids if i]
+        if not uuid_ids:
+            return []
+        result = db.execute(
+            select(Supplier).where(
+                Supplier.id.in_(uuid_ids),
+                Supplier.is_active == True,  # noqa: E712
+            )
+        )
+        return list(result.scalars().all())
