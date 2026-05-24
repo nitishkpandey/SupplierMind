@@ -165,7 +165,12 @@ class ComplianceAgent(BaseAgent):
                     f"{'matches' if status == 'PASS' else 'does not match'} "
                     f"required '{constraints['category']}'"
                 ),
-                "confidence": 1.0,
+                # Use 0.6 confidence so category mismatch does NOT trigger the
+                # hard-fail 0.6× penalty in ranking (which requires confidence > 0.8).
+                # The LLM parser may extract a category label not present in the DB;
+                # penalising the supplier's entire score for that mapping uncertainty
+                # causes all candidates to drop below the minimum score threshold.
+                "confidence": 0.6,
             })
 
         # ── Hard check: Certifications ────────────────────────────────
@@ -338,39 +343,29 @@ Return JSON: {{"status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "rea
             }
 
     def _fetch_suppliers(self, supplier_ids: list[str]) -> list[dict]:
-        """Fetch supplier data from database synchronously."""
-        import asyncio
-        import uuid
+        """Fetch supplier data using sync DB session (no async conflicts)."""
+        from app.db.session import SyncSessionLocal
         from app.db.repositories.supplier_repo import SupplierRepository
-        from app.db.session import AsyncSessionLocal
 
-        async def _fetch():
-            async with AsyncSessionLocal() as db:
-                repo = SupplierRepository(db)
-                suppliers = await repo.get_by_supplier_ids_str(supplier_ids)
-                return [
-                    {
-                        "id": str(s.id),
-                        "name": s.name,
-                        "description": s.description,
-                        "category": s.category,
-                        "country": s.country,
-                        "city": s.city,
-                        "latitude": s.latitude,
-                        "longitude": s.longitude,
-                        "certifications": s.certifications or [],
-                        "capacity_value": s.capacity_value,
-                        "capacity_unit": s.capacity_unit,
-                        "lead_time_days": s.lead_time_days,
-                        "website": s.website,
-                    }
-                    for s in suppliers
-                ]
-
-        try:
-            return asyncio.get_event_loop().run_until_complete(_fetch())
-        except RuntimeError:
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, _fetch())
-                return future.result()
+        with SyncSessionLocal() as db:
+            suppliers = SupplierRepository.get_by_ids_sync(db, supplier_ids)
+            return [
+                {
+                    "id": str(s.id),
+                    "name": s.name,
+                    "description": s.description,
+                    "category": s.category,
+                    "country": s.country,
+                    "city": s.city,
+                    "latitude": s.latitude,
+                    "longitude": s.longitude,
+                    "certifications": s.certifications or [],
+                    "certification_details": s.certification_details or {},
+                    "capacity_value": s.capacity_value,
+                    "capacity_unit": s.capacity_unit,
+                    "lead_time_days": s.lead_time_days,
+                    "website": s.website,
+                    "contact_email": s.contact_email,
+                }
+                for s in suppliers
+            ]

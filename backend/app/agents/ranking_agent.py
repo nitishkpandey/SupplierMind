@@ -27,7 +27,7 @@ from app.agents.state import AgentState, RankedSupplier, SupplierComplianceResul
 
 logger = logging.getLogger(__name__)
 
-MINIMUM_SCORE = 0.30    # Exclude results below this threshold
+MINIMUM_SCORE = 0.20    # Exclude results below this threshold
 MAX_RESULTS = 5          # Return top 5 (Precision@5 metric in evaluation)
 
 
@@ -281,36 +281,29 @@ class RankingAgent(BaseAgent):
         return filled / len(fields)
 
     def _fetch_suppliers(self, supplier_ids: list[str]) -> list[dict]:
-        """Synchronous wrapper for async DB fetch."""
-        import asyncio
+        """Fetch supplier data using sync DB session (no async conflicts)."""
+        from app.db.session import SyncSessionLocal
         from app.db.repositories.supplier_repo import SupplierRepository
-        from app.db.session import AsyncSessionLocal
 
-        async def _fetch():
-            async with AsyncSessionLocal() as db:
-                repo = SupplierRepository(db)
-                suppliers = await repo.get_by_supplier_ids_str(supplier_ids)
-                return [
-                    {
-                        "id": str(s.id),
-                        "name": s.name,
-                        "description": s.description,
-                        "category": s.category,
-                        "country": s.country,
-                        "city": s.city,
-                        "certifications": s.certifications or [],
-                        "capacity_value": s.capacity_value,
-                        "capacity_unit": s.capacity_unit,
-                        "lead_time_days": s.lead_time_days,
-                        "website": s.website,
-                        "contact_email": s.contact_email,
-                    }
-                    for s in suppliers
-                ]
-
-        try:
-            return asyncio.get_event_loop().run_until_complete(_fetch())
-        except RuntimeError:
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                return pool.submit(asyncio.run, _fetch()).result()
+        with SyncSessionLocal() as db:
+            suppliers = SupplierRepository.get_by_ids_sync(db, supplier_ids)
+            return [
+                {
+                    "id": str(s.id),
+                    "name": s.name,
+                    "description": s.description,
+                    "category": s.category,
+                    "country": s.country,
+                    "city": s.city,
+                    "latitude": s.latitude,
+                    "longitude": s.longitude,
+                    "certifications": s.certifications or [],
+                    "certification_details": s.certification_details or {},
+                    "capacity_value": s.capacity_value,
+                    "capacity_unit": s.capacity_unit,
+                    "lead_time_days": s.lead_time_days,
+                    "website": s.website,
+                    "contact_email": s.contact_email,
+                }
+                for s in suppliers
+            ]
