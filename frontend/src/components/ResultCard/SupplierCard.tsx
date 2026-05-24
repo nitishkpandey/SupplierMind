@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
-import { supplierService } from "@/services/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,12 +60,6 @@ export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
-  // Fetch supplier details
-  const { data: supplier } = useQuery({
-    queryKey: ["supplier", result.supplier_id],
-    queryFn: () => supplierService.getById(result.supplier_id).then((r) => r.data as any),
-  });
-
   const scorePercent = Math.round(result.total_score * 100);
   const scoreColor =
     scorePercent >= 80 ? "text-green-600" : scorePercent >= 60 ? "text-yellow-600" : "text-red-600";
@@ -95,19 +87,14 @@ export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-base">
-                {supplier?.name ?? result.supplier_id.slice(0, 8) + "..."}
+                {result.supplier_name ?? result.supplier_id.slice(0, 8) + "..."}
               </h3>
-              {supplier?.category && (
-                <Badge variant="secondary" className="text-xs">
-                  {supplier.category}
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-              {supplier?.city && (
+              {result.supplier_city && (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" />
-                  {supplier.city}, {supplier.country}
+                  {result.supplier_city}{result.supplier_country ? `, ${result.supplier_country}` : ""}
                 </span>
               )}
               {result.distance_km != null && (
@@ -116,18 +103,18 @@ export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
                   {t("supplier_card.distance", { km: result.distance_km.toFixed(1) })}
                 </span>
               )}
-              {supplier?.lead_time_days && (
+              {result.supplier_lead_time_days && (
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
-                  {t("supplier_card.lead_time", { days: supplier.lead_time_days })}
+                  {t("supplier_card.lead_time", { days: result.supplier_lead_time_days })}
                 </span>
               )}
-              {supplier?.capacity_value && (
+              {result.supplier_capacity_value && (
                 <span className="flex items-center gap-1">
                   <Package className="w-3.5 h-3.5" />
                   {t("supplier_card.capacity", {
-                    value: supplier.capacity_value.toLocaleString(),
-                    unit: supplier.capacity_unit ?? "",
+                    value: result.supplier_capacity_value.toLocaleString(),
+                    unit: result.supplier_capacity_unit ?? "",
                   })}
                 </span>
               )}
@@ -144,9 +131,9 @@ export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
         </div>
 
         {/* Certifications */}
-        {supplier?.certifications && supplier.certifications.length > 0 && (
+        {result.supplier_certifications && result.supplier_certifications.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {supplier.certifications.map((cert: string) => (
+            {result.supplier_certifications.map((cert: string) => (
               <Badge key={cert} variant="outline" className="text-xs">
                 {cert}
               </Badge>
@@ -201,9 +188,9 @@ export function SupplierCard({ result, hasProximity: _ }: SupplierCardProps) {
 
         {/* Actions */}
         <div className="flex gap-2 pt-1">
-          {supplier?.website && (
+          {result.supplier_website && (
             <Button variant="outline" size="sm" asChild>
-              <a href={supplier.website} target="_blank" rel="noreferrer" className="gap-1.5">
+              <a href={result.supplier_website} target="_blank" rel="noreferrer" className="gap-1.5">
                 <ExternalLink className="w-3.5 h-3.5" />
                 {t("supplier_card.visit_website")}
               </a>

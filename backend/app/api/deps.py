@@ -59,6 +59,7 @@ async def get_current_user(
     - User no longer exists or is deactivated
     """
     token_str: str | None = None
+    logger.info("get_current_user: credentials=%s, token=%s", credentials, token)
     if credentials:
         token_str = credentials.credentials
     elif token:

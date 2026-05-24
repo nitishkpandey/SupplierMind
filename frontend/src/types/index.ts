@@ -35,6 +35,18 @@ export interface ComplianceMatrix {
 export interface QueryResult {
   rank: number;
   supplier_id: string;
+  // Supplier details joined by the backend — avoids separate per-card fetch
+  supplier_name?: string;
+  supplier_city?: string;
+  supplier_country?: string;
+  supplier_lat?: number;
+  supplier_lng?: number;
+  supplier_certifications?: string[];
+  supplier_capacity_value?: number;
+  supplier_capacity_unit?: string;
+  supplier_lead_time_days?: number;
+  supplier_website?: string;
+  // Scores
   total_score: number;
   constraint_score: number;
   semantic_score: number;

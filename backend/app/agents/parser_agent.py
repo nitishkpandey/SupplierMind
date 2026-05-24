@@ -102,6 +102,19 @@ class ParserAgent(BaseAgent):
         clarification_needed = bool(extracted.get("clarification_needed", False))
         clarification_needed = clarification_needed or confidence < CLARIFICATION_THRESHOLD
 
+        # Only block on clarification when the query is fundamentally ambiguous:
+        # missing BOTH category AND location. If at least one is present, we have
+        # enough to search — optional constraints (MOQ, certifications, etc.) should
+        # not gate the pipeline.
+        has_category = bool(extracted.get("category"))
+        has_location = bool(extracted.get("location_name"))
+        if clarification_needed and (has_category or has_location):
+            logger.info(
+                "[parser] LLM requested clarification but category=%r location=%r — proceeding.",
+                extracted.get("category"), extracted.get("location_name"),
+            )
+            clarification_needed = False
+
         duration_ms = int((time.time() - start) * 1000)
 
         if clarification_needed:
