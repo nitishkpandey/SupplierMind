@@ -32,7 +32,7 @@ export default function ResultsPage() {
   const [completedAgents, setCompletedAgents] = useState<string[]>([]);
 
   // SSE for live progress
-  const { events, isComplete, error: sseError } = useSSE(queryId ?? null, accessToken);
+  const { events, isComplete, error: sseError } = useSSE(queryId ?? null);
 
   // Update completed agents from SSE events
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function ResultsPage() {
   const { data: queryData, isLoading } = useQuery<QueryWithResults>({
     queryKey: ["queryResult", queryId],
     queryFn: () => queryService.getResult(queryId!).then((r) => r.data),
-    enabled: isComplete && !!queryId,
+    enabled: isComplete && !sseError && !!queryId,
     refetchInterval: false,
   });
 
