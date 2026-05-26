@@ -76,7 +76,7 @@ class DiscoveryAgent(BaseAgent):
             from app.core.vector_store import get_vector_store
             vs = get_vector_store()
             query_text = self._build_query_text(constraints, state["raw_query"])
-            sem_results = vs.search(query_text, top_k=20)
+            sem_results = vs.search(query_text, top_k=10)
             semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(sem_results)}
             semantic_scores = {r.supplier_id: r.similarity_score for r in sem_results}
             logger.info("[discovery] Semantic: %d results", len(sem_results))
@@ -171,7 +171,7 @@ class DiscoveryAgent(BaseAgent):
                 return self._run_search(state, relaxed, retry_count + 1)
 
         # ── Final state ───────────────────────────────────────────────
-        state["candidate_supplier_ids"] = candidate_ids[:20]
+        state["candidate_supplier_ids"] = candidate_ids[:10]
         state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in candidate_ids}
         state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in candidate_ids}
         state["retry_count"] = retry_count

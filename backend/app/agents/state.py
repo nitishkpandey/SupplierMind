@@ -102,6 +102,10 @@ class AgentState(TypedDict):
     needs_clarification: bool
     clarification_question: Optional[str]
 
+    # ── External Discovery Agent output ───────────────────────────────
+    newly_discovered_supplier_ids: list[str]
+    external_discovery_stats: dict
+
     # ── Discovery Agent output ────────────────────────────────────────
     candidate_supplier_ids: list[str]
     semantic_scores: dict[str, float]   # {supplier_id: similarity_score}

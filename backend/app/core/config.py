@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     # ── External APIs ─────────────────────────────────────────────────
     OPENSANCTIONS_API_KEY: str = ""
 
+    # ── External Discovery ─────────────────────────────────────────────
+    TAVILY_API_KEY: str = ""
+    OPENCORPORATES_API_KEY: str = ""
+    ENABLE_EXTERNAL_DISCOVERY: bool = True
+    EXTERNAL_DISCOVERY_MAX_RESULTS: int = 10
+    EXTERNAL_DISCOVERY_TIMEOUT: int = 30
+
     # ── Mode ──────────────────────────────────────────────────────────
     LITE_MODE: bool = False
 

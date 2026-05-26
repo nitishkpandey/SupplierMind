@@ -279,6 +279,7 @@ async def get_query(
                 "supplier_capacity_unit": supplier_map[str(r.supplier_id)].capacity_unit if str(r.supplier_id) in supplier_map else None,
                 "supplier_lead_time_days": supplier_map[str(r.supplier_id)].lead_time_days if str(r.supplier_id) in supplier_map else None,
                 "supplier_website": supplier_map[str(r.supplier_id)].website if str(r.supplier_id) in supplier_map else None,
+                "supplier_source": supplier_map[str(r.supplier_id)].source if str(r.supplier_id) in supplier_map else None,
                 "total_score": r.total_score,
                 "constraint_score": r.constraint_score,
                 "semantic_score": r.semantic_score,

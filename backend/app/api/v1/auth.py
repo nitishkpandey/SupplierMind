@@ -43,6 +43,58 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# ── Dev Login (development only) ───────────────────────────────────────
+@router.get("/dev-login", summary="Dev-only login bypass")
+async def dev_login(
+    email: str = Query(default="dev@suppliermind.local"),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """
+    Issues a JWT without OAuth. Only works when APP_ENV=development.
+    Redirects to /auth/callback like OAuth, so AuthCallbackPage handles it.
+    """
+    if not settings.is_development:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dev login is only available in development mode.",
+        )
+
+    user = await _get_or_create_user(
+        db,
+        email=email,
+        name=email.split("@")[0].replace(".", " ").title(),
+        provider="dev",
+        oauth_id=f"dev-{email}",
+    )
+
+    # Promote to manager role if needed so user can submit queries
+    if user.role not in (UserRole.procurement_manager, UserRole.admin):
+        from sqlalchemy import update as sa_update
+        await db.execute(
+            sa_update(User)
+            .where(User.id == user.id)
+            .values(role=UserRole.procurement_manager)
+        )
+        await db.commit()
+        user.role = UserRole.procurement_manager
+
+    jwt_token = create_access_token(
+        subject=str(user.id),
+        role=user.role.value,
+        email=user.email,
+    )
+    refresh = create_refresh_token(subject=str(user.id))
+
+    return RedirectResponse(
+        url=(
+            f"{settings.FRONTEND_URL}/auth/callback"
+            f"?access_token={jwt_token}"
+            f"&refresh_token={refresh}"
+            f"&role={user.role.value}"
+        )
+    )
+
+
 # ── Google OAuth ───────────────────────────────────────────────────────
 @router.get("/google/authorize", summary="Redirect to Google OAuth consent screen")
 async def google_authorize() -> RedirectResponse:
