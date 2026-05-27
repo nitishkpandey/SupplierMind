@@ -26,8 +26,6 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# The model we use. Centralised here so changing model = one line.
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_MAX_TOKENS = 2048
 
 
@@ -58,7 +56,8 @@ class LLMClient:
                 "Get your free key at https://console.groq.com"
             )
         self._client = Groq(api_key=settings.GROQ_API_KEY)
-        logger.info("LLM client initialized (provider=groq, model=%s)", DEFAULT_MODEL)
+        self._model = settings.LLM_MODEL_NAME
+        logger.info("LLM client initialized (provider=groq, model=%s)", self._model)
 
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIStatusError)),
@@ -71,7 +70,7 @@ class LLMClient:
         self,
         messages: list[dict[str, str]],
         *,
-        model: str = DEFAULT_MODEL,
+        model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.1,
     ) -> str:
@@ -96,7 +95,7 @@ class LLMClient:
             APIStatusError: On non-retryable API errors
         """
         response = self._client.chat.completions.create(
-            model=model,
+            model=model or self._model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
@@ -114,7 +113,7 @@ class LLMClient:
         self,
         messages: list[dict[str, str]],
         *,
-        model: str = DEFAULT_MODEL,
+        model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.0,
     ) -> str:
@@ -131,7 +130,7 @@ class LLMClient:
         temperature=0.0 for structured outputs: we want exact, predictable JSON.
         """
         response = self._client.chat.completions.create(
-            model=model,
+            model=model or self._model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
