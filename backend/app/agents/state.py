@@ -2,7 +2,7 @@
 app/agents/state.py — Shared state schema for the LangGraph agent pipeline.
 
 WHY A SINGLE STATE DICT?
-All 5 agents share one state object. Each agent reads what it needs
+All agents share one state object. Each agent reads what it needs
 and writes its output back. LangGraph manages passing the state
 between agents automatically.
 
@@ -18,22 +18,33 @@ from typing_extensions import TypedDict
 
 
 class ParsedConstraints(TypedDict, total=False):
-    """
-    Structured output of the Parser Agent.
-    total=False means all fields are optional (parsed from natural language,
-    so not every query will contain every constraint type).
-    """
-    category: Optional[str]          # "metals", "electronics", etc.
-    location_name: Optional[str]      # "Bremen", "Germany", etc.
-    location_lat: Optional[float]     # Geocoded latitude
-    location_lng: Optional[float]     # Geocoded longitude
-    location_radius_km: Optional[float]  # Radius in km (if specified)
-    certifications: Optional[list[str]]  # ["ISO 9001", "ISO 14001"]
+    """Production v2: rich product intent representation."""
+    # Product intent (replaces category as primary key)
+    product_type: Optional[str]
+    product_keywords: Optional[list[str]]
+    industry_context: Optional[str]
+    buyer_intent: Optional[str]
+    category_hint: Optional[str]
+
+    # Location
+    location_name: Optional[str]
+    location_city: Optional[str]
+    location_country: Optional[str]
+    location_region: Optional[str]
+    location_lat: Optional[float]
+    location_lng: Optional[float]
+    location_radius_km: Optional[float]
+
+    # Constraints
+    certifications: Optional[list[str]]
     capacity_min: Optional[float]
-    capacity_unit: Optional[str]      # "kg/month", "units/month", etc.
+    capacity_unit: Optional[str]
     lead_time_max_days: Optional[int]
-    budget_note: Optional[str]        # Free text — not hard constraint
-    original_language: Optional[str]  # Detected language of input query
+
+    # Query metadata
+    query_type: Optional[str]
+    complexity: Optional[str]
+    original_language: Optional[str]
 
 
 class ComplianceResult(TypedDict):
@@ -83,12 +94,14 @@ class AgentState(TypedDict):
     The complete shared state for the SupplierMind agent pipeline.
 
     Lifecycle:
-    1. Initialised with: raw_query, query_id, user_id
+    1. Initialised with: raw_query, query_id, user_id, search_scope
     2. Parser Agent adds: parsed_constraints, detected_language
-    3. Discovery Agent adds: candidate_supplier_ids, semantic/structured/geo results
-    4. Compliance Agent adds: compliance_results_by_supplier
-    5. Ranking Agent adds: ranked_suppliers, final shortlist
-    6. Throughout: audit_log grows with each agent's reasoning
+    3. External Discovery Agent adds: newly_discovered_supplier_ids
+    4. Discovery Agent adds: candidate_supplier_ids, semantic/structured/geo results
+    5. Compliance Agent adds: compliance_results_by_supplier
+    6. Ranking Agent adds: ranked_suppliers, final shortlist
+    7. Evaluator Agent adds: evaluator_verdict, evaluator_should_retry
+    8. Throughout: audit_log grows with each agent's reasoning
     """
 
     # ── Input (set by API before pipeline starts) ─────────────────────
@@ -118,6 +131,13 @@ class AgentState(TypedDict):
 
     # ── Ranking Agent output ──────────────────────────────────────────
     ranked_suppliers: list[RankedSupplier]
+
+    # ── Production v2 additions ───────────────────────────────────────
+    search_scope: str
+    tier_assignments: dict[str, str]
+    evaluator_retries: int
+    evaluator_verdict: Optional[str]
+    evaluator_should_retry: bool
 
     # ── Audit trail (grows throughout pipeline) ───────────────────────
     audit_log: list[AuditEntry]
