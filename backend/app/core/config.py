@@ -46,6 +46,7 @@ class Settings(BaseSettings):
 
     # ── LLM ──────────────────────────────────────────────────────────
     LLM_PROVIDER: Literal["groq", "anthropic", "openai"] = "groq"
+    LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
     GROQ_API_KEY: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────
@@ -70,12 +71,15 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_URL: str = "http://localhost:8000"
 
     # ── Geocoding ─────────────────────────────────────────────────────
     NOMINATIM_USER_AGENT: str = "suppliermind-thesis/1.0"
 
     # ── External APIs ─────────────────────────────────────────────────
     OPENSANCTIONS_API_KEY: str = ""
+    SANCTIONS_API_BASE_URL: str = "https://api.opensanctions.org"
+    WIKIDATA_SPARQL_ENDPOINT: str = "https://query.wikidata.org/sparql"
 
     # ── External Discovery ─────────────────────────────────────────────
     TAVILY_API_KEY: str = ""
@@ -83,6 +87,13 @@ class Settings(BaseSettings):
     ENABLE_EXTERNAL_DISCOVERY: bool = True
     EXTERNAL_DISCOVERY_MAX_RESULTS: int = 10
     EXTERNAL_DISCOVERY_TIMEOUT: int = 30
+
+    # ── Pipeline tuning ───────────────────────────────────────────────
+    EVALUATOR_MAX_RETRIES: int = 1
+    SSE_TIMEOUT_SECONDS: int = 180
+    SSE_CLEANUP_DELAY_SECONDS: int = 300
+    QUERY_MIN_LENGTH: int = 10
+    QUERY_MAX_LENGTH: int = 1000
 
     # ── Mode ──────────────────────────────────────────────────────────
     LITE_MODE: bool = False
