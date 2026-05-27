@@ -14,12 +14,10 @@
 
 ## What is SupplierMind?
 
-SupplierMind is an AI-powered, multi-agent supplier discovery system. Procurement managers describe their sourcing needs in plain language — in any language — and receive a ranked, explainable shortlist of suppliers in under 2 minutes, with a complete audit trail of every AI decision.
+suppliers that did NOT exist in your database before you asked the question.
 
 **Example query:**
 > *"ISO 9001 certified bronze supplier within 25km of Bremen, capacity above 5000 kg/month, lead time under 21 days"*
-
-**What happens:** Five specialized AI agents decompose this query, search the supplier database using hybrid semantic + geospatial retrieval, validate each candidate against all constraints using chain-of-thought reasoning, rank results with explainable multi-factor scoring, and stream live progress to the UI.
 
 ---
 
@@ -30,11 +28,18 @@ React Frontend (TypeScript + Tailwind)
          │
     FastAPI Backend
          │
-    ┌────┴─────────────────────────┐
-    │       LangGraph Pipeline     │
-    │  Parser → Discovery →        │
-    │  Compliance → Ranking        │
-    └────┬─────────────────────────┘
+    ┌────┴─────────────────────────────────┐
+    │         LangGraph Pipeline           │
+    │  Parser                              │
+    │    │                                 │
+    │  External Discovery                  │
+    │  (Tavily, Wikidata, OpenSanctions)   │
+    │    │  [auto-ingest new suppliers]    │
+    │  Internal Discovery                  │
+    │  (Milvus + PostgreSQL)               │
+    │    │                                 │
+    │  Compliance (ReAct) → Ranking        │
+    └────┬─────────────────────────────────┘
          │
     ┌────┼──────────────────────────┐
     │    │                          │
