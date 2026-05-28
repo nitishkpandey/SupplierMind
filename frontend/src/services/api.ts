@@ -78,8 +78,8 @@ api.interceptors.response.use(
 
 // Query service methods
 export const queryService = {
-  submit: (rawQuery: string) =>
-    api.post<{ id: string; status: string }>("/queries", { raw_query: rawQuery }),
+  submit: (rawQuery: string, scope: 'approved_only' | 'both' = 'approved_only') =>
+    api.post<{ id: string; status: string }>("/queries", { raw_query: rawQuery, search_scope: scope }),
 
   getResult: (queryId: string) =>
     api.get(`/queries/${queryId}`),
@@ -95,6 +95,15 @@ export const queryService = {
 export const supplierService = {
   getById: (id: string) => api.get<{ id: string }>(`/suppliers/${id}`),
   list: (page = 1) => api.get(`/suppliers?offset=${(page - 1) * 20}&limit=20`),
+};
+
+// Production v2: Tier workflow service
+export const supplierWorkflowService = {
+  getMyList: (page = 1) => api.get(`/suppliers/my-list?offset=${(page - 1) * 20}&limit=20`),
+  save: (id: string) => api.post(`/suppliers/${id}/save`),
+  unsave: (id: string) => api.delete(`/suppliers/${id}/save`),
+  approve: (id: string) => api.post(`/suppliers/${id}/approve`),
+  reject: (id: string) => api.post(`/suppliers/${id}/reject`),
 };
 
 // Auth service methods

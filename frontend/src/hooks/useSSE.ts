@@ -18,9 +18,15 @@ export function useSSE(queryId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
   const { accessToken } = useAuthStore();
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   useEffect(() => {
     if (!queryId) return;
+
+    // Reset state for new query
+    setEvents([]);
+    setIsComplete(false);
+    setError(null);
 
     // Close any existing connection
     if (sourceRef.current) {
@@ -29,7 +35,7 @@ export function useSSE(queryId: string | null) {
 
     // Include token as query param (SSE can't use headers)
     const tokenParam = accessToken ? `?token=${encodeURIComponent(accessToken)}` : "";
-    const url = `http://localhost:8000/api/v1/queries/${queryId}/stream${tokenParam}`;
+    const url = `${apiBaseUrl}/api/v1/queries/${queryId}/stream${tokenParam}`;
     const source = new EventSource(url);
     sourceRef.current = source;
 
@@ -41,7 +47,7 @@ export function useSSE(queryId: string | null) {
       try {
         const data = JSON.parse(e.data) as SSEEvent;
         setEvents((prev) => [...prev, data]);
-      } catch (err) {
+      } catch {
         console.warn("[SSE] Failed to parse event:", e.data);
       }
     });
@@ -49,15 +55,21 @@ export function useSSE(queryId: string | null) {
     source.addEventListener("complete", (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as SSEEvent;
-        setEvents((prev) => [...prev, { type: "complete", ...data }]);
-      } catch {}
+        setEvents((prev) => [...prev, { ...data, type: "complete" }]);
+      } catch {
+        // Ignored empty catch block
+      }
       setIsComplete(true);
       source.close();
     });
 
     source.addEventListener("error", (e: MessageEvent) => {
-      const msg = e.data ? JSON.parse(e.data).message : "Pipeline failed";
-      setError(msg);
+      try {
+        const msg = e.data ? JSON.parse(e.data).message : "Pipeline failed";
+        setError(msg);
+      } catch {
+        setError("Pipeline failed");
+      }
       setIsComplete(true);
       source.close();
     });
@@ -78,7 +90,8 @@ export function useSSE(queryId: string | null) {
       source.close();
       sourceRef.current = null;
     };
-  }, [queryId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryId, accessToken]);
 
   return { events, isComplete, error };
 }

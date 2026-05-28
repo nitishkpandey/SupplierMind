@@ -1,0 +1,13 @@
+{
+  "name": "suppliermind",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --prefix \"[{name}][{time}]\" --timestamp-format \"HH:mm:ss\" -n \"backend,frontend\" -c \"green.bold,cyan.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
