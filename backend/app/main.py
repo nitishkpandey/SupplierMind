@@ -17,11 +17,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.middleware import RequestIDMiddleware, RateLimitMiddleware
 
 # Configure console logging for backend & agent processes
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
     force=True,
 )
@@ -84,6 +85,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # NOTE: Starlette applies middleware in reverse-registration order.
+    # RequestID must be outermost (registered last) so the ID is available
+    # to all inner middleware and route handlers.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.FRONTEND_URL],
@@ -91,6 +95,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RequestIDMiddleware)
 
     # Register routers
     from app.api.v1 import health

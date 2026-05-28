@@ -27,6 +27,10 @@ class SupplierResponse(BaseModel):
     lead_time_days: Optional[int] = None
     website: Optional[str] = None
     contact_email: Optional[str] = None
+    source: Optional[str] = None
+    status: str
+    source_url: Optional[str] = None
+    source_citations: Optional[dict] = None
     is_active: bool
     created_at: datetime
 

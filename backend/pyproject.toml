@@ -47,6 +47,9 @@ dependencies = [
     "sse-starlette==2.1.0",
     "setuptools<70",
     "marshmallow<4",
+    "tavily-python==0.3.3",
+    "beautifulsoup4==4.12.3",
+    "lxml==5.2.2",
 ]
 
 [dependency-groups]
