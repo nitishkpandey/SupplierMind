@@ -108,9 +108,11 @@ async def google_authorize() -> RedirectResponse:
             detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID in .env",
         )
 
+    backend_base = settings.BACKEND_URL.rstrip("/")
+    redirect_uri = f"{backend_base}/api/v1/auth/google/callback"
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": f"{settings.FRONTEND_URL.replace('5173', '8000')}/api/v1/auth/google/callback",
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
@@ -129,7 +131,8 @@ async def google_callback(
     Step 2: Exchange authorization code for user profile and issue JWT.
     Google redirects here after the user approves access.
     """
-    redirect_uri = f"{settings.FRONTEND_URL.replace('5173', '8000')}/api/v1/auth/google/callback"
+    backend_base = settings.BACKEND_URL.rstrip("/")
+    redirect_uri = f"{backend_base}/api/v1/auth/google/callback"
 
     async with httpx.AsyncClient() as client:
         # Exchange code for tokens
@@ -198,9 +201,12 @@ async def github_authorize() -> RedirectResponse:
             detail="GitHub OAuth not configured. Set GITHUB_CLIENT_ID in .env",
         )
 
+    backend_base = settings.BACKEND_URL.rstrip("/")
+    redirect_uri = f"{backend_base}/api/v1/auth/github/callback"
     github_url = (
         f"https://github.com/login/oauth/authorize"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
         f"&scope=user:email"
     )
     return RedirectResponse(url=github_url)
@@ -212,6 +218,8 @@ async def github_callback(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Exchange GitHub code for user profile and issue JWT."""
+    backend_base = settings.BACKEND_URL.rstrip("/")
+    redirect_uri = f"{backend_base}/api/v1/auth/github/callback"
     async with httpx.AsyncClient() as client:
         # Exchange code for access token
         token_response = await client.post(
@@ -220,6 +228,7 @@ async def github_callback(
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
+                "redirect_uri": redirect_uri,
             },
             headers={"Accept": "application/json"},
         )

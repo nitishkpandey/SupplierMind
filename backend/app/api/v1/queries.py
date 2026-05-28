@@ -16,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import run_pipeline
 from app.api.deps import get_current_user, require_manager
-from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User
+from app.core.config import settings
+from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User, UserRole
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import get_db
 from app.schemas.query import QueryCreate, QueryResponse
@@ -48,15 +49,15 @@ async def submit_query(
     """
     logger.info("Received query submission from user_id=%s: %r", current_user.id, body.raw_query)
     # Validate query length
-    if len(body.raw_query.strip()) < 10:
+    if len(body.raw_query.strip()) < settings.QUERY_MIN_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Query too short. Please provide more details.",
+            detail=f"Query too short. Minimum {settings.QUERY_MIN_LENGTH} characters.",
         )
-    if len(body.raw_query) > 1000:
+    if len(body.raw_query) > settings.QUERY_MAX_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Query too long. Maximum 1000 characters.",
+            detail=f"Query too long. Maximum {settings.QUERY_MAX_LENGTH} characters.",
         )
 
     # Check for prompt injection
@@ -85,6 +86,7 @@ async def submit_query(
         id=uuid.uuid4(),
         user_id=current_user.id,
         raw_query=body.raw_query.strip(),
+        search_scope=body.search_scope,
         status=QueryStatus.pending,
     )
     db.add(query)
@@ -101,6 +103,7 @@ async def submit_query(
         query_id=query_id,
         raw_query=body.raw_query.strip(),
         user_id=str(current_user.id),
+        search_scope=body.search_scope,
     )
 
     return QueryResponse(
@@ -135,22 +138,33 @@ async def stream_query_progress(
         const url = `/api/v1/queries/${id}/stream?token=${accessToken}`;
         const source = new EventSource(url);
     """
-    # Validate the token
-    if token:
-        try:
-            from app.core.security import decode_access_token
-            from jose import JWTError
-            import uuid as _uuid
-            payload = decode_access_token(token)
-            user_id = _uuid.UUID(payload["sub"])
-            # Optionally verify user still exists — skip for performance in SSE
-        except Exception:
-            pass  # For thesis prototype, continue even if token invalid
-            # In production: return 401 immediately
+    # Validate token and enforce query ownership
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing access token")
+
+    try:
+        from app.core.security import decode_access_token
+        payload = decode_access_token(token)
+        user_id = uuid.UUID(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    try:
+        qid = uuid.UUID(query_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid query ID format")
+
+    query_repo = QueryRepository(db)
+    query = await query_repo.get_by_id(qid)
+    if query is None:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    if query.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     async def event_generator() -> AsyncGenerator[str, None]:
         sent_count = 0
-        timeout_seconds = 180
+        timeout_seconds = settings.SSE_TIMEOUT_SECONDS
         start = time.time()
 
         # Connection confirmation
@@ -158,7 +172,7 @@ async def stream_query_progress(
 
         while True:
             if time.time() - start > timeout_seconds:
-                yield f"event: error\ndata: {json.dumps({'message': 'Pipeline timeout after 3 minutes'})}\n\n"
+                yield f"event: error\ndata: {json.dumps({'message': f'Pipeline timeout after {timeout_seconds}s'})}\n\n"
                 break
 
             events = _sse_events.get(query_id, [])
@@ -178,7 +192,7 @@ async def stream_query_progress(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",  # Allow SSE from frontend
+            "Access-Control-Allow-Origin": settings.FRONTEND_URL,
         },
     )
 
@@ -245,6 +259,9 @@ async def get_query(
     if query is None:
         raise HTTPException(status_code=404, detail="Query not found")
 
+    if query.user_id != current_user.id and current_user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
     # Enrich results with supplier details so the frontend avoids
     # a separate per-supplier fetch (which has no endpoint).
     from app.db.repositories.supplier_repo import SupplierRepository
@@ -254,6 +271,34 @@ async def get_query(
         sids = [r.supplier_id for r in query.results]
         suppliers = await repo.get_by_ids(sids)
         supplier_map = {str(s.id): s for s in suppliers}
+
+    def _result_dict(r: QueryResult) -> dict:
+        supplier = supplier_map.get(str(r.supplier_id))
+        return {
+            "rank": r.rank,
+            "supplier_id": str(r.supplier_id),
+            "supplier_name": supplier.name if supplier else None,
+            "supplier_city": supplier.city if supplier else None,
+            "supplier_country": supplier.country if supplier else None,
+            "supplier_lat": float(supplier.latitude) if supplier and supplier.latitude else None,
+            "supplier_lng": float(supplier.longitude) if supplier and supplier.longitude else None,
+            "supplier_certifications": supplier.certifications if supplier else [],
+            "supplier_capacity_value": supplier.capacity_value if supplier else None,
+            "supplier_capacity_unit": supplier.capacity_unit if supplier else None,
+            "supplier_lead_time_days": supplier.lead_time_days if supplier else None,
+            "supplier_website": supplier.website if supplier else None,
+            "supplier_source": supplier.source if supplier else None,
+            "supplier_status": supplier.status.value if supplier else None,
+            "tier": supplier.status.value if supplier else None,
+            "total_score": r.total_score,
+            "constraint_score": r.constraint_score,
+            "semantic_score": r.semantic_score,
+            "proximity_score": r.proximity_score,
+            "completeness_score": r.completeness_score,
+            "compliance_matrix": r.compliance_matrix,
+            "explanation": r.explanation,
+            "distance_km": r.distance_km,
+        }
 
     return {
         "id": str(query.id),
@@ -265,32 +310,7 @@ async def get_query(
         "error_message": query.error_message,
         "created_at": query.created_at.isoformat(),
         "completed_at": query.completed_at.isoformat() if query.completed_at else None,
-        "results": [
-            {
-                "rank": r.rank,
-                "supplier_id": str(r.supplier_id),
-                "supplier_name": supplier_map[str(r.supplier_id)].name if str(r.supplier_id) in supplier_map else None,
-                "supplier_city": supplier_map[str(r.supplier_id)].city if str(r.supplier_id) in supplier_map else None,
-                "supplier_country": supplier_map[str(r.supplier_id)].country if str(r.supplier_id) in supplier_map else None,
-                "supplier_lat": float(supplier_map[str(r.supplier_id)].latitude) if str(r.supplier_id) in supplier_map and supplier_map[str(r.supplier_id)].latitude else None,
-                "supplier_lng": float(supplier_map[str(r.supplier_id)].longitude) if str(r.supplier_id) in supplier_map and supplier_map[str(r.supplier_id)].longitude else None,
-                "supplier_certifications": supplier_map[str(r.supplier_id)].certifications if str(r.supplier_id) in supplier_map else [],
-                "supplier_capacity_value": supplier_map[str(r.supplier_id)].capacity_value if str(r.supplier_id) in supplier_map else None,
-                "supplier_capacity_unit": supplier_map[str(r.supplier_id)].capacity_unit if str(r.supplier_id) in supplier_map else None,
-                "supplier_lead_time_days": supplier_map[str(r.supplier_id)].lead_time_days if str(r.supplier_id) in supplier_map else None,
-                "supplier_website": supplier_map[str(r.supplier_id)].website if str(r.supplier_id) in supplier_map else None,
-                "supplier_source": supplier_map[str(r.supplier_id)].source if str(r.supplier_id) in supplier_map else None,
-                "total_score": r.total_score,
-                "constraint_score": r.constraint_score,
-                "semantic_score": r.semantic_score,
-                "proximity_score": r.proximity_score,
-                "completeness_score": r.completeness_score,
-                "compliance_matrix": r.compliance_matrix,
-                "explanation": r.explanation,
-                "distance_km": r.distance_km,
-            }
-            for r in (query.results or [])
-        ],
+        "results": [_result_dict(r) for r in (query.results or [])],
     }
 
 
@@ -310,6 +330,14 @@ async def get_audit_trail(
         raise HTTPException(status_code=400, detail="Invalid query ID")
 
     from sqlalchemy import select
+    query_repo = QueryRepository(db)
+    query = await query_repo.get_by_id(qid)
+    if query is None:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    if query.user_id != current_user.id and current_user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
     result = await db.execute(
         select(AuditLog)
         .where(AuditLog.query_id == qid)
@@ -338,13 +366,13 @@ async def _run_pipeline_background(
     query_id: str,
     raw_query: str,
     user_id: str,
+    search_scope: str,
 ) -> None:
     """
     Background task: runs the full agent pipeline and saves results.
     Sends SSE events to notify the frontend of progress.
     """
     from app.db.session import AsyncSessionLocal
-    import uuid
 
     start_time = time.time()
 
@@ -372,7 +400,7 @@ async def _run_pipeline_background(
     try:
         # Run the agent pipeline
         _push("agent_update", {"agent": "parser", "status": "running", "message": "Extracting constraints..."})
-        final_state = await run_pipeline(raw_query, query_id, user_id)
+        final_state = await run_pipeline(raw_query, query_id, user_id, search_scope)
         execution_time_ms = int((time.time() - start_time) * 1000)
 
         # Push agent completion events from audit log
@@ -402,6 +430,9 @@ async def _run_pipeline_background(
                     status=new_status,
                     detected_language=final_state.get("detected_language", "en"),
                     parsed_constraints=final_state.get("parsed_constraints"),
+                    search_scope=final_state.get("search_scope", search_scope),
+                    evaluator_retries=final_state.get("evaluator_retries", 0),
+                    evaluator_verdict=final_state.get("evaluator_verdict"),
                     execution_time_ms=execution_time_ms,
                     completed_at=datetime.now(timezone.utc),
                     error_message=final_state.get("error"),
@@ -466,5 +497,5 @@ async def _run_pipeline_background(
             await db.commit()
 
     finally:
-        await asyncio.sleep(300)
+        await asyncio.sleep(settings.SSE_CLEANUP_DELAY_SECONDS)
         _sse_events.pop(query_id, None)
