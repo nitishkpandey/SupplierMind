@@ -1,18 +1,22 @@
 """
-app/agents/discovery_agent.py — Hybrid supplier retrieval with agentic retry.
-Rewritten to use synchronous DB session (no async/event loop conflicts in LangGraph).
+app/agents/discovery_agent.py — Hybrid supplier retrieval with tier awareness.
+
+PRODUCTION V2 CHANGES:
+- Retrieval respects search_scope ("approved_only" vs "both")
+- Queries Tier 2 (user-saved) suppliers automatically
+- Records tier_assignments in state for downstream ranking boosts
 """
 
 import json
 import logging
 import time
 from typing import Optional
-
-from sqlalchemy.orm import Session
+from sqlalchemy import select, or_, and_, func, Text
 
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState
 from app.db.session import SyncSessionLocal
+from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 
 logger = logging.getLogger(__name__)
@@ -34,7 +38,7 @@ Priority for relaxation (relax first to last):
 3. capacity_min — lower the capacity threshold
 4. certifications — only remove ONE certification, keep the others
 
-NEVER relax: category (defines the product type)
+NEVER relax: product_type (defines the product)
 
 Return JSON only:
 {{
@@ -46,8 +50,8 @@ Return JSON only:
 
 class DiscoveryAgent(BaseAgent):
     """
-    Retrieves candidate suppliers using 3 parallel strategies + agentic retry.
-    Uses sync DB session to avoid event loop conflicts inside LangGraph.
+    Retrieves candidate suppliers using hybrid search + agentic retry.
+    Production v2: Tier-aware retrieval.
     """
 
     agent_name = "discovery"
@@ -58,17 +62,22 @@ class DiscoveryAgent(BaseAgent):
         state.setdefault("semantic_scores", {})
         state.setdefault("geo_distances", {})
         state.setdefault("relaxed_constraints", [])
+        state.setdefault("tier_assignments", {})
         state.setdefault("retry_count", 0)
 
         constraints = state.get("parsed_constraints") or {}
         retry_count = state.get("retry_count", 0)
+        search_scope = state.get("search_scope", "approved_only")
+        user_id = state.get("user_id")
 
-        return self._run_search(state, constraints, retry_count)
+        return self._run_search(state, constraints, retry_count, search_scope, user_id)
 
-    def _run_search(self, state: AgentState, constraints: dict, retry_count: int) -> AgentState:
+    def _run_search(
+        self, state: AgentState, constraints: dict, retry_count: int, search_scope: str, user_id: str
+    ) -> AgentState:
         start = time.time()
 
-        # ── Strategy 1: Semantic vector search ───────────────────────
+        # ── Step 1: Semantic vector search ───────────────────────
         semantic_ranked: dict[str, int] = {}
         semantic_scores: dict[str, float] = {}
 
@@ -76,32 +85,93 @@ class DiscoveryAgent(BaseAgent):
             from app.core.vector_store import get_vector_store
             vs = get_vector_store()
             query_text = self._build_query_text(constraints, state["raw_query"])
-            sem_results = vs.search(query_text, top_k=10)
-            semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(sem_results)}
-            semantic_scores = {r.supplier_id: r.similarity_score for r in sem_results}
-            logger.info("[discovery] Semantic: %d results", len(sem_results))
+            sem_results = vs.search(query_text, top_k=20) # Get more to filter locally
+
+            # Filter vector results by scope (Milvus doesn't currently index status in this prototype)
+            with SyncSessionLocal() as db:
+                valid_ids = self._filter_ids_by_scope(db, [r.supplier_id for r in sem_results], search_scope, user_id)
+                filtered_results = [r for r in sem_results if r.supplier_id in valid_ids]
+
+                semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(filtered_results[:10])}
+                semantic_scores = {r.supplier_id: r.similarity_score for r in filtered_results[:10]}
+                logger.debug("[discovery] Semantic: %d results (filtered from %d)", len(semantic_ranked), len(sem_results))
+
         except Exception as e:
             logger.warning("[discovery] Semantic search failed: %s", e)
 
-        # ── Strategy 2 & 3: Structured + Geospatial (sync DB) ────────
+        # ── Step 2 & 3: Structured + Geospatial (sync DB) ────────
         structured_ranked: dict[str, int] = {}
         geo_ranked: dict[str, int] = {}
         geo_distances: dict[str, float] = {}
+        tier_assignments: dict[str, str] = {}
 
         try:
             with SyncSessionLocal() as db:
+                # Build base condition for scope
+                # approved_only = status=='approved' OR user_supplier_saves matching this user
+                # both = status IN ('approved', 'discovered') OR user_supplier_saves
+                base_conds = []
+                if search_scope == "approved_only":
+                    base_conds.append(Supplier.status == SupplierStatus.approved)
+                else:
+                    base_conds.append(Supplier.status.in_([SupplierStatus.approved, SupplierStatus.discovered]))
+
+                # Add user saved
+                if user_id:
+                    base_conds.append(
+                        Supplier.id.in_(
+                            select(UserSupplierSave.supplier_id).where(UserSupplierSave.user_id == user_id)
+                        )
+                    )
+
+                scope_filter = or_(*base_conds)
+
                 # Strategy 2: Structured SQL filter
-                structured = SupplierRepository.filter_by_constraints_sync(
-                    db=db,
-                    category=constraints.get("category"),
-                    country=self._extract_country(constraints),
-                    required_certifications=constraints.get("certifications"),
-                    min_capacity=constraints.get("capacity_min"),
-                    capacity_unit=constraints.get("capacity_unit"),
-                    max_lead_time_days=constraints.get("lead_time_max_days"),
-                )
+                # We do this manually here to inject the scope filter, since repository method is static
+                category = constraints.get("category_hint")
+                country = self._extract_country_from_constraints(constraints)
+                certs = constraints.get("certifications")
+
+                query = select(Supplier).where(Supplier.is_active == True).where(scope_filter)
+
+                if category:
+                    query = query.where(Supplier.category == category)
+                if country:
+                    query = query.where(Supplier.country == country)
+                if certs:
+                    for c in certs:
+                        query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
+
+                structured = db.execute(query.limit(20)).scalars().all()
                 structured_ranked = {str(s.id): i + 1 for i, s in enumerate(structured)}
-                logger.info("[discovery] Structured filter: %d results", len(structured))
+                logger.debug("[discovery] Structured filter: %d results", len(structured))
+
+                # Build tier assignments for ALL found suppliers
+                all_found_ids = set(semantic_ranked) | set(structured_ranked)
+                if all_found_ids:
+                    # Determine tiers
+                    suppliers_info = db.execute(
+                        select(Supplier.id, Supplier.status).where(Supplier.id.in_(all_found_ids))
+                    ).all()
+
+                    # Find which ones are saved by user
+                    saved_ids = set()
+                    if user_id:
+                        saved_ids = set(db.execute(
+                            select(UserSupplierSave.supplier_id)
+                            .where(UserSupplierSave.supplier_id.in_(all_found_ids))
+                            .where(UserSupplierSave.user_id == user_id)
+                        ).scalars().all())
+
+                    for sid, status in suppliers_info:
+                        sid_str = str(sid)
+                        # Tier 2 overrides Tier 3, Tier 1 is top
+                        if status == SupplierStatus.approved:
+                            tier_assignments[sid_str] = "approved"
+                        elif sid in saved_ids:
+                            tier_assignments[sid_str] = "saved"
+                        else:
+                            tier_assignments[sid_str] = "discovered"
 
                 # Strategy 3: Geospatial radius
                 if (constraints.get("location_lat") and
@@ -113,14 +183,16 @@ class DiscoveryAgent(BaseAgent):
                         center_lng=constraints["location_lng"],
                         radius_km=constraints["location_radius_km"],
                     )
-                    geo_ranked = {str(s.id): i + 1 for i, (s, _) in enumerate(geo_with_dist)}
-                    geo_distances = {str(s.id): dist for s, dist in geo_with_dist}
-                    logger.info("[discovery] Geospatial: %d results", len(geo_with_dist))
+                    # Filter geo results by scope locally
+                    valid_geo = [(s, d) for s, d in geo_with_dist if str(s.id) in tier_assignments]
+                    geo_ranked = {str(s.id): i + 1 for i, (s, _) in enumerate(valid_geo)}
+                    geo_distances = {str(s.id): dist for s, dist in valid_geo}
+                    logger.debug("[discovery] Geospatial: %d results", len(valid_geo))
 
         except Exception as e:
             logger.error("[discovery] DB search failed: %s", e)
 
-        # ── Merge with Reciprocal Rank Fusion ─────────────────────────
+        # ── Step 4: Merge with Reciprocal Rank Fusion ─────────────────
         all_ids = set(semantic_ranked) | set(structured_ranked) | set(geo_ranked)
         rrf_scores: dict[str, float] = {}
         for sid in all_ids:
@@ -136,27 +208,30 @@ class DiscoveryAgent(BaseAgent):
         candidate_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)
         duration_ms = int((time.time() - start) * 1000)
 
-        logger.info("[discovery] Merged: %d candidates (retry=%d)", len(candidate_ids), retry_count)
+        logger.info(
+            "[discovery] %d candidates: sem=%d, sql=%d, geo=%d%s",
+            len(candidate_ids), len(semantic_ranked), len(structured_ranked), len(geo_ranked),
+            f" (retry={retry_count})" if retry_count > 0 else "",
+        )
 
         self._log_audit(
             state,
             action=f"search_completed{'_retry' + str(retry_count) if retry_count > 0 else ''}",
-            input_summary=f"query={state['raw_query'][:60]}",
+            input_summary=f"query={state['raw_query'][:60]} | scope={search_scope}",
             output_summary=(
                 f"semantic={len(semantic_ranked)}, "
                 f"structured={len(structured_ranked)}, "
-                f"geo={len(geo_ranked)}, "
                 f"merged={len(candidate_ids)}"
             ),
             duration_ms=duration_ms,
             reasoning=(
-                f"RRF merge applied. "
+                f"RRF merge applied across tiers. "
                 f"Relaxed: {state.get('relaxed_constraints', [])}"
                 if state.get("relaxed_constraints") else "Initial search."
             ),
         )
 
-        # ── Agentic retry ─────────────────────────────────────────────
+        # ── Step 5: Agentic retry ─────────────────────────────────────
         if len(candidate_ids) < MIN_RESULTS and retry_count < MAX_RETRIES:
             relaxed, relax_key = self._decide_relaxation(
                 constraints,
@@ -168,43 +243,63 @@ class DiscoveryAgent(BaseAgent):
                 state["retry_count"] = retry_count + 1
                 state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
                 logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
-                return self._run_search(state, relaxed, retry_count + 1)
+                return self._run_search(state, relaxed, retry_count + 1, search_scope, user_id)
 
         # ── Final state ───────────────────────────────────────────────
         state["candidate_supplier_ids"] = candidate_ids[:10]
         state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in candidate_ids}
         state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in candidate_ids}
+        state["tier_assignments"] = tier_assignments
         state["retry_count"] = retry_count
 
         if not candidate_ids:
             state["pipeline_status"] = "failed"
             state["error"] = (
                 "No suppliers found matching your constraints after "
-                f"{retry_count} relaxation attempt(s). "
+                f"{retry_count} relaxation attempt(s) in scope '{search_scope}'. "
                 "Try broadening your search."
             )
         else:
             state["pipeline_status"] = "running"
+            state["error"] = None # Clear any previous error if we succeeded on retry
 
         return state
 
+    def _filter_ids_by_scope(self, db, sids: list[str], scope: str, user_id: str) -> set[str]:
+        """Returns subset of IDs that are allowed by the current search scope."""
+        if not sids:
+            return set()
+
+        base_conds = []
+        if scope == "approved_only":
+            base_conds.append(Supplier.status == SupplierStatus.approved)
+        else:
+            base_conds.append(Supplier.status.in_([SupplierStatus.approved, SupplierStatus.discovered]))
+
+        if user_id:
+            base_conds.append(
+                Supplier.id.in_(
+                    select(UserSupplierSave.supplier_id).where(UserSupplierSave.user_id == user_id)
+                )
+            )
+
+        valid = db.execute(
+            select(Supplier.id).where(Supplier.id.in_(sids)).where(or_(*base_conds))
+        ).scalars().all()
+
+        return {str(i) for i in valid}
+
     def _build_query_text(self, constraints: dict, raw_query: str) -> str:
         parts = [raw_query]
-        if constraints.get("category"):
-            parts.append(f"category: {constraints['category']}")
+        if constraints.get("product_type"):
+            parts.append(f"product: {constraints['product_type']}")
+        if constraints.get("product_keywords"):
+            parts.append(f"keywords: {', '.join(constraints['product_keywords'])}")
         if constraints.get("certifications"):
             parts.append(f"certifications: {', '.join(constraints['certifications'])}")
         if constraints.get("location_name"):
             parts.append(f"location: {constraints['location_name']}")
         return " | ".join(parts)
-
-    def _extract_country(self, constraints: dict) -> Optional[str]:
-        location = constraints.get("location_name", "") or ""
-        if "," in location:
-            parts = [p.strip() for p in location.split(",")]
-            if len(parts) >= 2:
-                return parts[-1]
-        return None
 
     def _decide_relaxation(
         self,
@@ -212,7 +307,6 @@ class DiscoveryAgent(BaseAgent):
         result_count: int,
         previous: list[str],
     ) -> tuple[Optional[dict], str]:
-        """Ask LLM which constraint to relax. Returns (relaxed_constraints, key)."""
         available = [
             k for k in ["location_radius_km", "lead_time_max_days", "capacity_min"]
             if k in constraints and k not in previous

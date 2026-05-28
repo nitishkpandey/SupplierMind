@@ -22,8 +22,9 @@ The LLM can reason about:
 
 import json
 import logging
-import math
+import re
 import time
+from pathlib import Path
 from typing import Optional
 
 from app.agents.base import BaseAgent
@@ -31,35 +32,163 @@ from app.agents.state import AgentState, ComplianceResult, SupplierComplianceRes
 
 logger = logging.getLogger(__name__)
 
-COMPLIANCE_SYSTEM_PROMPT = """You are a procurement compliance expert using the ReAct reasoning pattern.
+# ── Certification taxonomy (Task 1.3) ─────────────────────────────────
+# Human-verified lookup table that grounds cert-equivalence decisions in
+# facts instead of LLM guesses. See app/data/cert_taxonomy.json.
+_TAXONOMY_PATH = Path(__file__).resolve().parent.parent / "data" / "cert_taxonomy.json"
 
-For each constraint, you will:
-1. REASON about what the constraint requires
-2. ACT by examining the supplier's data
-3. OBSERVE what you find
-4. OUTPUT your verdict
+TAXONOMY_PASS_CONFIDENCE = 0.95   # supersession relationship — deterministic, no LLM
+TAXONOMY_FAIL_CONFIDENCE = 0.95   # explicit NOT_equivalent — kills the hallucination
+
+
+def _load_cert_taxonomy() -> dict[str, dict]:
+    try:
+        with open(_TAXONOMY_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        logger.info("Loaded cert taxonomy: %d entries", len(data))
+        return data
+    except Exception as e:
+        logger.error("Failed to load cert taxonomy from %s: %s", _TAXONOMY_PATH, e)
+        return {}
+
+
+CERT_TAXONOMY: dict[str, dict] = _load_cert_taxonomy()
+
+
+def _canonical_cert_token(raw: str) -> str:
+    """Normalize a cert name to a comparable token.
+
+    Drops version years (':2015'), the '/IEC' qualifier, and all non-alphanumerics
+    so 'ISO 9001:2015', 'ISO/IEC 27001', and 'OEKO-TEX Standard 100' compare cleanly.
+    """
+    s = (raw or "").upper()
+    s = re.sub(r":\s*\d{4}", "", s)      # ISO 9001:2015 → ISO 9001
+    s = s.replace("ISO/IEC", "ISO")
+    s = re.sub(r"[^A-Z0-9]", "", s)      # drop spaces, hyphens, slashes
+    return s
+
+
+# Precomputed {normalized_token: canonical_taxonomy_key}
+_NORM_TO_KEY: dict[str, str] = {
+    _canonical_cert_token(key): key for key in CERT_TAXONOMY
+}
+
+# Explicit aliases for cert spellings that don't resolve via substring matching
+# (e.g. 'OEKO-TEX 100' → digits are non-adjacent after normalization).
+_CERT_ALIASES: dict[str, str] = {
+    "OEKOTEX100": "OEKO-TEX Standard 100",
+}
+
+
+def canonical_cert_key(raw: str) -> Optional[str]:
+    """Resolve a raw cert string to its canonical taxonomy key, or None.
+
+    Exact normalized match first, then explicit aliases, then a length-guarded
+    substring match so 'OEKO-TEX' resolves to 'OEKO-TEX Standard 100' and
+    'AS9100D' to 'AS9100', while short tokens like 'CE' (len < 4) only match
+    exactly to avoid noise.
+    """
+    n = _canonical_cert_token(raw)
+    if not n:
+        return None
+    if n in _NORM_TO_KEY:
+        return _NORM_TO_KEY[n]
+    if n in _CERT_ALIASES:
+        return _CERT_ALIASES[n]
+    if len(n) >= 4:
+        for norm_key, key in _NORM_TO_KEY.items():
+            if n in norm_key or norm_key in n:
+                return key
+    return None
+
+
+def taxonomy_cert_verdict(
+    required_cert: str, supplier_certs: list[str]
+) -> Optional[dict]:
+    """Decide a required cert against a supplier's certs using the taxonomy only.
+
+    Returns a verdict dict {status, reason, matched_via} when the taxonomy is
+    conclusive, else None (caller falls back to the LLM). Precedence:
+      1. A supplier cert supersedes/contains the required cert  → PASS
+      2. A supplier cert is explicitly NOT_equivalent to it     → FAIL
+    """
+    req_key = canonical_cert_key(required_cert)
+    if req_key is None:
+        return None  # required cert not in taxonomy — let the LLM handle it
+
+    # 1. Supersession: supplier cert fully includes the required cert.
+    for sup_cert in supplier_certs:
+        sup_key = canonical_cert_key(sup_cert)
+        if sup_key is None:
+            continue
+        supersedes = {
+            canonical_cert_key(c)
+            for c in CERT_TAXONOMY[sup_key].get("contains_or_supersedes", [])
+        }
+        if req_key in supersedes:
+            return {
+                "status": "PASS",
+                "reason": f"{sup_key} contains/supersedes {req_key}",
+                "matched_via": "contains_or_supersedes",
+            }
+
+    # 2. Explicit non-equivalence (checked both directions; taxonomy lists both).
+    req_not_equiv = {
+        canonical_cert_key(c)
+        for c in CERT_TAXONOMY[req_key].get("NOT_equivalent_to", [])
+    }
+    for sup_cert in supplier_certs:
+        sup_key = canonical_cert_key(sup_cert)
+        if sup_key is None:
+            continue
+        sup_not_equiv = {
+            canonical_cert_key(c)
+            for c in CERT_TAXONOMY[sup_key].get("NOT_equivalent_to", [])
+        }
+        if req_key in sup_not_equiv or sup_key in req_not_equiv:
+            return {
+                "status": "FAIL",
+                "reason": f"{sup_key} is explicitly not equivalent to {req_key}",
+                "matched_via": "NOT_equivalent_to",
+            }
+
+    return None
+
+
+def taxonomy_prompt_snippet(cert_names: list[str]) -> str:
+    """Build an authoritative taxonomy block for the LLM prompt (step 5)."""
+    seen: set[str] = set()
+    lines: list[str] = []
+    for name in cert_names:
+        key = canonical_cert_key(name)
+        if key is None or key in seen:
+            continue
+        seen.add(key)
+        e = CERT_TAXONOMY[key]
+        lines.append(
+            f"- {key}: {e.get('what_it_covers', '')} "
+            f"| supersedes: {e.get('contains_or_supersedes', []) or 'none'} "
+            f"| NOT equivalent to: {e.get('NOT_equivalent_to', []) or 'none'}"
+        )
+    return "\n".join(lines)
+
+
+LEAD_TIME_GRACE_MULTIPLIER = 1.15   # 15% over limit → PARTIAL instead of FAIL
+LOCATION_GRACE_MULTIPLIER = 1.10    # 10% outside radius → PARTIAL instead of FAIL
+CAPACITY_PARTIAL_THRESHOLD = 0.80   # within 20% of min → PARTIAL instead of FAIL
+CATEGORY_CONFIDENCE = 0.60          # below ranking hard-fail threshold of 0.8
+LLM_CERT_CONFIDENCE = 0.80          # LLM reasoning certainty for cert equivalence
+
+COMPLIANCE_BATCH_SYSTEM_PROMPT = """You are a procurement compliance expert. Return JSON only.
+
+Validate multiple certifications for a single supplier in one response.
 
 VERDICT RULES:
-- PASS: Supplier clearly satisfies the constraint
-- FAIL: Supplier clearly does not satisfy the constraint
-- PARTIAL: Supplier partially satisfies it OR there is insufficient data to be certain
+- PASS: Supplier holds a directly equivalent certification
+- PARTIAL: Supplier holds a related but not equivalent certification
+- FAIL: No related certification found
 
-IMPORTANT:
-- Certifications: PASS only if exact certification is listed. PARTIAL if closely related standard found.
-- Capacity: compare numeric values. PARTIAL if within 20% of minimum.
-- Location: PASS if within radius. PARTIAL if slightly outside (within 10% of radius).
-- Lead time: PASS if at or under limit. FAIL if over.
-
-Return JSON array of compliance results:
-[
-  {
-    "constraint_name": "ISO 9001",
-    "status": "PASS" | "FAIL" | "PARTIAL",
-    "reason": "one sentence explanation",
-    "confidence": 0.0 to 1.0,
-    "reasoning_trace": "your THOUGHT→ACT→OBSERVE chain"
-  }
-]"""
+Return: {"results": [{"constraint_name": "...", "status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}, ...]}"""
 
 
 class ComplianceAgent(BaseAgent):
@@ -78,6 +207,10 @@ class ComplianceAgent(BaseAgent):
     """
 
     agent_name = "compliance"
+
+    # Per-query counters (reset at the start of each execute()).
+    _llm_supplier_count: int = 0
+    _short_circuit_count: int = 0
 
     def execute(self, state: AgentState) -> AgentState:
         candidate_ids = state.get("candidate_supplier_ids", [])
@@ -105,10 +238,15 @@ class ComplianceAgent(BaseAgent):
 
         start = time.time()
 
+        # Reset per-query counters (instance is reused across pipeline runs)
+        self._llm_supplier_count = 0
+        self._short_circuit_count = 0
+
         # Fetch full supplier data from database
         suppliers = self._fetch_suppliers(candidate_ids)
+        active_constraint_count = sum(1 for v in constraints.values() if v)
         logger.info("[compliance] Checking %d suppliers against %d constraint types",
-                    len(suppliers), len([k for k, v in constraints.items() if v]))
+                    len(suppliers), active_constraint_count)
 
         compliance_results: list[SupplierComplianceResult] = []
 
@@ -122,6 +260,11 @@ class ComplianceAgent(BaseAgent):
                 geo_distance=geo_distance,
             )
             compliance_results.append(result)
+
+        logger.info(
+            "[compliance] %d/%d suppliers needed an LLM call; %d verdict(s) short-circuited deterministically",
+            self._llm_supplier_count, len(suppliers), self._short_circuit_count,
+        )
 
         # Sort: fully passing suppliers first, then partial, then failed
         compliance_results.sort(
@@ -138,7 +281,11 @@ class ComplianceAgent(BaseAgent):
             input_summary=f"{len(suppliers)} suppliers, constraints: {list(constraints.keys())}",
             output_summary=f"PASS={pass_count}, PARTIAL={partial_count}, FAIL={len(suppliers)-pass_count-partial_count}",
             duration_ms=duration_ms,
-            reasoning="ReAct pattern applied to each constraint per supplier.",
+            reasoning=(
+                "Hybrid validation: deterministic short-circuit for unambiguous cases "
+                f"({self._short_circuit_count} verdicts), LLM reserved for semantic cert "
+                f"equivalence ({self._llm_supplier_count}/{len(suppliers)} suppliers)."
+            ),
         )
 
         state["compliance_results"] = compliance_results
@@ -153,6 +300,7 @@ class ComplianceAgent(BaseAgent):
     ) -> SupplierComplianceResult:
         """Run all compliance checks for one supplier."""
         results: list[ComplianceResult] = []
+        sc_count = 0   # short-circuited (deterministic, no-LLM) verdicts for this supplier
 
         # ── Hard check: Category ──────────────────────────────────────
         if constraints.get("category") and supplier.get("category"):
@@ -165,30 +313,93 @@ class ComplianceAgent(BaseAgent):
                     f"{'matches' if status == 'PASS' else 'does not match'} "
                     f"required '{constraints['category']}'"
                 ),
-                # Use 0.6 confidence so category mismatch does NOT trigger the
-                # hard-fail 0.6× penalty in ranking (which requires confidence > 0.8).
-                # The LLM parser may extract a category label not present in the DB;
-                # penalising the supplier's entire score for that mapping uncertainty
-                # causes all candidates to drop below the minimum score threshold.
-                "confidence": 0.6,
+                "confidence": CATEGORY_CONFIDENCE,
             })
 
+        # ── Short-circuit: Hard country mismatch ──────────────────────
+        # Semantic search can surface out-of-country suppliers (structured
+        # search filters by country, semantic does not). A confident country
+        # mismatch is deterministic — FAIL at confidence 1.0, no LLM. Only a
+        # mismatch is recorded; matches add no entry so pass_rate (and the
+        # ranking score distribution) is unchanged for in-country suppliers.
+        req_country = (constraints.get("location_country") or "").strip().casefold()
+        sup_country = (supplier.get("country") or "").strip().casefold()
+        if req_country and sup_country and req_country != sup_country \
+                and req_country not in sup_country and sup_country not in req_country:
+            results.append({
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": (
+                    f"Supplier is in {supplier.get('country')}, "
+                    f"required country is {constraints.get('location_country')}"
+                ),
+                "confidence": 1.0,
+            })
+            sc_count += 1
+
         # ── Hard check: Certifications ────────────────────────────────
-        supplier_certs = [c.upper() for c in (supplier.get("certifications") or [])]
-        for required_cert in (constraints.get("certifications") or []):
-            if required_cert.upper() in supplier_certs:
+        supplier_certs_raw = supplier.get("certifications") or []
+        supplier_certs = [c.upper() for c in supplier_certs_raw]
+        required_certs = constraints.get("certifications") or []
+        certs_needing_llm: list[str] = []
+
+        if required_certs and not supplier_certs:
+            # Short-circuit: supplier lists NO certifications at all, so every
+            # required cert FAILs deterministically. Skips the batch LLM call.
+            for required_cert in required_certs:
                 results.append({
                     "constraint_name": required_cert,
-                    "status": "PASS",
-                    "reason": f"Supplier holds {required_cert} certification",
+                    "status": "FAIL",
+                    "reason": f"Supplier lists no certifications; {required_cert} required",
                     "confidence": 1.0,
                 })
-            else:
-                # Check for related standards using LLM reasoning
-                llm_result = self._llm_check_certification(
-                    required_cert, supplier
-                )
-                results.append(llm_result)
+            sc_count += len(required_certs)
+        else:
+            for required_cert in required_certs:
+                if required_cert.upper() in supplier_certs:
+                    # Step 1 (Task 1.2): verbatim (case-insensitive) match → PASS, no LLM.
+                    results.append({
+                        "constraint_name": required_cert,
+                        "status": "PASS",
+                        "reason": f"Supplier holds {required_cert} certification",
+                        "confidence": 1.0,
+                    })
+                    sc_count += 1
+                    continue
+
+                # Steps 3-4 (Task 1.3): taxonomy lookup before the LLM.
+                # contains_or_supersedes → PASS; NOT_equivalent_to → FAIL.
+                verdict = taxonomy_cert_verdict(required_cert, supplier_certs_raw)
+                if verdict is not None:
+                    results.append({
+                        "constraint_name": required_cert,
+                        "status": verdict["status"],
+                        "reason": verdict["reason"],
+                        "confidence": (
+                            TAXONOMY_PASS_CONFIDENCE
+                            if verdict["status"] == "PASS"
+                            else TAXONOMY_FAIL_CONFIDENCE
+                        ),
+                    })
+                    sc_count += 1
+                    logger.info(
+                        "[compliance] Supplier %r: taxonomy %s for %r (%s), no LLM",
+                        supplier.get("name", supplier.get("id", "?")),
+                        verdict["status"], required_cert, verdict["matched_via"],
+                    )
+                    continue
+
+                # Step 5: genuinely ambiguous — defer to the LLM.
+                certs_needing_llm.append(required_cert)
+
+        # Single batched LLM call for ONLY the genuinely ambiguous certs
+        # (no exact match, no taxonomy verdict, supplier has at least one cert).
+        if certs_needing_llm:
+            batch_results = self._llm_check_certifications_batch(
+                certs_needing_llm, supplier
+            )
+            results.extend(batch_results)
+            self._llm_supplier_count += 1
 
         # ── Numeric check: Capacity ───────────────────────────────────
         if constraints.get("capacity_min") and constraints.get("capacity_unit"):
@@ -206,7 +417,7 @@ class ComplianceAgent(BaseAgent):
             if actual_lt <= max_lt:
                 status = "PASS"
                 reason = f"Lead time {actual_lt}d is within the {max_lt}d limit"
-            elif actual_lt <= max_lt * 1.15:  # 15% grace
+            elif actual_lt <= max_lt * LEAD_TIME_GRACE_MULTIPLIER:
                 status = "PARTIAL"
                 reason = f"Lead time {actual_lt}d slightly exceeds {max_lt}d limit"
             else:
@@ -225,7 +436,7 @@ class ComplianceAgent(BaseAgent):
             if geo_distance <= radius:
                 status = "PASS"
                 reason = f"Supplier is {geo_distance:.1f}km away, within {radius}km radius"
-            elif geo_distance <= radius * 1.1:  # 10% grace
+            elif geo_distance <= radius * LOCATION_GRACE_MULTIPLIER:
                 status = "PARTIAL"
                 reason = f"Supplier is {geo_distance:.1f}km away, slightly outside {radius}km radius"
             else:
@@ -244,6 +455,13 @@ class ComplianceAgent(BaseAgent):
         pass_count = sum(1 for r in results if r["status"] == "PASS")
         pass_rate = pass_count / len(results) if results else 1.0
 
+        if sc_count:
+            self._short_circuit_count += sc_count
+            logger.info(
+                "[compliance] Supplier %r: %d verdict(s) short-circuited (deterministic, no LLM)",
+                supplier.get("name", supplier.get("id", "?")), sc_count,
+            )
+
         return {
             "supplier_id": str(supplier.get("id", "")),
             "compliance_results": results,
@@ -252,50 +470,90 @@ class ComplianceAgent(BaseAgent):
             "pass_rate": pass_rate,
         }
 
-    def _llm_check_certification(
-        self, required_cert: str, supplier: dict
-    ) -> ComplianceResult:
+    def _llm_check_certifications_batch(
+        self, certs_to_check: list[str], supplier: dict
+    ) -> list[ComplianceResult]:
         """
-        Use LLM to reason about certification equivalence.
-        Called only when exact match fails.
-
-        Example: required=ISO 14001, supplier has EMAS
-        LLM reasons: EMAS is equivalent in scope, return PARTIAL.
+        Single LLM call to validate ALL unmatched certs for one supplier.
+        Replaces per-cert calls — 1 call per supplier regardless of cert count.
         """
-        prompt = f"""A supplier does NOT hold {required_cert} certification.
-Supplier description: {supplier.get('description', 'N/A')[:200]}
-Supplier certifications: {supplier.get('certifications', [])}
+        supplier_certs = supplier.get("certifications", []) or []
+        taxonomy_block = taxonomy_prompt_snippet(certs_to_check + supplier_certs)
+        taxonomy_section = (
+            f"\nAUTHORITATIVE CERTIFICATION TAXONOMY (consult this; do NOT claim "
+            f"equivalence unless supported by the 'supersedes' relationship below):\n"
+            f"{taxonomy_block}\n"
+            if taxonomy_block else ""
+        )
 
-Using the ReAct pattern:
-THOUGHT: What does {required_cert} certify?
-ACT: Look at what certifications and description the supplier has.
-OBSERVE: Is there any equivalent or related certification?
-OUTPUT: PASS (equivalent found), PARTIAL (related but not equivalent), or FAIL (nothing related)
+        prompt = f"""Supplier does NOT hold these certifications (no exact match found): {certs_to_check}
 
-Return JSON: {{"status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}}"""
+Supplier description: {supplier.get('description', 'N/A')[:300]}
+Supplier certifications: {supplier_certs}
+{taxonomy_section}
+For each required certification, check if the supplier holds an equivalent or related one.
+
+Return JSON object:
+{{"results": [
+  {{"constraint_name": "<cert>", "status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}},
+  ...one entry per cert in {certs_to_check}
+]}}"""
 
         try:
             raw = self.llm.complete_json(
                 [
-                    {"role": "system", "content": "Return JSON only."},
+                    {"role": "system", "content": COMPLIANCE_BATCH_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.0,
             )
-            result = json.loads(raw)
-            return {
-                "constraint_name": required_cert,
-                "status": result.get("status", "FAIL"),
-                "reason": result.get("reason", f"No {required_cert} found"),
-                "confidence": 0.8,
-            }
-        except Exception:
-            return {
-                "constraint_name": required_cert,
-                "status": "FAIL",
-                "reason": f"{required_cert} not found in certifications list",
-                "confidence": 1.0,
-            }
+            data = json.loads(raw)
+            items = data.get("results", [])
+            if not isinstance(items, list):
+                raise ValueError("LLM returned non-list results")
+
+            output: list[ComplianceResult] = []
+            returned_names = set()
+            for item in items:
+                name = item.get("constraint_name", "")
+                returned_names.add(name)
+                output.append({
+                    "constraint_name": name,
+                    "status": item.get("status", "FAIL"),
+                    "reason": item.get("reason", f"No {name} found"),
+                    "confidence": LLM_CERT_CONFIDENCE,
+                })
+
+            # Fill in any certs the LLM omitted
+            for cert in certs_to_check:
+                if cert not in returned_names:
+                    logger.warning("[compliance] LLM omitted cert %r from batch response", cert)
+                    output.append({
+                        "constraint_name": cert,
+                        "status": "FAIL",
+                        "reason": f"{cert} not found in certifications list",
+                        "confidence": 1.0,
+                    })
+
+            logger.info(
+                "[compliance] Supplier %r: 1 LLM call for %d unmatched cert(s): %s",
+                supplier.get("name", supplier.get("id", "?")),
+                len(certs_to_check),
+                certs_to_check,
+            )
+            return output
+
+        except Exception as e:
+            logger.warning("[compliance] Batch LLM cert check failed: %s", e)
+            return [
+                {
+                    "constraint_name": cert,
+                    "status": "FAIL",
+                    "reason": f"{cert} not found in certifications list",
+                    "confidence": 1.0,
+                }
+                for cert in certs_to_check
+            ]
 
     def _check_capacity(
         self, supplier: dict, min_cap: float, cap_unit: str
@@ -327,7 +585,7 @@ Return JSON: {{"status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "rea
                 "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} meets minimum {min_cap:,.0f}",
                 "confidence": 1.0,
             }
-        elif supplier_cap >= min_cap * 0.8:  # Within 20%
+        elif supplier_cap >= min_cap * CAPACITY_PARTIAL_THRESHOLD:
             return {
                 "constraint_name": "capacity",
                 "status": "PARTIAL",
@@ -342,30 +600,3 @@ Return JSON: {{"status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "rea
                 "confidence": 1.0,
             }
 
-    def _fetch_suppliers(self, supplier_ids: list[str]) -> list[dict]:
-        """Fetch supplier data using sync DB session (no async conflicts)."""
-        from app.db.session import SyncSessionLocal
-        from app.db.repositories.supplier_repo import SupplierRepository
-
-        with SyncSessionLocal() as db:
-            suppliers = SupplierRepository.get_by_ids_sync(db, supplier_ids)
-            return [
-                {
-                    "id": str(s.id),
-                    "name": s.name,
-                    "description": s.description,
-                    "category": s.category,
-                    "country": s.country,
-                    "city": s.city,
-                    "latitude": s.latitude,
-                    "longitude": s.longitude,
-                    "certifications": s.certifications or [],
-                    "certification_details": s.certification_details or {},
-                    "capacity_value": s.capacity_value,
-                    "capacity_unit": s.capacity_unit,
-                    "lead_time_days": s.lead_time_days,
-                    "website": s.website,
-                    "contact_email": s.contact_email,
-                }
-                for s in suppliers
-            ]
