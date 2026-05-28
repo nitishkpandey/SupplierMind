@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
-import { AppLayout } from "@/components/Layout/AppLayout";
+import { AppLayout } from "@/features/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import DashboardPage from "@/pages/DashboardPage";
@@ -8,6 +8,7 @@ import QueryPage from "@/pages/QueryPage";
 import ResultsPage from "@/pages/ResultsPage";
 import HistoryPage from "@/pages/HistoryPage";
 import AdminPage from "@/pages/AdminPage";
+import MySuppliersPage from "@/pages/MySuppliersPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="query" element={<QueryPage />} />
           <Route path="query/:queryId/results" element={<ResultsPage />} />
           <Route path="history" element={<HistoryPage />} />
+          <Route path="my-suppliers" element={<MySuppliersPage />} />
           <Route
             path="admin"
             element={

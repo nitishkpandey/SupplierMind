@@ -1,0 +1,222 @@
+{
+  "ISO 9001": {
+    "full_name": "ISO 9001:2015 Quality Management Systems",
+    "category": "quality_management",
+    "what_it_covers": "Quality management system focused on consistent processes and customer satisfaction",
+    "issuer": "International Organization for Standardization",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 14001", "ISO 27001", "ISO 45001", "ISO 22000"],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 14001", "ISO 45001"],
+    "common_in_industries": ["manufacturing", "general", "services"]
+  },
+  "ISO 14001": {
+    "full_name": "ISO 14001:2015 Environmental Management Systems",
+    "category": "environmental",
+    "what_it_covers": "Environmental management system for reducing environmental impact",
+    "issuer": "International Organization for Standardization",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 9001", "ISO 27001", "ISO 45001"],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 9001", "ISO 50001"],
+    "common_in_industries": ["manufacturing", "chemicals", "construction"]
+  },
+  "ISO 27001": {
+    "full_name": "ISO/IEC 27001 Information Security Management",
+    "category": "information_security",
+    "what_it_covers": "Information security management system for protecting data assets",
+    "issuer": "International Organization for Standardization / IEC",
+    "equivalent_to": ["ISO/IEC 27001"],
+    "NOT_equivalent_to": ["ISO 9001", "ISO 14001", "GDPR"],
+    "contains_or_supersedes": [],
+    "complementary": ["GDPR", "SOC 2"],
+    "common_in_industries": ["software_services", "electronics", "logistics"]
+  },
+  "ISO 45001": {
+    "full_name": "ISO 45001:2018 Occupational Health and Safety Management",
+    "category": "health_safety",
+    "what_it_covers": "Occupational health and safety management to prevent workplace injury",
+    "issuer": "International Organization for Standardization",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 9001", "ISO 14001"],
+    "contains_or_supersedes": ["OHSAS 18001"],
+    "complementary": ["ISO 9001", "ISO 14001"],
+    "common_in_industries": ["manufacturing", "construction", "chemicals"]
+  },
+  "ISO 22000": {
+    "full_name": "ISO 22000 Food Safety Management Systems",
+    "category": "food_safety",
+    "what_it_covers": "Food safety management system incorporating HACCP principles and management requirements",
+    "issuer": "International Organization for Standardization",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 9001", "HACCP", "BRC"],
+    "contains_or_supersedes": ["HACCP"],
+    "complementary": ["HACCP", "FSSC 22000"],
+    "common_in_industries": ["food_ingredients"]
+  },
+  "IATF 16949": {
+    "full_name": "IATF 16949:2016 Automotive Quality Management",
+    "category": "automotive_quality",
+    "what_it_covers": "Automotive sector quality management, built on ISO 9001 with automotive-specific requirements",
+    "issuer": "International Automotive Task Force",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["AS9100"],
+    "contains_or_supersedes": ["ISO 9001"],
+    "complementary": ["ISO 14001"],
+    "common_in_industries": ["automotive", "metals", "electronics"]
+  },
+  "AS9100": {
+    "full_name": "AS9100D Aerospace Quality Management",
+    "category": "aerospace_quality",
+    "what_it_covers": "Aerospace sector quality management, built on ISO 9001 with aviation/space/defense requirements",
+    "issuer": "SAE International / IAQG",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["IATF 16949"],
+    "contains_or_supersedes": ["ISO 9001"],
+    "complementary": ["ISO 14001", "NADCAP"],
+    "common_in_industries": ["aerospace", "metals", "machinery"]
+  },
+  "OEKO-TEX Standard 100": {
+    "full_name": "OEKO-TEX Standard 100",
+    "category": "textile_chemical",
+    "what_it_covers": "Tests textiles for harmful substances; certifies product is free of harmful chemical levels",
+    "issuer": "OEKO-TEX Association",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["GOTS", "ISO 9001"],
+    "contains_or_supersedes": [],
+    "complementary": ["GOTS"],
+    "common_in_industries": ["textiles"]
+  },
+  "GOTS": {
+    "full_name": "Global Organic Textile Standard",
+    "category": "textile_organic",
+    "what_it_covers": "Certifies organic fiber content plus environmental and social criteria across the supply chain",
+    "issuer": "Global Standard gGmbH",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["OEKO-TEX Standard 100"],
+    "contains_or_supersedes": [],
+    "complementary": ["OEKO-TEX Standard 100"],
+    "common_in_industries": ["textiles"]
+  },
+  "FSC": {
+    "full_name": "Forest Stewardship Council Certification",
+    "category": "forestry",
+    "what_it_covers": "Certifies wood/paper products come from responsibly managed forests",
+    "issuer": "Forest Stewardship Council",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["PEFC"],
+    "contains_or_supersedes": [],
+    "complementary": [],
+    "common_in_industries": ["packaging", "construction_materials"]
+  },
+  "PEFC": {
+    "full_name": "Programme for the Endorsement of Forest Certification",
+    "category": "forestry",
+    "what_it_covers": "Certifies sustainable forest management; competing scheme to FSC, not mutually recognized",
+    "issuer": "PEFC Council",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["FSC"],
+    "contains_or_supersedes": [],
+    "complementary": [],
+    "common_in_industries": ["packaging", "construction_materials"]
+  },
+  "REACH": {
+    "full_name": "Registration, Evaluation, Authorisation and Restriction of Chemicals",
+    "category": "chemical_regulation",
+    "what_it_covers": "EU regulation requiring registration and safe management of chemical substances",
+    "issuer": "European Chemicals Agency (ECHA)",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["RoHS"],
+    "contains_or_supersedes": [],
+    "complementary": ["RoHS"],
+    "common_in_industries": ["chemicals", "textiles", "electronics"]
+  },
+  "RoHS": {
+    "full_name": "Restriction of Hazardous Substances Directive",
+    "category": "hazardous_substances",
+    "what_it_covers": "EU directive restricting specific hazardous substances in electrical and electronic equipment",
+    "issuer": "European Union",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["REACH"],
+    "contains_or_supersedes": [],
+    "complementary": ["REACH", "CE"],
+    "common_in_industries": ["electronics", "machinery"]
+  },
+  "CE": {
+    "full_name": "Conformite Europeenne Marking",
+    "category": "product_conformity",
+    "what_it_covers": "Indicates product conforms with EU health, safety, and environmental requirements",
+    "issuer": "Manufacturer self-declaration per EU directives",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 9001", "RoHS"],
+    "contains_or_supersedes": [],
+    "complementary": ["RoHS"],
+    "common_in_industries": ["electronics", "machinery", "construction_materials"]
+  },
+  "GDPR": {
+    "full_name": "General Data Protection Regulation",
+    "category": "data_protection",
+    "what_it_covers": "EU regulation on data protection and privacy; a legal obligation, not a certification per se",
+    "issuer": "European Union",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 27001"],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 27001"],
+    "common_in_industries": ["software_services", "logistics"]
+  },
+  "HACCP": {
+    "full_name": "Hazard Analysis and Critical Control Points",
+    "category": "food_safety",
+    "what_it_covers": "Systematic preventive approach to food safety hazards",
+    "issuer": "Codex Alimentarius (framework)",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 22000", "BRC"],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 22000"],
+    "common_in_industries": ["food_ingredients"]
+  },
+  "BRC": {
+    "full_name": "BRCGS Global Standard for Food Safety",
+    "category": "food_safety",
+    "what_it_covers": "GFSI-recognized food safety standard widely required by retailers",
+    "issuer": "BRCGS (Brand Reputation Compliance Global Standards)",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["FDA", "HACCP", "ISO 22000"],
+    "contains_or_supersedes": ["HACCP"],
+    "complementary": ["HACCP"],
+    "common_in_industries": ["food_ingredients"]
+  },
+  "FDA": {
+    "full_name": "US Food and Drug Administration Approval/Registration",
+    "category": "food_safety",
+    "what_it_covers": "US regulatory approval/registration for food, drugs, devices; regulatory not a private standard",
+    "issuer": "US Food and Drug Administration",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["BRC", "CE"],
+    "contains_or_supersedes": [],
+    "complementary": [],
+    "common_in_industries": ["food_ingredients", "chemicals"]
+  },
+  "KOSHER": {
+    "full_name": "Kosher Certification",
+    "category": "religious_dietary",
+    "what_it_covers": "Certifies food complies with Jewish dietary law",
+    "issuer": "Various kosher certifying agencies (e.g., OU, OK)",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["HALAL"],
+    "contains_or_supersedes": [],
+    "complementary": [],
+    "common_in_industries": ["food_ingredients"]
+  },
+  "HALAL": {
+    "full_name": "Halal Certification",
+    "category": "religious_dietary",
+    "what_it_covers": "Certifies food complies with Islamic dietary law",
+    "issuer": "Various halal certifying bodies",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["KOSHER"],
+    "contains_or_supersedes": [],
+    "complementary": [],
+    "common_in_industries": ["food_ingredients"]
+  }
+}
