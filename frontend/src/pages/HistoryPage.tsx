@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { QueryWithResults } from "@/types";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { queryService } from "@/services/api";
@@ -49,7 +50,7 @@ export default function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {queries.map((query: any) => {
+          {queries.map((query: QueryWithResults) => {
             const status = statusConfig[query.status as keyof typeof statusConfig]
               ?? statusConfig.pending;
             const Icon = status.icon;

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { QueryWithResults } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -49,7 +50,7 @@ export default function DashboardPage() {
 
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
+        <Card className="border-zinc-200 dark:border-zinc-800 shadow-none hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">
               {t("dashboard.total_suppliers")}
@@ -60,7 +61,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-1">In SupplierBench database</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-zinc-200 dark:border-zinc-800 shadow-none hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">
               {t("dashboard.your_queries")}
@@ -73,7 +74,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-1">Total discoveries run</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-zinc-200 dark:border-zinc-800 shadow-none hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Active Agents</CardTitle>
           </CardHeader>
@@ -87,7 +88,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent queries */}
-      <Card>
+      <Card className="border-zinc-200 dark:border-zinc-800 shadow-none">
         <CardHeader>
           <CardTitle>{t("dashboard.recent_queries")}</CardTitle>
         </CardHeader>
@@ -110,11 +111,11 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {recentQueries.map((query: any) => (
+              {recentQueries.map((query: QueryWithResults) => (
                 <Link
                   key={query.id}
                   to={`/query/${query.id}/results`}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800"
                 >
                   {statusIcon(query.status)}
                   <div className="flex-1 min-w-0">

@@ -49,7 +49,7 @@ export default function AuthCallbackPage() {
       .catch(() => {
         navigate("/login?error=profile_failed");
       });
-  }, []);
+  }, [navigate, params, setAuth]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900">

@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { useAuthStore } from "@/store/authStore";
 import { queryService } from "@/services/api";
 import { useSSE } from "@/hooks/useSSE";
-import { SupplierCard } from "@/components/ResultCard/SupplierCard";
-import { SupplierMap } from "@/components/SupplierMap/SupplierMap";
-import { AuditTrail } from "@/components/AuditTrail/AuditTrail";
+import { SupplierCard } from "@/features/suppliers/SupplierCard";
+import { SupplierMap } from "@/features/suppliers/SupplierMap";
+import { AuditTrail } from "@/features/queries/AuditTrail";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +17,8 @@ import type { QueryWithResults } from "@/types";
 // Agent step display config
 const AGENT_STEPS = [
   { id: "parser", label: "Parser Agent", desc: "Extracting constraints" },
-  { id: "discovery", label: "Discovery Agent", desc: "Searching database" },
+  { id: "external_discovery", label: "External Discovery", desc: "Searching the web for new suppliers" },
+  { id: "discovery", label: "Internal Search", desc: "Matching from database" },
   { id: "compliance", label: "Compliance Agent", desc: "Validating suppliers" },
   { id: "ranking", label: "Ranking Agent", desc: "Scoring results" },
 ];
@@ -26,23 +26,18 @@ const AGENT_STEPS = [
 export default function ResultsPage() {
   const { queryId } = useParams<{ queryId: string }>();
   const { t } = useTranslation();
-  const { accessToken } = useAuthStore();
   const [showMap, setShowMap] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
-  const [completedAgents, setCompletedAgents] = useState<string[]>([]);
 
   // SSE for live progress
   const { events, isComplete, error: sseError } = useSSE(queryId ?? null);
 
-  // Update completed agents from SSE events
-  useEffect(() => {
-    for (const event of events) {
-      if (event.agent && event.status === "done") {
-        setCompletedAgents((prev) =>
-          prev.includes(event.agent!) ? prev : [...prev, event.agent!]
-        );
-      }
-    }
+  // Derived state for completed agents
+  const completedAgents = useMemo(() => {
+    const agents = events
+      .filter((e) => e.agent && e.status === "done")
+      .map((e) => e.agent as string);
+    return Array.from(new Set(agents));
   }, [events]);
 
   // Poll for results after SSE completes
@@ -113,22 +108,20 @@ export default function ResultsPage() {
               return (
                 <div
                   key={step.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                    isDone
+                  className={`flex items-center gap-3 p-3 rounded-lg transition-all ${isDone
                       ? "bg-green-500/10 border border-green-500/20"
                       : isActive
-                      ? "bg-primary/10 border border-primary/30"
-                      : "opacity-40"
-                  }`}
+                        ? "bg-primary/10 border border-primary/30"
+                        : "opacity-40"
+                    }`}
                 >
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      isDone
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isDone
                         ? "bg-green-500 text-white"
                         : isActive
-                        ? "bg-primary text-white"
-                        : "bg-muted"
-                    }`}
+                          ? "bg-primary text-white"
+                          : "bg-muted"
+                      }`}
                   >
                     {isDone ? "✓" : AGENT_STEPS.findIndex((s) => s.id === step.id) + 1}
                   </div>

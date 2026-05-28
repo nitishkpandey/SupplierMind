@@ -26,13 +26,18 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const { t } = useTranslation();
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:8000/api/v1/auth/google/authorize";
+    window.location.href = `${apiBaseUrl}/api/v1/auth/google/authorize`;
   };
 
   const handleGithubLogin = () => {
-    window.location.href = "http://localhost:8000/api/v1/auth/github/authorize";
+    window.location.href = `${apiBaseUrl}/api/v1/auth/github/authorize`;
+  };
+
+  const handleDevLogin = () => {
+    window.location.href = `${apiBaseUrl}/api/v1/auth/dev-login?email=dev@suppliermind.local`;
   };
 
   return (
@@ -87,6 +92,26 @@ export default function LoginPage() {
               <GithubIcon />
               {t("auth.github")}
             </Button>
+
+            {import.meta.env.DEV && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-slate-700" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-slate-800 text-slate-600">dev only</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleDevLogin}
+                  variant="outline"
+                  className="w-full h-11 gap-3 bg-slate-700/50 hover:bg-slate-700 text-slate-400 border-slate-700 border-dashed"
+                >
+                  Dev Login (no OAuth)
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
 

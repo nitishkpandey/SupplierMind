@@ -28,12 +28,15 @@ export default function AdminPage() {
 
   // Build chart data from report
   const comparisonData = report?.rq2_performance_comparison
-    ? Object.entries(report.rq2_performance_comparison).map(([key, metrics]: [string, any]) => ({
-        name: key === "suppliermind" ? "SupplierMind" : key === "manual_simulation" ? "Manual Sim" : "Keyword SQL",
-        "P@5": parseFloat((metrics.precision_at_5?.mean * 100).toFixed(1)),
-        CSR: parseFloat((metrics.constraint_satisfaction_rate?.mean * 100).toFixed(1)),
-        MRR: parseFloat((metrics.mean_reciprocal_rank?.mean * 100).toFixed(1)),
-      }))
+    ? Object.entries(report.rq2_performance_comparison).map(([key, metricsRaw]) => {
+        const metrics = metricsRaw as Record<string, { mean: number }>;
+        return {
+          name: key === "suppliermind" ? "SupplierMind" : key === "manual_simulation" ? "Manual Sim" : "Keyword SQL",
+          "P@5": parseFloat((metrics.precision_at_5?.mean * 100).toFixed(1)),
+          CSR: parseFloat((metrics.constraint_satisfaction_rate?.mean * 100).toFixed(1)),
+          MRR: parseFloat((metrics.mean_reciprocal_rank?.mean * 100).toFixed(1)),
+        };
+      })
     : [];
 
   const difficultyData = report?.difficulty_breakdown?.suppliermind
