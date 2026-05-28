@@ -57,6 +57,20 @@ class QueryStatus(str, enum.Enum):
     failed = "failed"
 
 
+class SupplierStatus(str, enum.Enum):
+    """
+    Tier-based supplier classification.
+    approved   = Tier 1: company-wide trusted vendors (admin-curated)
+    saved      = Tier 2: personal shortlist (user-saved discoveries)
+    discovered = Tier 3: fresh from web, not yet promoted
+    rejected   = User marked "not relevant" — excluded from future searches
+    """
+    approved = "approved"
+    saved = "saved"
+    discovered = "discovered"
+    rejected = "rejected"
+
+
 # ── Supplier ──────────────────────────────────────────────────────────
 class Supplier(Base):
     """
@@ -90,6 +104,32 @@ class Supplier(Base):
     website: Mapped[Optional[str]] = mapped_column(String(500))
     contact_email: Mapped[Optional[str]] = mapped_column(String(255))
     embedding_id: Mapped[Optional[str]] = mapped_column(String(255))
+    source: Mapped[Optional[str]] = mapped_column(String(50), default="manual")
+    # source values: "manual" | "web_discovery" | "imported"
+
+    # ── Production v2: tier classification ─────────────────────────
+    status: Mapped[SupplierStatus] = mapped_column(
+        SAEnum(SupplierStatus, name="supplierstatus"),
+        default=SupplierStatus.approved,
+        nullable=False,
+        index=True,
+    )
+
+    # Provenance URL (where on the web did we find this?)
+    source_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+
+    # Citation tracking: per-field source URLs for verifiability
+    # Example: {"certifications": {"url": "...", "source_phrase": "..."}, ...}
+    source_citations: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+
+    # Approval workflow (who promoted this supplier to Tier 1?)
+    approved_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -114,6 +154,35 @@ class Supplier(Base):
 
     def __repr__(self) -> str:
         return f"<Supplier id={self.id} name={self.name!r}>"
+
+
+
+class UserSupplierSave(Base):
+    """
+    Tier 2 (Saved): Many-to-many between users and suppliers.
+    A user can save suppliers to their personal shortlist.
+    Saved suppliers remain visible only to the user who saved them.
+    """
+    __tablename__ = "user_supplier_saves"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    supplier_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("suppliers.id"), nullable=False
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_user_supplier_saves_user", "user_id"),
+        Index("ix_user_supplier_saves_unique", "user_id", "supplier_id", unique=True),
+    )
 
 
 # ── User ──────────────────────────────────────────────────────────────
@@ -183,6 +252,14 @@ class Query(Base):
         default=QueryStatus.pending,
         nullable=False,
     )
+
+    # ── Production v2: routing and evaluation tracking ─────────────
+    search_scope: Mapped[str] = mapped_column(
+        String(20), default="approved_only", nullable=False
+    )
+    evaluator_retries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    evaluator_verdict: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     execution_time_ms: Mapped[Optional[int]] = mapped_column(Integer)
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

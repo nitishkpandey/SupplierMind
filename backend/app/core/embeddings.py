@@ -13,12 +13,19 @@ Supplier descriptions rarely change, so cache hits will be very high.
 """
 
 import hashlib
-import json
 import logging
+import time
 from functools import lru_cache
 
 import voyageai
-from tenacity import retry, stop_after_attempt, wait_exponential
+from voyageai.error import RateLimitError
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+)
 
 from app.core.config import settings
 
@@ -31,6 +38,18 @@ EMBEDDING_MODEL = "voyage-3-lite"
 
 # Voyage AI batch size limit
 MAX_BATCH_SIZE = 128
+
+# Embedding cache TTL — supplier descriptions and queries rarely change.
+EMBED_CACHE_TTL_SECONDS = 604800  # 7 days
+_EMBED_CACHE_MAX_ENTRIES = 5000
+
+# Module-level sync cache: {cache_key: (vector, expiry_timestamp)}.
+# The shared app cache (app.core.cache) is async-only; the embedding client is
+# called from sync LangGraph agent nodes, so we keep a process-local sync cache
+# here — same pattern as app/services/page_fetcher.py. This is what stops the
+# discovery agent from re-embedding the identical query on every relaxation
+# retry and blowing through Voyage's free-tier 3 RPM limit.
+_EMBED_CACHE: dict[str, tuple[list[float], float]] = {}
 
 
 class EmbeddingClient:
@@ -70,8 +89,10 @@ class EmbeddingClient:
         return f"embed:{hashlib.md5(content.encode()).hexdigest()}"
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception_type(RateLimitError),
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=4, min=4, max=30),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
     def _call_api(
@@ -81,7 +102,10 @@ class EmbeddingClient:
     ) -> list[list[float]]:
         """
         Raw API call to Voyage AI.
-        Retries up to 3 times on transient failures.
+
+        Retries specifically on RateLimitError with a long backoff. The free
+        tier allows only 3 requests/minute, so a 1-second retry is pointless —
+        waits ramp up to 30s to actually clear the rolling window.
         """
         result = self._client.embed(
             texts,
@@ -113,21 +137,52 @@ class EmbeddingClient:
         if not texts:
             return []
 
-        all_embeddings: list[list[float]] = []
+        # Resolve from cache first; only call the API for misses.
+        results: list[list[float] | None] = [None] * len(texts)
+        miss_indices: list[int] = []
+        miss_texts: list[str] = []
+        for idx, text in enumerate(texts):
+            cached = self._cache_get(text, input_type)
+            if cached is not None:
+                results[idx] = cached
+            else:
+                miss_indices.append(idx)
+                miss_texts.append(text)
 
-        # Process in batches to respect API limits
-        for i in range(0, len(texts), MAX_BATCH_SIZE):
-            batch = texts[i : i + MAX_BATCH_SIZE]
+        if miss_texts:
             logger.debug(
-                "Embedding batch %d/%d (%d texts)",
-                i // MAX_BATCH_SIZE + 1,
-                (len(texts) - 1) // MAX_BATCH_SIZE + 1,
-                len(batch),
+                "Embedding %d/%d texts (rest served from cache)",
+                len(miss_texts), len(texts),
             )
-            batch_embeddings = self._call_api(batch, input_type)
-            all_embeddings.extend(batch_embeddings)
+            fresh: list[list[float]] = []
+            for i in range(0, len(miss_texts), MAX_BATCH_SIZE):
+                batch = miss_texts[i : i + MAX_BATCH_SIZE]
+                fresh.extend(self._call_api(batch, input_type))
 
-        return all_embeddings
+            for idx, text, vector in zip(miss_indices, miss_texts, fresh):
+                results[idx] = vector
+                self._cache_set(text, input_type, vector)
+
+        return [v for v in results if v is not None]
+
+    def _cache_get(self, text: str, input_type: str) -> list[float] | None:
+        entry = _EMBED_CACHE.get(self._cache_key(text, input_type))
+        if entry is None:
+            return None
+        vector, expiry = entry
+        if time.time() > expiry:
+            _EMBED_CACHE.pop(self._cache_key(text, input_type), None)
+            return None
+        return vector
+
+    def _cache_set(self, text: str, input_type: str, vector: list[float]) -> None:
+        # Cap cache size to prevent unbounded memory growth.
+        if len(_EMBED_CACHE) >= _EMBED_CACHE_MAX_ENTRIES:
+            _EMBED_CACHE.clear()
+        _EMBED_CACHE[self._cache_key(text, input_type)] = (
+            vector,
+            time.time() + EMBED_CACHE_TTL_SECONDS,
+        )
 
     def embed_one(
         self,

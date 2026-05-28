@@ -29,9 +29,43 @@ class QueryRepository(BaseRepository[Query]):
         """Get paginated query history for a user."""
         result = await self.db.execute(
             select(Query)
+            .options(selectinload(Query.results))
             .where(Query.user_id == user_id)
             .order_by(Query.created_at.desc())
             .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_user_recent_queries(
+        self, user_id: uuid.UUID, limit: int = 5
+    ) -> list[Query]:
+        """Get user's recent successful queries for memory context."""
+        from app.db.models import QueryStatus
+        result = await self.db.execute(
+            select(Query)
+            .where(
+                Query.user_id == user_id,
+                Query.status == QueryStatus.completed,
+            )
+            .order_by(Query.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    def get_user_recent_queries_sync(
+        db, user_id: uuid.UUID, limit: int = 5
+    ) -> list[Query]:
+        """Sync version for agent nodes (uses SyncSessionLocal)."""
+        from app.db.models import QueryStatus
+        result = db.execute(
+            select(Query)
+            .where(
+                Query.user_id == user_id,
+                Query.status == QueryStatus.completed,
+            )
+            .order_by(Query.created_at.desc())
             .limit(limit)
         )
         return list(result.scalars().all())

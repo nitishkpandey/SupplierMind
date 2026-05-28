@@ -221,7 +221,6 @@ class SupplierRepository(BaseRepository[Supplier]):
     ) -> list[Supplier]:
         """Sync version for use inside LangGraph agent nodes."""
         from sqlalchemy import and_
-        from sqlalchemy.orm import Session as SyncSession
 
         conditions = [Supplier.is_active == True]  # noqa: E712
 
@@ -230,8 +229,9 @@ class SupplierRepository(BaseRepository[Supplier]):
         if country:
             conditions.append(Supplier.country == country)
         if required_certifications:
+            from sqlalchemy import cast, String
             for cert in required_certifications:
-                conditions.append(Supplier.certifications.contains([cert]))  # type: ignore
+                conditions.append(cast(Supplier.certifications, String).contains(cert))
         if min_capacity and capacity_unit:
             conditions.append(Supplier.capacity_value >= min_capacity)
             conditions.append(Supplier.capacity_unit == capacity_unit)
