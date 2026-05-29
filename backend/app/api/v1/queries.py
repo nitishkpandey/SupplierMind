@@ -274,6 +274,19 @@ async def get_query(
 
     def _result_dict(r: QueryResult) -> dict:
         supplier = supplier_map.get(str(r.supplier_id))
+        # Task 1.5: explanation is stored as a JSON structured object. Parse it
+        # into explanation_detail; keep explanation as the plain summary string
+        # (legacy rows hold plain text and pass through unchanged).
+        explanation_text = r.explanation or ""
+        explanation_detail = None
+        if explanation_text:
+            try:
+                parsed = json.loads(explanation_text)
+                if isinstance(parsed, dict) and "summary" in parsed:
+                    explanation_detail = parsed
+                    explanation_text = parsed.get("summary", "")
+            except (ValueError, TypeError):
+                pass  # legacy free-text explanation
         return {
             "rank": r.rank,
             "supplier_id": str(r.supplier_id),
@@ -290,13 +303,20 @@ async def get_query(
             "supplier_source": supplier.source if supplier else None,
             "supplier_status": supplier.status.value if supplier else None,
             "tier": supplier.status.value if supplier else None,
+            # Task 1.6: only present when screening couldn't complete; absence
+            # means no pending state (we never assert "clear" in the UI).
+            "sanctions_status": (
+                (supplier.source_citations or {}).get("sanctions", {}).get("status")
+                if supplier else None
+            ),
             "total_score": r.total_score,
             "constraint_score": r.constraint_score,
             "semantic_score": r.semantic_score,
             "proximity_score": r.proximity_score,
             "completeness_score": r.completeness_score,
             "compliance_matrix": r.compliance_matrix,
-            "explanation": r.explanation,
+            "explanation": explanation_text,
+            "explanation_detail": explanation_detail,
             "distance_km": r.distance_km,
         }
 
