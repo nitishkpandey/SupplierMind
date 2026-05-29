@@ -13,20 +13,31 @@ import logging
 from functools import lru_cache
 from typing import Any
 
-from groq import Groq, RateLimitError, APIStatusError
+from groq import APIStatusError, Groq, RateLimitError
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from app.core.config import settings
+from app.core.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_TOKENS = 2048
+
+# English-with-JSON/code averages ~3.5 chars/token; close enough to pace the
+# throttle. Corrected to the real count via update_actual_tokens after each call.
+_CHARS_PER_TOKEN = 3.5
+
+
+def estimate_message_tokens(messages: list[dict[str, str]], max_tokens: int = 0) -> int:
+    """Estimate total tokens (prompt + reserved completion) for a chat request."""
+    prompt_chars = sum(len(m.get("content", "") or "") for m in messages)
+    return int(prompt_chars / _CHARS_PER_TOKEN) + max_tokens
 
 
 class LLMClient:
@@ -57,6 +68,7 @@ class LLMClient:
             )
         self._client = Groq(api_key=settings.GROQ_API_KEY)
         self._model = settings.LLM_MODEL_NAME
+        self._rate_limiter = get_rate_limiter()
         logger.info("LLM client initialized (provider=groq, model=%s)", self._model)
 
     @retry(
@@ -94,12 +106,17 @@ class LLMClient:
             RateLimitError: After 3 retries with exponential backoff
             APIStatusError: On non-retryable API errors
         """
+        resolved_model = model or self._model
+        ts = self._rate_limiter.acquire(
+            resolved_model, estimate_message_tokens(messages, max_tokens)
+        )
         response = self._client.chat.completions.create(
-            model=model or self._model,
+            model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
         )
+        self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or ""
 
     @retry(
@@ -129,14 +146,26 @@ class LLMClient:
 
         temperature=0.0 for structured outputs: we want exact, predictable JSON.
         """
+        resolved_model = model or self._model
+        ts = self._rate_limiter.acquire(
+            resolved_model, estimate_message_tokens(messages, max_tokens)
+        )
         response = self._client.chat.completions.create(
-            model=model or self._model,
+            model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={"type": "json_object"},
         )
+        self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or "{}"
+
+    def _record_usage(self, model: str, ts: float, response: Any) -> None:
+        """Feed the real token count back to the throttle window."""
+        usage = getattr(response, "usage", None)
+        total = getattr(usage, "total_tokens", None)
+        if total is not None:
+            self._rate_limiter.update_actual_tokens(model, ts, int(total))
 
     def count_tokens_estimate(self, text: str) -> int:
         """
