@@ -44,6 +44,7 @@ async def test_parser_extracts_radius():
         raw_query="Bronze supplier within 25km of Bremen ISO 9001 certified",
         query_id="test-002",
         user_id="test-user",
+        search_scope="both",
     )
     parser = ParserAgent()
     result = parser.run(state)
@@ -65,6 +66,7 @@ async def test_ambiguous_query_triggers_clarification():
         raw_query="good supplier",  # Too vague
         query_id="test-003",
         user_id="test-user",
+        search_scope="both",
     )
     parser = ParserAgent()
     result = parser.run(state)
