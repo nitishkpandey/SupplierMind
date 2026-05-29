@@ -156,7 +156,15 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
         return END
 
     if not state.get("candidate_supplier_ids"):
-        # Auto-fallback: if we only searched approved and found nothing, expand scope to 'both'
+        # On a retry pass (evaluator already looped us back once), never bounce
+        # to external_discovery again — re-running the web stage is the doubling
+        # cost Task 1.6 Component A caps. Accept the empty result and end.
+        if state.get("evaluator_retries", 0) > 0:
+            logger.info("[orchestrator] Routing to END: no candidates on retry pass (external_discovery not re-run)")
+            return END
+
+        # First-pass auto-fallback: if we only searched approved and found
+        # nothing, expand scope to 'both' and discover from the web once.
         if state.get("search_scope") == "approved_only":
             logger.info("[orchestrator] No approved suppliers found. Auto-expanding scope to 'both'")
             state["search_scope"] = "both"
@@ -171,7 +179,12 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
 
 def after_evaluator(state: AgentState) -> Literal["discovery_node", "__end__"]:
     if state.get("evaluator_should_retry"):
-        logger.info("[orchestrator] Evaluator requested retry — looping back to discovery")
+        n_candidates = len(state.get("candidate_supplier_ids", []))
+        logger.info(
+            "[orchestrator] Retry pass: skipping external_discovery, "
+            "reusing %d candidates from first pass",
+            n_candidates,
+        )
         return "discovery_node"
     return END
 
