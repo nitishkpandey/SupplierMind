@@ -28,32 +28,122 @@ TIER_BOOST_SAVED = 1.03     # User-saved supplier score boost
 PROXIMITY_DECAY_FACTOR = 2  # Linear decay: score = 0 at distance = radius × this factor
 
 
-EXPLANATION_PROMPT = """You are a procurement advisor explaining a supplier recommendation.
+# ── Template-based explanations (Task 1.5) ────────────────────────────
+# Result explanations are assembled deterministically from the validated
+# compliance matrix and supplier data fields — no LLM writes any of it, so no
+# number, cert name, or fact can be hallucinated. Every value traces to a
+# database field or a verified compliance verdict.
 
-Supplier: {name}
-Tier: {tier} (approved=company trusted, saved=your shortlist, discovered=new from web)
-Location: {city}, {country}
-Category: {category}
-Certifications: {certifications}
-Capacity: {capacity}
-Lead time: {lead_time} days
+# Constraints whose verdict reason is already a deterministic, data-built string
+# in the compliance agent (safe to reuse verbatim). Everything else is a cert,
+# which we phrase from scratch so no LLM prose enters the explanation.
+_STRUCTURED_CONSTRAINTS = {"capacity", "lead_time", "location_radius", "country", "category"}
 
-Constraint check results:
-{compliance_summary}
+# Quote-or-fail flags (Task 1.4) that mean "claim could not be verified".
+_UNVERIFIED_FLAGS = {
+    "quote_not_in_source", "quote_too_short",
+    "equivalence_unverifiable", "quote_unverifiable",
+}
 
-Scores:
-- Constraint satisfaction: {constraint_score:.0%}
-- Semantic relevance: {semantic_score:.0%}
-{proximity_line}
-- Overall score: {total_score:.0%}
+LOW_SEMANTIC_THRESHOLD = 0.5
 
-Write a 2-3 sentence explanation for a procurement manager explaining:
-1. Why this supplier is a good match for the query
-2. Any concerns or partial matches they should be aware of
-3. Briefly acknowledge their tier status if it's 'approved' or 'saved'
 
-Be specific and factual. Do not use generic phrases like "strong candidate".
-Return only the explanation text, no JSON."""
+def _render_verdict_reason(r: dict) -> str:
+    """Deterministic human phrasing for one constraint verdict.
+
+    Numeric/location/category verdicts reuse the compliance agent's already
+    data-built reason string. Cert verdicts are phrased from the verdict status
+    alone (never the LLM's free text), so no hallucinated wording survives.
+    """
+    name = r.get("constraint_name", "")
+    status = r.get("status", "FAIL")
+
+    if name in _STRUCTURED_CONSTRAINTS:
+        return r.get("reason", f"{name}: {status}")
+
+    # Certification constraint.
+    if status == "PASS":
+        return f"Holds required {name} certification"
+    if status == "PARTIAL":
+        if r.get("quote_flag") in _UNVERIFIED_FLAGS:
+            return f"{name} could not be verified from supplier text"
+        return f"Holds a certification related to {name}, but not an exact match"
+    return f"Does not hold required {name} certification"
+
+
+def _format_capacity(value, unit: str) -> str:
+    """Format capacity exactly from the DB value — no rounding, no invention."""
+    if value is None:
+        return "not specified"
+    if isinstance(value, (int, float)) and float(value).is_integer():
+        num = f"{int(value):,}"
+    elif isinstance(value, (int, float)):
+        num = f"{value:,}"
+    else:
+        num = str(value)
+    return f"{num} {unit}".strip() if unit else num
+
+
+def build_facts(supplier: dict, tier: str) -> dict:
+    """Render the supplier's verifiable facts straight from the DB row."""
+    lead = supplier.get("lead_time_days")
+    location = ", ".join(
+        p for p in (supplier.get("city"), supplier.get("country")) if p
+    ) or "not specified"
+    return {
+        "capacity": _format_capacity(
+            supplier.get("capacity_value"), supplier.get("capacity_unit") or ""
+        ),
+        "lead_time": f"{lead} days" if lead is not None else "not specified",
+        "certifications": supplier.get("certifications") or [],
+        "location": location,
+        "tier": tier,
+    }
+
+
+def build_match_reasons(comp_result: dict) -> list[str]:
+    """One reason per PASS verdict."""
+    return [
+        _render_verdict_reason(r)
+        for r in comp_result.get("compliance_results", [])
+        if r.get("status") == "PASS"
+    ]
+
+
+def build_concerns(comp_result: dict, semantic_score: Optional[float]) -> list[str]:
+    """One concern per FAIL/PARTIAL verdict, plus a low-semantic-match note."""
+    concerns = [
+        _render_verdict_reason(r)
+        for r in comp_result.get("compliance_results", [])
+        if r.get("status") in ("FAIL", "PARTIAL")
+    ]
+    if semantic_score is not None and semantic_score < LOW_SEMANTIC_THRESHOLD:
+        concerns.append("Limited semantic match to the query")
+    return concerns
+
+
+def build_summary(comp_result: dict) -> str:
+    """One deterministic headline sentence from the verdict mix."""
+    results = comp_result.get("compliance_results", [])
+    n_fail = sum(1 for r in results if r.get("status") == "FAIL")
+    if n_fail:
+        return f"Partial match; {n_fail} requirement(s) not met."
+    if any(r.get("status") == "PARTIAL" for r in results):
+        return "Meets core requirements; some criteria need confirmation."
+    return "Meets all specified requirements."
+
+
+def build_explanation(
+    supplier: dict, tier: str, comp_result: dict, semantic_score: Optional[float]
+) -> dict:
+    """Assemble the full structured explanation. No LLM involved."""
+    return {
+        "match_reasons": build_match_reasons(comp_result),
+        "concerns": build_concerns(comp_result, semantic_score),
+        "facts": build_facts(supplier, tier),
+        "summary": build_summary(comp_result),
+    }
+
 
 class RankingAgent(BaseAgent):
     """
@@ -174,16 +264,11 @@ class RankingAgent(BaseAgent):
             ) if has_radius else None
             completeness_score = self._calculate_completeness(supplier)
 
-            explanation = self._generate_explanation(
-                supplier=supplier,
-                tier=tier,
-                comp_result=comp_result,
-                constraint_score=constraint_score,
-                semantic_score=semantic_score,
-                proximity_score=proximity_score,
-                total_score=total_score,
-                geo_distance=geo_distances.get(sid),
-                constraints=constraints,
+            # Task 1.5: deterministic, template-based explanation — no LLM.
+            # Stored as a JSON string in the Text column; the API parses it back
+            # into a structured object for the frontend.
+            explanation = json.dumps(
+                build_explanation(supplier, tier, comp_result, semantic_score)
             )
 
             compliance_matrix = {
@@ -229,59 +314,6 @@ class RankingAgent(BaseAgent):
         state["ranked_suppliers"] = ranked
         # Don't set pipeline_status to completed here, let evaluator do it
         return state
-
-    def _generate_explanation(
-        self,
-        supplier: dict,
-        tier: str,
-        comp_result: SupplierComplianceResult,
-        constraint_score: float,
-        semantic_score: float,
-        proximity_score: Optional[float],
-        total_score: float,
-        geo_distance: Optional[float],
-        constraints: dict,
-    ) -> str:
-        """Generate a human-readable explanation using the LLM."""
-        status_icons = {"PASS": "✓", "PARTIAL": "~", "FAIL": "✗"}
-        compliance_summary_lines = []
-        for r in comp_result["compliance_results"]:
-            icon = status_icons.get(r["status"], "✗")
-            compliance_summary_lines.append(f"  {icon} {r['constraint_name']}: {r['reason']}")
-        compliance_summary = "\n".join(compliance_summary_lines) or "  No specific constraints checked"
-
-        proximity_line = ""
-        if proximity_score is not None and geo_distance is not None:
-            proximity_line = f"- Proximity score: {proximity_score:.0%} ({geo_distance:.1f}km away)\n"
-
-        prompt = EXPLANATION_PROMPT.format(
-            name=supplier.get("name", "Unknown"),
-            tier=tier,
-            city=supplier.get("city", "Unknown"),
-            country=supplier.get("country", "Unknown"),
-            category=supplier.get("category", "Unknown"),
-            certifications=", ".join(supplier.get("certifications") or []) or "None listed",
-            capacity=f"{supplier.get('capacity_value', 'N/A')} {supplier.get('capacity_unit', '')}",
-            lead_time=supplier.get("lead_time_days", "N/A"),
-            compliance_summary=compliance_summary,
-            constraint_score=constraint_score,
-            semantic_score=semantic_score,
-            proximity_line=proximity_line,
-            total_score=total_score,
-        )
-
-        try:
-            return self.llm.complete(
-                [{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=200,
-            ).strip()
-        except Exception as e:
-            logger.warning("[ranking] Explanation generation failed: %s", e)
-            return (
-                f"{supplier.get('name', 'This supplier')} scored {total_score:.0%} overall. "
-                f"Constraint satisfaction: {constraint_score:.0%}."
-            )
 
     def _calculate_proximity_score(
         self, distance_km: Optional[float], radius_km: Optional[float]
