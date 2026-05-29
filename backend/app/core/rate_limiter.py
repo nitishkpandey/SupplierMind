@@ -1,0 +1,142 @@
+"""
+app/core/rate_limiter.py — Proactive sliding-window throttle for the Groq client.
+
+WHY: Firing LLM calls with no quota awareness means the first few succeed and
+the rest get 429, after which tenacity backs off 2-15s per call. A single query
+can spend most of its time in reactive backoff. This limiter paces requests to
+stay under ~85% of the published per-model limits so 429s rarely happen at all.
+The tenacity retry in llm.py stays as a backstop for the edge cases.
+
+Sliding window, per model, tracking both RPM and TPM over a 60s window.
+Thread-safe: multiple agent nodes may issue calls concurrently.
+"""
+
+import logging
+import threading
+import time
+from collections import defaultdict, deque
+from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
+
+WINDOW_SECONDS = 60.0
+
+# Pace to this fraction of the published limit. Real limits have variance
+# (clock skew, bursts, the retry backstop), so leave headroom. Start at 0.85;
+# drop toward 0.75 if 429s persist, creep to 0.90 if queries feel slow.
+SAFETY_MARGIN = 0.85
+
+# Per-model Groq limits. VERIFY against your Groq dashboard before trusting —
+# Groq updates tier limits periodically and they differ per model.
+#   - llama-3.1-8b-instant: 30 RPM / 14,400 TPM (confirmed from query logs)
+#   - llama-3.3-70b-versatile: conservative placeholder; CONFIRM from dashboard
+GROQ_RATE_LIMITS: dict[str, dict[str, int]] = {
+    "llama-3.1-8b-instant": {"rpm": 30, "tpm": 14_400},
+    "llama-3.3-70b-versatile": {"rpm": 30, "tpm": 12_000},
+}
+
+# Used when a model is not in GROQ_RATE_LIMITS — conservative so an unknown
+# model under-throttles rather than 429-storms.
+DEFAULT_LIMIT: dict[str, int] = {"rpm": 30, "tpm": 12_000}
+
+
+class GroqRateLimiter:
+    """Per-model sliding-window limiter. Call acquire() before each API call."""
+
+    def __init__(
+        self,
+        limits: dict[str, dict[str, int]] | None = None,
+        default_limit: dict[str, int] | None = None,
+        margin: float = SAFETY_MARGIN,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self._limits = limits if limits is not None else GROQ_RATE_LIMITS
+        self._default = default_limit if default_limit is not None else DEFAULT_LIMIT
+        self._margin = margin
+        self._monotonic = monotonic
+        self._sleep = sleep
+        self._lock = threading.Lock()
+        # Per model: request timestamps and (timestamp, tokens) entries.
+        self._request_log: dict[str, deque[float]] = defaultdict(deque)
+        self._token_log: dict[str, deque[list]] = defaultdict(deque)
+
+    def _caps(self, model: str) -> tuple[float, float]:
+        limit = self._limits.get(model, self._default)
+        return limit["rpm"] * self._margin, limit["tpm"] * self._margin
+
+    def _prune(self, model: str, now: float) -> None:
+        cutoff = now - WINDOW_SECONDS
+        rlog = self._request_log[model]
+        while rlog and rlog[0] <= cutoff:
+            rlog.popleft()
+        tlog = self._token_log[model]
+        while tlog and tlog[0][0] <= cutoff:
+            tlog.popleft()
+
+    def acquire(self, model: str, estimated_tokens: int = 0) -> float:
+        """
+        Block until issuing one request of `estimated_tokens` stays within the
+        paced limits. Returns the request timestamp (pass it to
+        update_actual_tokens once the real usage is known).
+        """
+        rpm_cap, tpm_cap = self._caps(model)
+        with self._lock:
+            while True:
+                now = self._monotonic()
+                self._prune(model, now)
+                rlog = self._request_log[model]
+                tlog = self._token_log[model]
+
+                req_blocked = len(rlog) + 1 > rpm_cap
+                token_sum = sum(entry[1] for entry in tlog)
+                tok_blocked = token_sum + estimated_tokens > tpm_cap
+
+                if not req_blocked and not tok_blocked:
+                    break
+
+                waits: list[float] = []
+                if req_blocked and rlog:
+                    waits.append(rlog[0] + WINDOW_SECONDS - now)
+                if tok_blocked and tlog:
+                    waits.append(tlog[0][0] + WINDOW_SECONDS - now)
+                if not waits:
+                    # Nothing to age out (e.g. a single request larger than the
+                    # whole token budget). Let it through; the retry backstop
+                    # handles the rare 429.
+                    break
+
+                wait = max(0.0, min(waits))
+                logger.info(
+                    "[ratelimit] Pacing call: sleeping %dms for model %s "
+                    "(current: %d rpm, %d tpm)",
+                    int(wait * 1000), model, len(rlog), token_sum,
+                )
+                self._sleep(wait)
+
+            now = self._monotonic()
+            self._request_log[model].append(now)
+            self._token_log[model].append([now, estimated_tokens])
+            return now
+
+    def update_actual_tokens(self, model: str, timestamp: float, actual_tokens: int) -> None:
+        """Replace the pre-call estimate with the real usage from the response."""
+        with self._lock:
+            for entry in self._token_log[model]:
+                if entry[0] == timestamp:
+                    entry[1] = actual_tokens
+                    return
+
+
+_limiter: GroqRateLimiter | None = None
+_limiter_lock = threading.Lock()
+
+
+def get_rate_limiter() -> GroqRateLimiter:
+    """Process-wide singleton limiter shared across all agents/threads."""
+    global _limiter
+    if _limiter is None:
+        with _limiter_lock:
+            if _limiter is None:
+                _limiter = GroqRateLimiter()
+    return _limiter

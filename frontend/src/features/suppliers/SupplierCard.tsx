@@ -148,6 +148,12 @@ export function SupplierCard({ result }: SupplierCardProps) {
                   New Discovery
                 </Badge>
               )}
+              {result.sanctions_status === "pending_review" && (
+                <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700 gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Sanctions check pending
+                </Badge>
+              )}
             </div>
             
             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
@@ -217,11 +223,45 @@ export function SupplierCard({ result }: SupplierCardProps) {
           </div>
         )}
 
-        {/* Explanation */}
-        {result.explanation && (
-          <p className="text-sm text-muted-foreground leading-relaxed bg-muted/50 p-3 rounded-lg border border-border/50">
-            {result.explanation}
-          </p>
+        {/* Explanation — Task 1.5: structured, data-derived (no LLM free text) */}
+        {result.explanation_detail ? (
+          <div className="bg-muted/50 p-3 rounded-lg border border-border/50 space-y-2.5">
+            {result.explanation_detail.summary && (
+              <p className="text-sm font-medium">{result.explanation_detail.summary}</p>
+            )}
+            {result.explanation_detail.match_reasons.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-green-700">Why it matches</p>
+                <ul className="space-y-0.5">
+                  {result.explanation_detail.match_reasons.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result.explanation_detail.concerns.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-amber-700">Things to check</p>
+                <ul className="space-y-0.5">
+                  {result.explanation_detail.concerns.map((concern, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <span>{concern}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ) : (
+          result.explanation && (
+            <p className="text-sm text-muted-foreground leading-relaxed bg-muted/50 p-3 rounded-lg border border-border/50">
+              {result.explanation}
+            </p>
+          )
         )}
 
         {/* Expandable scores */}

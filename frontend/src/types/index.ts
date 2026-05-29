@@ -28,6 +28,21 @@ export interface ParsedConstraints {
 export type ComplianceStatus = "PASS" | "FAIL" | "PARTIAL";
 export type ComplianceMatrix = Record<string, ComplianceStatus>;
 
+// Task 1.5: structured, template-based explanation assembled from validated
+// data (no LLM free text). Numbers trace to the supplier DB row.
+export interface ExplanationDetail {
+  match_reasons: string[];
+  concerns: string[];
+  facts: {
+    capacity: string;
+    lead_time: string;
+    certifications: string[];
+    location: string;
+    tier: string;
+  };
+  summary: string;
+}
+
 export interface QueryResult {
   rank: number;
   supplier_id: string;
@@ -44,6 +59,8 @@ export interface QueryResult {
   supplier_source: string | null;
   supplier_status: 'approved' | 'saved' | 'discovered' | 'rejected' | null;
   tier: 'approved' | 'saved' | 'discovered' | null;
+  // Task 1.6: present only when sanctions screening could not complete.
+  sanctions_status?: 'pending_review' | null;
   total_score: number;
   constraint_score: number;
   semantic_score: number;
@@ -51,6 +68,7 @@ export interface QueryResult {
   completeness_score: number;
   compliance_matrix: ComplianceMatrix;
   explanation: string;
+  explanation_detail: ExplanationDetail | null;
   distance_km: number | null;
 }
 
