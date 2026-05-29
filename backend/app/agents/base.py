@@ -124,6 +124,7 @@ class BaseAgent(ABC):
                     "longitude": s.longitude,
                     "certifications": s.certifications or [],
                     "certification_details": s.certification_details or {},
+                    "source_citations": s.source_citations or {},
                     "capacity_value": s.capacity_value,
                     "capacity_unit": s.capacity_unit,
                     "lead_time_days": s.lead_time_days,
