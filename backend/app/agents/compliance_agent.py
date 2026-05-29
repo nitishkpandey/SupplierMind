@@ -173,6 +173,109 @@ def taxonomy_prompt_snippet(cert_names: list[str]) -> str:
     return "\n".join(lines)
 
 
+# ── Quote-or-fail verification (Task 1.4) ─────────────────────────────
+# Every LLM-issued PASS/PARTIAL must cite a verbatim phrase from the supplier's
+# source text. The backend verifies the phrase exists (substring after
+# normalization); unverifiable claims are downgraded to PARTIAL with a logged
+# reason rather than silently accepted. Extends the numeric hallucination guard
+# to textual compliance claims.
+
+MIN_QUOTE_LEN = 12        # quotes shorter than this are too generic to verify
+CONFIDENCE_FLOOR = 0.75   # LLM PASS below this is hedging → downgrade to PARTIAL
+
+# Surrounding quotation marks the LLM may wrap around its evidence_quote.
+_QUOTE_CHARS = "\"'“”‘’"
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lowercase, strip surrounding quote marks, collapse whitespace runs."""
+    s = (text or "").strip().strip(_QUOTE_CHARS).strip()
+    s = s.lower()
+    s = re.sub(r"\s+", " ", s)
+    return s.strip()
+
+
+def build_evidence_pool(supplier: dict) -> str:
+    """Concatenate a supplier's verifiable text — the only source an LLM
+    evidence_quote may be drawn from.
+
+    Sources: free-text description, certification_details values, the structured
+    certifications list rendered as text, and per-field source_citation phrases
+    (for web-discovered suppliers).
+    """
+    parts: list[str] = []
+
+    if supplier.get("description"):
+        parts.append(str(supplier["description"]))
+
+    cert_details = supplier.get("certification_details")
+    if isinstance(cert_details, dict) and cert_details:
+        parts.append(" ".join(str(v) for v in cert_details.values() if v))
+    elif cert_details:
+        parts.append(str(cert_details))
+
+    certs = supplier.get("certifications") or []
+    if certs:
+        parts.append("Certifications: " + ", ".join(str(c) for c in certs))
+
+    citations = supplier.get("source_citations")
+    if isinstance(citations, dict):
+        for field in citations.values():
+            if isinstance(field, dict) and field.get("source_phrase"):
+                parts.append(str(field["source_phrase"]))
+
+    return "\n".join(parts)
+
+
+def verify_evidence_quote(evidence_quote: Optional[str], evidence_pool: str) -> dict:
+    """Check an LLM evidence_quote against the supplier's evidence pool.
+
+    Returns {"ok": bool, "flag": Optional[str]}. flag is the machine reason when
+    the quote cannot be trusted: 'equivalence_unverifiable' (missing),
+    'quote_too_short' (too generic), or 'quote_not_in_source' (fabrication).
+    """
+    if not evidence_quote or not str(evidence_quote).strip():
+        return {"ok": False, "flag": "equivalence_unverifiable"}
+
+    norm_quote = _normalize_for_match(evidence_quote)
+    if len(norm_quote) < MIN_QUOTE_LEN:
+        return {"ok": False, "flag": "quote_too_short"}
+
+    if norm_quote not in _normalize_for_match(evidence_pool):
+        return {"ok": False, "flag": "quote_not_in_source"}
+
+    return {"ok": True, "flag": None}
+
+
+def quote_or_fail_verdict(
+    status: str, confidence: float, evidence_quote: Optional[str], evidence_pool: str
+) -> tuple[str, Optional[str]]:
+    """Apply the quote-or-fail rule to one LLM verdict.
+
+    Returns (new_status, flag). flag is None when the verdict stands as-is, else a
+    machine reason for the downgrade/annotation. FAIL is never touched (no positive
+    claim to substantiate). PASS with an unverifiable quote or sub-floor confidence
+    drops to PARTIAL; PARTIAL never escalates and never drops to FAIL — an
+    unverifiable PARTIAL is only annotated.
+    """
+    if status not in ("PASS", "PARTIAL"):
+        return status, None
+
+    check = verify_evidence_quote(evidence_quote, evidence_pool)
+
+    if status == "PASS":
+        if not check["ok"]:
+            return "PARTIAL", check["flag"]
+        if (confidence or 0.0) < CONFIDENCE_FLOOR:
+            return "PARTIAL", "low_confidence"
+        return "PASS", None
+
+    # status == "PARTIAL"
+    if not check["ok"]:
+        return "PARTIAL", "quote_unverifiable"
+    return "PARTIAL", None
+
+
 LEAD_TIME_GRACE_MULTIPLIER = 1.15   # 15% over limit → PARTIAL instead of FAIL
 LOCATION_GRACE_MULTIPLIER = 1.10    # 10% outside radius → PARTIAL instead of FAIL
 CAPACITY_PARTIAL_THRESHOLD = 0.80   # within 20% of min → PARTIAL instead of FAIL
@@ -188,7 +291,22 @@ VERDICT RULES:
 - PARTIAL: Supplier holds a related but not equivalent certification
 - FAIL: No related certification found
 
-Return: {"results": [{"constraint_name": "...", "status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}, ...]}"""
+EVIDENCE RULE (mandatory for every PASS or PARTIAL):
+- You MUST copy, VERBATIM, the exact phrase from the supplier text that justifies the verdict into "evidence_quote". Copy it character-for-character — do NOT paraphrase, summarize, translate, or reconstruct it.
+- If you cannot find a supporting phrase in the supplier text, return FAIL (or leave evidence_quote empty). A PASS/PARTIAL without a verbatim quote found in the text WILL be rejected.
+- Never invent or assume text that is not present.
+- "confidence" is your certainty the verdict is correct, 0.0 to 1.0.
+
+Return: {"results": [{"constraint_name": "...", "status": "PASS"|"PARTIAL"|"FAIL", "confidence": 0.0, "evidence_quote": "verbatim phrase from supplier text, or empty", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}, ...]}"""
+
+# Human-readable tails for the downgrade log line (thesis audit trail).
+_QUOTE_FLAG_MESSAGES = {
+    "quote_not_in_source": "LLM quote not found in supplier text",
+    "quote_too_short": "LLM quote too short to verify",
+    "equivalence_unverifiable": "LLM gave no supporting quote",
+    "low_confidence": "LLM confidence below floor",
+    "quote_unverifiable": "LLM quote could not be verified",
+}
 
 
 class ComplianceAgent(BaseAgent):
@@ -486,16 +604,23 @@ class ComplianceAgent(BaseAgent):
             if taxonomy_block else ""
         )
 
+        # The evidence pool is the ONLY text the LLM may quote from, and exactly
+        # what the backend verifies the evidence_quote against (Task 1.4).
+        evidence_pool = build_evidence_pool(supplier)
+
         prompt = f"""Supplier does NOT hold these certifications (no exact match found): {certs_to_check}
 
-Supplier description: {supplier.get('description', 'N/A')[:300]}
-Supplier certifications: {supplier_certs}
+SUPPLIER TEXT (you may ONLY quote verbatim from the text below):
+\"\"\"
+{evidence_pool[:1500]}
+\"\"\"
 {taxonomy_section}
 For each required certification, check if the supplier holds an equivalent or related one.
+For any PASS or PARTIAL, copy the exact supporting phrase from the SUPPLIER TEXT into evidence_quote.
 
 Return JSON object:
 {{"results": [
-  {{"constraint_name": "<cert>", "status": "PASS"|"PARTIAL"|"FAIL", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}},
+  {{"constraint_name": "<cert>", "status": "PASS"|"PARTIAL"|"FAIL", "confidence": 0.0, "evidence_quote": "verbatim phrase from supplier text, or empty", "reason": "one sentence", "reasoning_trace": "THOUGHT→ACT→OBSERVE"}},
   ...one entry per cert in {certs_to_check}
 ]}}"""
 
@@ -512,17 +637,50 @@ Return JSON object:
             if not isinstance(items, list):
                 raise ValueError("LLM returned non-list results")
 
+            supplier_label = supplier.get("name", supplier.get("id", "?"))
             output: list[ComplianceResult] = []
             returned_names = set()
             for item in items:
                 name = item.get("constraint_name", "")
                 returned_names.add(name)
-                output.append({
+                raw_status = item.get("status", "FAIL")
+                evidence_quote = (item.get("evidence_quote") or "").strip()
+                reason = item.get("reason", f"No {name} found")
+                try:
+                    confidence = float(item.get("confidence", LLM_CERT_CONFIDENCE))
+                except (TypeError, ValueError):
+                    confidence = LLM_CERT_CONFIDENCE
+
+                # Quote-or-fail (Task 1.4): a PASS/PARTIAL must cite a verbatim
+                # phrase that exists in the supplier text, else it is downgraded.
+                new_status, flag = quote_or_fail_verdict(
+                    raw_status, confidence, evidence_quote, evidence_pool
+                )
+
+                result: ComplianceResult = {
                     "constraint_name": name,
-                    "status": item.get("status", "FAIL"),
-                    "reason": item.get("reason", f"No {name} found"),
-                    "confidence": LLM_CERT_CONFIDENCE,
-                })
+                    "status": new_status,
+                    "reason": reason,
+                    "confidence": confidence,
+                }
+                if evidence_quote:
+                    result["evidence_quote"] = evidence_quote
+                if flag:
+                    result["quote_flag"] = flag
+                    detail = _QUOTE_FLAG_MESSAGES.get(flag, "verdict not verifiable")
+                    if new_status != raw_status:
+                        result["reason"] = f"{reason} [downgraded: {flag}]"
+                        logger.info(
+                            "[compliance] Supplier %r constraint %r: %s downgraded to %s (%s) - %s",
+                            supplier_label, name, raw_status, new_status, flag, detail,
+                        )
+                    else:
+                        result["reason"] = f"{reason} [unverified: {flag}]"
+                        logger.info(
+                            "[compliance] Supplier %r constraint %r: %s kept, quote unverifiable (%s) - %s",
+                            supplier_label, name, raw_status, flag, detail,
+                        )
+                output.append(result)
 
             # Fill in any certs the LLM omitted
             for cert in certs_to_check:
@@ -537,7 +695,7 @@ Return JSON object:
 
             logger.info(
                 "[compliance] Supplier %r: 1 LLM call for %d unmatched cert(s): %s",
-                supplier.get("name", supplier.get("id", "?")),
+                supplier_label,
                 len(certs_to_check),
                 certs_to_check,
             )
