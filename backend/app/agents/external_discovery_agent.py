@@ -135,17 +135,30 @@ class ExternalDiscoveryAgent(BaseAgent):
         validated: list[dict] = []
         rejected_sanctions = 0
         rejected_duplicate = 0
+        pending_sanctions = 0
 
         with SyncSessionLocal() as db:
             for s in extracted:
                 screening = self.sanctions.screen_company(s["name"])
-                if screening.is_flagged:
+                if screening.status == "flagged":
                     logger.warning(
                         "[external_discovery] REJECTED (sanctions): %s — lists: %s",
                         s["name"], screening.matched_lists,
                     )
                     rejected_sanctions += 1
                     continue
+
+                if screening.status == "pending_review":
+                    # Screening couldn't complete (API rate-limited/down). Do NOT
+                    # silently pass as clean — admit the supplier but flag it for
+                    # manual review so the UI never claims "sanctions: clear".
+                    citations = s.setdefault("source_citations", {}) or {}
+                    citations["sanctions"] = {
+                        "status": "pending_review",
+                        "reason": screening.reason,
+                    }
+                    s["source_citations"] = citations
+                    pending_sanctions += 1
 
                 if self._is_duplicate(db, s["name"], s.get("country")):
                     logger.debug("[external_discovery] Duplicate: %r", s["name"])
@@ -179,6 +192,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             "extracted": len(extracted),
             "validated": len(validated),
             "rejected_sanctions": rejected_sanctions,
+            "pending_sanctions": pending_sanctions,
             "rejected_duplicates": rejected_duplicate,
             "ingested": len(newly_added_ids),
         }
@@ -195,7 +209,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                 f"web={len(web_results)}, stage1_pass={stage1_passed}, "
                 f"extracted={len(extracted)}, validated={len(validated)}, "
                 f"ingested={len(newly_added_ids)}, "
-                f"rejected_sanctions={rejected_sanctions}, duplicates={rejected_duplicate}"
+                f"rejected_sanctions={rejected_sanctions}, pending_sanctions={pending_sanctions}, "
+                f"duplicates={rejected_duplicate}"
             ),
             duration_ms=duration_ms,
             reasoning=(
