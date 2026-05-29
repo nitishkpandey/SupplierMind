@@ -47,12 +47,14 @@ class ParsedConstraints(TypedDict, total=False):
     original_language: Optional[str]
 
 
-class ComplianceResult(TypedDict):
+class ComplianceResult(TypedDict, total=False):
     """Compliance check result for one constraint on one supplier."""
     constraint_name: str
     status: str               # "PASS", "FAIL", "PARTIAL"
     reason: str               # Human-readable explanation
     confidence: float         # 0.0 to 1.0
+    evidence_quote: str       # Task 1.4: verbatim phrase the LLM cited (LLM path only)
+    quote_flag: str           # Task 1.4: downgrade reason, e.g. "quote_not_in_source"
 
 
 class SupplierComplianceResult(TypedDict):
