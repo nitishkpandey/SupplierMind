@@ -47,6 +47,12 @@ logger = logging.getLogger(__name__)
 BENCHMARK_FILE = Path(__file__).parent.parent.parent / "data" / "queries_benchmark.json"
 RESULTS_FILE = Path(__file__).parent.parent.parent / "data" / "evaluation_results.json"
 
+# Discovery casts user_id to UUID in the user-saves subquery, so the eval must
+# pass a real UUID (a non-UUID label raises a SQL error and zeroes every
+# candidate set). This nil UUID owns no saves, so it exercises the same path a
+# real user would without skewing retrieval.
+EVAL_USER_ID = "00000000-0000-0000-0000-000000000000"
+
 
 async def run_suppliermind_query(
     raw_query: str,
@@ -62,7 +68,7 @@ async def run_suppliermind_query(
     from app.agents.orchestrator import run_pipeline
 
     start = time.time()
-    state = await run_pipeline(raw_query, query_id, user_id="eval-runner")
+    state = await run_pipeline(raw_query, query_id, user_id=EVAL_USER_ID)
     exec_ms = int((time.time() - start) * 1000)
 
     ranked = state.get("ranked_suppliers", [])

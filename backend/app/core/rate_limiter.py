@@ -26,18 +26,20 @@ WINDOW_SECONDS = 60.0
 # drop toward 0.75 if 429s persist, creep to 0.90 if queries feel slow.
 SAFETY_MARGIN = 0.85
 
-# Per-model Groq limits. VERIFY against your Groq dashboard before trusting —
-# Groq updates tier limits periodically and they differ per model.
-#   - llama-3.1-8b-instant: 30 RPM / 14,400 TPM (confirmed from query logs)
-#   - llama-3.3-70b-versatile: conservative placeholder; CONFIRM from dashboard
+# Per-model Groq limits, confirmed from the Groq dashboard (2026-05-29, free tier).
+# NOTE: the per-minute TOKEN limit is the binding constraint here, not RPM. An
+# earlier config used 14,400 TPM — that was actually the requests-per-DAY figure;
+# the real TPM is 6,000, so pacing was set to ~2x reality and 429s slipped through.
+#   - llama-3.1-8b-instant:     30 RPM / 6,000 TPM  (14.4K RPD / 500K TPD)
+#   - llama-3.3-70b-versatile:  30 RPM / 12,000 TPM (not used by any agent today)
 GROQ_RATE_LIMITS: dict[str, dict[str, int]] = {
-    "llama-3.1-8b-instant": {"rpm": 30, "tpm": 14_400},
+    "llama-3.1-8b-instant": {"rpm": 30, "tpm": 6_000},
     "llama-3.3-70b-versatile": {"rpm": 30, "tpm": 12_000},
 }
 
 # Used when a model is not in GROQ_RATE_LIMITS — conservative so an unknown
 # model under-throttles rather than 429-storms.
-DEFAULT_LIMIT: dict[str, int] = {"rpm": 30, "tpm": 12_000}
+DEFAULT_LIMIT: dict[str, int] = {"rpm": 30, "tpm": 6_000}
 
 
 class GroqRateLimiter:
