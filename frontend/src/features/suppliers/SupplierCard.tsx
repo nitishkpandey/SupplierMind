@@ -83,7 +83,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
     ? "bg-amber-600"
     : "bg-muted";
 
-  const isManager = user?.role === "admin" || user?.role === "procurement_manager";
+  const isAdmin = user?.role === "admin";
 
   const handleAction = async (action: 'save' | 'unsave' | 'approve' | 'reject') => {
     if (isProcessing) return;
@@ -326,7 +326,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
               </Button>
             )}
 
-            {isManager && tier !== 'approved' && (
+            {isAdmin && tier !== 'approved' && (
               <Button 
                 variant="default" 
                 size="sm" 
@@ -339,7 +339,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
               </Button>
             )}
 
-            {isManager && tier !== 'approved' && (
+            {isAdmin && tier !== 'approved' && (
               <Button 
                 variant="ghost" 
                 size="sm" 
