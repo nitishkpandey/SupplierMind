@@ -124,3 +124,41 @@ export const evalService = {
   triggerRun: (baselinesOnly = false) =>
     api.post("/eval/run", null, { params: { baselines_only: baselinesOnly } }),
 };
+
+// Task 2.5 — admin operational metrics
+export interface AgentLatency {
+  agent_name: string;
+  p50_ms: number;
+  p95_ms: number;
+  mean_ms: number;
+  count: number;
+}
+
+export interface AdminMetrics {
+  window_hours: number;
+  as_of: string;
+  summary: {
+    total_queries: number;
+    total_agent_invocations: number;
+    total_human_decisions: number;
+    queries_with_errors: number;
+  };
+  agent_latency: AgentLatency[];
+  throttle_events: {
+    groq_429_count: number;
+    groq_pacing_events: number;
+    sanctions_pending_review: number;
+  };
+  recent_errors: Array<{
+    timestamp: string | null;
+    agent_name: string;
+    action: string;
+    query_id: string | null;
+    reasoning: string;
+  }>;
+}
+
+export const metricsService = {
+  get: (windowHours: number) =>
+    api.get<AdminMetrics>(`/admin/metrics?window_hours=${windowHours}`),
+};

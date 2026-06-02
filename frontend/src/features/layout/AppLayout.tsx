@@ -11,6 +11,7 @@ import {
   LogOut,
   Globe,
   Bookmark,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +46,10 @@ export function AppLayout() {
     { to: "/my-suppliers", icon: Bookmark, label: "My Suppliers" },
     { to: "/history", icon: History, label: t("nav.history") },
     ...(user?.role === "admin"
-      ? [{ to: "/admin", icon: Settings, label: t("nav.admin") }]
+      ? [
+          { to: "/admin", icon: Settings, label: t("nav.admin") },
+          { to: "/admin/metrics", icon: Activity, label: "Metrics" },
+        ]
       : []),
   ];
 

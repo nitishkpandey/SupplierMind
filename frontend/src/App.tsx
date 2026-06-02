@@ -8,6 +8,7 @@ import QueryPage from "@/pages/QueryPage";
 import ResultsPage from "@/pages/ResultsPage";
 import HistoryPage from "@/pages/HistoryPage";
 import AdminPage from "@/pages/AdminPage";
+import AdminMetricsPage from "@/pages/AdminMetricsPage";
 import MySuppliersPage from "@/pages/MySuppliersPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,14 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="admin/metrics"
+            element={
+              <AdminRoute>
+                <AdminMetricsPage />
               </AdminRoute>
             }
           />
