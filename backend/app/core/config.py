@@ -90,7 +90,7 @@ class Settings(BaseSettings):
 
     # ── Pipeline tuning ───────────────────────────────────────────────
     EVALUATOR_MAX_RETRIES: int = 1
-    SSE_TIMEOUT_SECONDS: int = 180
+    SSE_TIMEOUT_SECONDS: int = 300
     SSE_CLEANUP_DELAY_SECONDS: int = 300
     QUERY_MIN_LENGTH: int = 10
     QUERY_MAX_LENGTH: int = 1000
@@ -133,6 +133,14 @@ class Settings(BaseSettings):
                 missing.append("GROQ_API_KEY")
             if not self.VOYAGE_API_KEY:
                 missing.append("VOYAGE_API_KEY")
+            if not self.GOOGLE_CLIENT_ID:
+                missing.append("GOOGLE_CLIENT_ID")
+            if not self.GOOGLE_CLIENT_SECRET:
+                missing.append("GOOGLE_CLIENT_SECRET")
+            if not self.GITHUB_CLIENT_ID:
+                missing.append("GITHUB_CLIENT_ID")
+            if not self.GITHUB_CLIENT_SECRET:
+                missing.append("GITHUB_CLIENT_SECRET")
             if self.SECRET_KEY == "change-me-in-production-use-32-byte-hex":
                 missing.append("SECRET_KEY")
             if missing:

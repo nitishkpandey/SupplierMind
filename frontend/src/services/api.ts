@@ -22,7 +22,7 @@ const BASE_URL = "/api/v1";
 
 export const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000, // 60s — agent pipeline can take up to 30s
+  timeout: 320000, // 320s — backend pipeline timeout is 300s, frontend gives it a small margin
   headers: {
     "Content-Type": "application/json",
   },
