@@ -47,6 +47,10 @@ router = APIRouter()
 @router.get("/dev-login", summary="Dev-only login bypass")
 async def dev_login(
     email: str = Query(default="dev@suppliermind.local"),
+    role: str = Query(
+        default="procurement_manager",
+        description="Role to assign in dev. Allowed: procurement_manager (default), admin. Dev-only.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """
@@ -54,12 +58,23 @@ async def dev_login(
 
     Issues a JWT without OAuth. Only works when APP_ENV=development.
     Redirects to /auth/callback like OAuth, so AuthCallbackPage handles it.
+
+    The `role` query parameter lets local testing exercise the admin-only
+    flows (e.g. supplier approve/reject) without a manual DB role bump.
+    Production is unaffected because the entire endpoint is 404'd there.
     """
     if not settings.is_development:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Endpoint not available in this environment",
         )
+
+    if role not in ("procurement_manager", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role. Allowed: procurement_manager, admin.",
+        )
+    target_role = UserRole.admin if role == "admin" else UserRole.procurement_manager
 
     user = await _get_or_create_user(
         db,
@@ -69,16 +84,16 @@ async def dev_login(
         oauth_id=f"dev-{email}",
     )
 
-    # Promote to manager role if needed so user can submit queries
-    if user.role not in (UserRole.procurement_manager, UserRole.admin):
+    # Apply requested dev role (idempotent if already matching).
+    if user.role != target_role:
         from sqlalchemy import update as sa_update
         await db.execute(
             sa_update(User)
             .where(User.id == user.id)
-            .values(role=UserRole.procurement_manager)
+            .values(role=target_role)
         )
         await db.commit()
-        user.role = UserRole.procurement_manager
+        user.role = target_role
 
     jwt_token = create_access_token(
         subject=str(user.id),

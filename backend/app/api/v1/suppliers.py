@@ -225,12 +225,14 @@ async def unsave_supplier(
 )
 async def approve_supplier(
     supplier_id: uuid.UUID,
-    current_user: Annotated[User, Depends(require_manager)],
+    current_user: Annotated[User, Depends(require_admin)],
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Promote a discovered supplier to Approved status.
-    This makes them available to all users in 'approved_only' searches.
+    Promote a discovered supplier to Approved status (Tier 1).
+    Admin only: promotion is an org-wide governance event that affects every
+    user's 'approved_only' searches. procurement_managers use Tier 2 (saves)
+    for personal shortlists.
     """
     from datetime import datetime, timezone
     
@@ -255,12 +257,13 @@ async def approve_supplier(
 )
 async def reject_supplier(
     supplier_id: uuid.UUID,
-    current_user: Annotated[User, Depends(require_manager)],
+    current_user: Annotated[User, Depends(require_admin)],
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Mark a discovered supplier as rejected.
-    They will no longer appear in search results.
+    Mark a discovered supplier as rejected. Admin only — same governance
+    rationale as approve: rejection removes the supplier from every user's
+    discovery results, not just the caller's.
     """
     result = await db.execute(
         update(Supplier)

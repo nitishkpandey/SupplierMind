@@ -15,9 +15,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import run_pipeline
-from app.api.deps import get_current_user, require_manager
+from app.api.deps import assert_owner_or_admin, get_current_user, require_manager
 from app.core.config import settings
-from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User, UserRole
+from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import get_db
 from app.schemas.query import QueryCreate, QueryResponse
@@ -159,8 +159,8 @@ async def stream_query_progress(
     if query is None:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    if query.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if str(query.user_id) != str(user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Query not found")
 
     async def event_generator() -> AsyncGenerator[str, None]:
         sent_count = 0
@@ -259,8 +259,7 @@ async def get_query(
     if query is None:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    if query.user_id != current_user.id and current_user.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    assert_owner_or_admin(query.user_id, current_user)
 
     # Enrich results with supplier details so the frontend avoids
     # a separate per-supplier fetch (which has no endpoint).
@@ -355,8 +354,7 @@ async def get_audit_trail(
     if query is None:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    if query.user_id != current_user.id and current_user.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    assert_owner_or_admin(query.user_id, current_user)
 
     result = await db.execute(
         select(AuditLog)

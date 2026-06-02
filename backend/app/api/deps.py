@@ -148,3 +148,24 @@ def require_role(*roles: UserRole):
 require_admin = require_role(UserRole.admin)
 require_manager = require_role(UserRole.admin, UserRole.procurement_manager)
 require_any_role = require_role(UserRole.admin, UserRole.procurement_manager, UserRole.analyst)
+
+
+# ── Resource-level ownership check ────────────────────────────────────
+def assert_owner_or_admin(resource_user_id, current_user: User) -> None:
+    """
+    Authorize access to a user-scoped resource: the caller must either
+    own it (resource_user_id == current_user.id) or be an admin.
+
+    Raises 404 — NOT 403 — when neither condition holds. 403 would confirm
+    that a resource exists at this ID; 404 makes "not yours" indistinguishable
+    from "doesn't exist", which protects users from existence-leak probes.
+    Admin bypass is for support workflows.
+    """
+    if current_user.role == UserRole.admin:
+        return
+    if str(resource_user_id) == str(current_user.id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Resource not found",
+    )
