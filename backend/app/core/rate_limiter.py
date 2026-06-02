@@ -16,6 +16,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +53,18 @@ class GroqRateLimiter:
         margin: float = SAFETY_MARGIN,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        audit_writer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self._limits = limits if limits is not None else GROQ_RATE_LIMITS
         self._default = default_limit if default_limit is not None else DEFAULT_LIMIT
         self._margin = margin
         self._monotonic = monotonic
         self._sleep = sleep
+        # Optional callback invoked once per pacing event. Production wires this
+        # to an audit_logs writer (see _default_audit_writer below) so the Week 1
+        # throttle work is observable from the admin metrics page. Tests pass
+        # None to keep the limiter pure.
+        self._audit_writer = audit_writer
         self._lock = threading.Lock()
         # Per model: request timestamps and (timestamp, tokens) entries.
         self._request_log: dict[str, deque[float]] = defaultdict(deque)
@@ -109,12 +116,28 @@ class GroqRateLimiter:
                     break
 
                 wait = max(0.0, min(waits))
+                wait_ms = int(wait * 1000)
                 logger.info(
                     "[ratelimit] Pacing call: sleeping %dms for model %s "
                     "(current: %d rpm, %d tpm)",
-                    int(wait * 1000), model, len(rlog), token_sum,
+                    wait_ms, model, len(rlog), token_sum,
                 )
                 self._sleep(wait)
+                if self._audit_writer is not None:
+                    try:
+                        self._audit_writer(
+                            {
+                                "model": model,
+                                "wait_ms": wait_ms,
+                                "rpm": len(rlog),
+                                "tpm": token_sum,
+                            }
+                        )
+                    except Exception:
+                        logger.warning(
+                            "[ratelimit] audit_writer failed; pacing event not persisted",
+                            exc_info=True,
+                        )
 
             now = self._monotonic()
             self._request_log[model].append(now)
@@ -130,6 +153,37 @@ class GroqRateLimiter:
                     return
 
 
+def _default_audit_writer(event: dict[str, Any]) -> None:
+    """
+    Persist one pacing event to audit_logs so the admin metrics page can
+    surface throttle activity. Runs in the same thread as the limiter (we
+    are already sleeping when this fires, so the DB write is hidden inside
+    the pause). Swallows DB failures — observability must never break the
+    pipeline.
+    """
+    # Late imports avoid a circular import: rate_limiter is pulled in by
+    # llm.py very early in startup, before the DB layer is fully resolved.
+    from app.db.models import AuditLog
+    from app.db.session import SyncSessionLocal
+
+    with SyncSessionLocal() as session:
+        session.add(
+            AuditLog(
+                query_id=None,
+                agent_name="rate_limiter",
+                action="pacing_event",
+                input_snapshot={"model": event["model"]},
+                output_snapshot=event,
+                reasoning=(
+                    f"Paced {event['wait_ms']}ms for {event['model']} "
+                    f"(rpm={event['rpm']}, tpm={event['tpm']})"
+                ),
+                duration_ms=event["wait_ms"],
+            )
+        )
+        session.commit()
+
+
 _limiter: GroqRateLimiter | None = None
 _limiter_lock = threading.Lock()
 
@@ -140,5 +194,5 @@ def get_rate_limiter() -> GroqRateLimiter:
     if _limiter is None:
         with _limiter_lock:
             if _limiter is None:
-                _limiter = GroqRateLimiter()
+                _limiter = GroqRateLimiter(audit_writer=_default_audit_writer)
     return _limiter

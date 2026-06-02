@@ -104,6 +104,7 @@ def create_app() -> FastAPI:
     from app.api.v1 import queries
     from app.api.v1 import evaluation
     from app.api.v1 import suppliers
+    from app.api.v1 import metrics
 
     app.include_router(health.router, tags=["Health"])
     app.include_router(
@@ -125,6 +126,11 @@ def create_app() -> FastAPI:
         suppliers.router,
         prefix="/api/v1/suppliers",
         tags=["Suppliers"],
+    )
+    app.include_router(
+        metrics.router,
+        prefix="/api/v1/admin",
+        tags=["Admin"],
     )
 
     return app
