@@ -157,7 +157,7 @@ async def get_supplier(
 ) -> Supplier:
     """Get a specific supplier by ID."""
     repo = SupplierRepository(db)
-    supplier = await repo.get(supplier_id)
+    supplier = await repo.get_by_id(supplier_id)
     if not supplier or not supplier.is_active:
         raise HTTPException(status_code=404, detail="Supplier not found")
     return supplier
