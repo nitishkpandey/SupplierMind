@@ -1,0 +1,360 @@
+"""Unit tests for the ReAct Parser loop (Task 3.1 / Component C).
+
+These tests pin the *structure* of the loop, not LLM phrasing. The LLM is
+injected as a FakeLLM whose `complete()` returns scripted Thought / Action /
+Action Input strings; tools are injected as fakes where they touch the
+network. All five tests cover the scenarios in Task 3.1's spec:
+
+1. Simple query, single tool call -> Finish in 2 iterations
+2. Multi-tool reasoning             -> 4 iterations across distinct tools
+3. Tool failure recovery            -> exception surfaced as Observation
+4. Same-args dedup                  -> 2nd identical call refused
+5. Max-iteration termination        -> fallback extraction runs
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import pytest
+
+from app.agents.parser_agent import MAX_REACT_ITERATIONS, ParserAgent
+from app.agents.tools import Tool, ToolRegistry
+from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+from app.agents.tools.geocode import geocode_location_tool
+from app.agents.tools.industry_context import infer_industry_context_tool
+from app.agents.tools.past_query_stub import lookup_past_query_tool
+from app.agents.tools.quantity_parser import parse_quantity_unit_tool
+
+
+# ── Fakes ────────────────────────────────────────────────────────────
+
+
+class _FakeLLM:
+    """Scripted LLM: hands out the next response from a list per `complete`.
+
+    If the script is exhausted the LLM falls back to a default refusal response
+    that lets the loop continue (used by the max-iterations test where we want
+    the loop to spin without ever emitting Finish).
+    """
+
+    def __init__(self, responses: list[str], default: str | None = None):
+        self.responses = list(responses)
+        self.default = default
+        self.calls: list[list[dict[str, str]]] = []
+
+    def complete(self, messages, **kwargs):
+        self.calls.append(messages)
+        if self.responses:
+            return self.responses.pop(0)
+        if self.default is not None:
+            return self.default
+        raise AssertionError("FakeLLM script exhausted and no default set")
+
+
+class _FakeGeocoder:
+    def __init__(self, result):
+        self.result = result
+        self.calls: list[str] = []
+
+    def geocode(self, name):
+        self.calls.append(name)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def _build_registry(geocoder=None, industry_llm=None) -> ToolRegistry:
+    reg = ToolRegistry()
+    reg.register(geocode_location_tool(_geocoder=geocoder))
+    reg.register(canonicalize_certification_tool())
+    reg.register(infer_industry_context_tool(_llm=industry_llm))
+    reg.register(parse_quantity_unit_tool())
+    reg.register(lookup_past_query_tool())
+    return reg
+
+
+def _make_state(raw_query: str) -> dict[str, Any]:
+    return {
+        "raw_query": raw_query,
+        "query_id": "q-test",
+        "user_id": "",   # skips memory loading
+        "audit_log": [],
+        "search_scope": "approved_only",
+    }
+
+
+def _make_parser(llm: _FakeLLM, registry: ToolRegistry) -> ParserAgent:
+    parser = ParserAgent(tool_registry=registry)
+    parser.llm = llm  # type: ignore[assignment]
+    return parser
+
+
+# ── 1. Simple query — single tool call ───────────────────────────────
+
+
+def test_simple_query_single_tool_then_finish():
+    geocoder = _FakeGeocoder((52.52, 13.405))
+    registry = _build_registry(geocoder=geocoder)
+
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging", "boxes", "containers"],
+        "industry_context": None,
+        "buyer_intent": "manufacturer",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": ["ISO 9001"],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "compliance_critical",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: I need coordinates for Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: I have enough information.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
+
+    trace = out["react_trace"]
+    assert [s["action"] for s in trace] == ["geocode_location", "Finish"]
+    assert out["react_terminated_by"] == "finish"
+    constraints = out["parsed_constraints"]
+    assert constraints["location_country"] == "Germany"
+    assert constraints["location_lat"] == 52.52
+    assert constraints["location_lng"] == 13.405
+    assert "ISO 9001" in constraints["certifications"]
+
+
+# ── 2. Multi-tool reasoning ──────────────────────────────────────────
+
+
+def test_multi_tool_reasoning_chains_distinct_tools():
+    geocoder = _FakeGeocoder((48.137, 11.575))
+    industry_llm = _FakeLLM([
+        '{"industry":"aerospace","common_certs":["AS9100","NADCAP"],"typical_units":"units/month"}',
+    ])
+    registry = _build_registry(geocoder=geocoder, industry_llm=industry_llm)
+
+    finish_payload = {
+        "product_type": "aerospace machining",
+        "product_keywords": ["aerospace", "machined parts", "CNC", "precision"],
+        "industry_context": "aerospace",
+        "buyer_intent": "manufacturer",
+        "category_hint": "machinery",
+        "location_city": "Bavaria",
+        "location_country": None,
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": ["AS9100"],
+        "capacity_min": 10000,
+        "capacity_unit": "units/month",
+        "lead_time_max_days": None,
+        "query_type": "capability_match",
+        "complexity": "complex",
+        "original_language": "en",
+        "confidence": 0.85,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: I should geocode Bavaria first.\nAction: geocode_location\nAction Input: {"location_name": "Bavaria"}',
+        'Thought: Normalise the cert name.\nAction: canonicalize_certification\nAction Input: {"cert_name": "AS9100"}',
+        'Thought: Parse the quantity phrase.\nAction: parse_quantity_unit\nAction Input: {"text": "10k units/month"}',
+        f'Thought: Done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("AS9100 aerospace machining 10k units/month Bavaria"))
+
+    actions = [s["action"] for s in out["react_trace"]]
+    assert actions == [
+        "geocode_location",
+        "canonicalize_certification",
+        "parse_quantity_unit",
+        "Finish",
+    ]
+    assert out["react_terminated_by"] == "finish"
+    constraints = out["parsed_constraints"]
+    assert constraints["capacity_min"] == 10000
+    assert constraints["capacity_unit"] == "units/month"
+    assert "AS9100" in constraints["certifications"]
+
+
+# ── 3. Tool failure recovery ─────────────────────────────────────────
+
+
+def test_tool_failure_surfaces_as_observation_and_loop_continues():
+    geocoder = _FakeGeocoder(RuntimeError("nominatim timeout"))
+    registry = _build_registry(geocoder=geocoder)
+
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging"],
+        "industry_context": None,
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": ["ISO 9001"],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "geographic_priority",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.65,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: Try to geocode.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: Tool failed, finishing with location name only.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
+
+    trace = out["react_trace"]
+    assert trace[0]["action"] == "geocode_location"
+    assert trace[0]["observation"]["error"] == "RuntimeError"
+    assert "nominatim timeout" in trace[0]["observation"]["detail"]
+    assert trace[-1]["action"] == "Finish"
+    assert out["react_terminated_by"] == "finish"
+    constraints = out["parsed_constraints"]
+    assert constraints["location_country"] == "Germany"
+    # lat/lng remain absent because the geocode failed.
+    assert constraints["location_lat"] is None
+    assert constraints["location_lng"] is None
+
+
+# ── 4. Same-args dedup ───────────────────────────────────────────────
+
+
+def test_same_args_dedup_intercepts_repeat_call():
+    geocoder = _FakeGeocoder((52.52, 13.405))
+    registry = _build_registry(geocoder=geocoder)
+
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging"],
+        "industry_context": None,
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.8,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: Geocode Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        'Thought: Try again with same args.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: OK done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("packaging supplier in Germany"))
+
+    trace = out["react_trace"]
+    assert trace[1]["action"] == "geocode_location"
+    assert trace[1]["observation"]["error"] == "duplicate_call"
+    # The real geocode tool was called once; the dedup intercepted the second.
+    assert len(geocoder.calls) == 1
+    assert out["react_terminated_by"] == "finish"
+
+
+# ── 5. Max-iteration termination + fallback extraction ──────────────
+
+
+def test_max_iteration_termination_runs_fallback():
+    geocoder = _FakeGeocoder((52.52, 13.405))
+    registry = _build_registry(geocoder=geocoder)
+
+    # LLM never emits Finish — every response is the same tool call with
+    # different args so dedup doesn't fire and the loop drains to the cap.
+    responses = [
+        f'Thought: Step {i}.\nAction: geocode_location\nAction Input: {{"location_name": "Place{i}"}}'
+        for i in range(MAX_REACT_ITERATIONS + 2)
+    ]
+    llm = _FakeLLM(responses)
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("Bronze supplier near Bremen ISO 9001"))
+
+    assert out["react_terminated_by"] == "max_iterations"
+    assert len(out["react_trace"]) == MAX_REACT_ITERATIONS
+    # Fallback extraction populated constraints from the trace and the
+    # raw-query tokeniser, and flagged needs_clarification.
+    constraints = out["parsed_constraints"]
+    assert constraints["product_keywords"], "fallback should tokenise raw query"
+    assert out["needs_clarification"] is True
+
+
+# ── Audit-log integration ────────────────────────────────────────────
+
+
+def test_react_trace_lands_in_audit_log_output_snapshot():
+    geocoder = _FakeGeocoder((52.52, 13.405))
+    registry = _build_registry(geocoder=geocoder)
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging"],
+        "industry_context": None,
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: geocode.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("packaging supplier in Germany"))
+
+    audit = out["audit_log"]
+    assert len(audit) == 1
+    entry = audit[0]
+    assert entry["agent_name"] == "parser"
+    assert entry["action"] == "react_loop_completed"
+    out_snap = entry["output_snapshot"]
+    assert out_snap["terminated_by"] == "finish"
+    assert out_snap["tools_called"] == ["geocode_location"]
+    assert isinstance(out_snap["trace"], list)
+    assert out_snap["trace"][-1]["action"] == "Finish"
