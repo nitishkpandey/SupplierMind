@@ -80,8 +80,14 @@ class RankedSupplier(TypedDict):
     distance_km: Optional[float]
 
 
-class AuditEntry(TypedDict):
-    """One entry in the agent audit trail."""
+class AuditEntry(TypedDict, total=False):
+    """One entry in the agent audit trail.
+
+    `input_snapshot` / `output_snapshot` are optional structured payloads
+    introduced for Task 3.1's ReAct trace. When present they override the
+    plain-string summaries at the API flush stage so the full trace lands
+    in audit_logs.{input,output}_snapshot as JSON.
+    """
     agent_name: str
     action: str
     reasoning: Optional[str]
@@ -89,6 +95,8 @@ class AuditEntry(TypedDict):
     output_summary: str
     duration_ms: int
     timestamp: str
+    input_snapshot: Optional[dict]
+    output_snapshot: Optional[dict]
 
 
 class AgentState(TypedDict):
@@ -140,6 +148,10 @@ class AgentState(TypedDict):
     evaluator_retries: int
     evaluator_verdict: Optional[str]
     evaluator_should_retry: bool
+
+    # ── Task 3.1 — ReAct trace + termination reason ─────────────────
+    react_trace: list[dict]
+    react_terminated_by: Optional[str]   # "finish" | "max_iterations" | "parse_failed"
 
     # ── Audit trail (grows throughout pipeline) ───────────────────────
     audit_log: list[AuditEntry]

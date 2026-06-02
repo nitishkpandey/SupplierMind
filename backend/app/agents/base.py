@@ -85,11 +85,17 @@ class BaseAgent(ABC):
         output_summary: str,
         duration_ms: int,
         reasoning: str | None = None,
+        input_snapshot: dict | None = None,
+        output_snapshot: dict | None = None,
     ) -> None:
         """
         Append an entry to the audit log in state.
         Every significant agent decision should be logged here.
         This is what appears in the UI's "Agent Audit Trail" panel.
+
+        Optional structured snapshots (Task 3.1) carry richer payloads such
+        as the ReAct trace; the API flush stage prefers them when present
+        and falls back to the plain summaries otherwise.
         """
         entry: AuditEntry = {
             "agent_name": self.agent_name,
@@ -100,6 +106,10 @@ class BaseAgent(ABC):
             "duration_ms": duration_ms,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
+        if input_snapshot is not None:
+            entry["input_snapshot"] = input_snapshot
+        if output_snapshot is not None:
+            entry["output_snapshot"] = output_snapshot
 
         if "audit_log" not in state or state["audit_log"] is None:
             state["audit_log"] = []

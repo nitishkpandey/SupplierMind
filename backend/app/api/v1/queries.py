@@ -482,13 +482,21 @@ async def _run_pipeline_background(
                 db.add(result)
 
             for entry in final_state.get("audit_log", []):
+                # Task 3.1: prefer structured snapshots (ReAct trace) when
+                # provided; otherwise fall back to wrapping the plain summary.
+                input_snap = entry.get("input_snapshot") or {
+                    "summary": entry.get("input_summary", "")
+                }
+                output_snap = entry.get("output_snapshot") or {
+                    "summary": entry.get("output_summary", "")
+                }
                 log = AuditLog(
                     query_id=uuid.UUID(query_id),
                     agent_name=entry["agent_name"],
                     action=entry["action"],
                     reasoning=entry.get("reasoning"),
-                    input_snapshot={"summary": entry.get("input_summary", "")},
-                    output_snapshot={"summary": entry.get("output_summary", "")},
+                    input_snapshot=input_snap,
+                    output_snapshot=output_snap,
                     duration_ms=entry.get("duration_ms", 0),
                 )
                 db.add(log)
