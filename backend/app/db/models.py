@@ -130,6 +130,15 @@ class Supplier(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # HITL approval rationale (Task 2.4). Captured every time an admin
+    # promotes (approves) or removes (rejects) a supplier — the *why*
+    # behind the human decision, persisted next to who+when.
+    approval_justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approval_action: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    approval_decided_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -338,8 +347,10 @@ class AuditLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    query_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=False
+    # Nullable because human-admin entries (Task 2.4) are not query-scoped.
+    # Agent rows still set query_id; human_admin rows leave it NULL.
+    query_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=True
     )
     agent_name: Mapped[str] = mapped_column(String(50), nullable=False)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
