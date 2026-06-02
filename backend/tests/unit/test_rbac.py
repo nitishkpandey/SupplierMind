@@ -199,13 +199,28 @@ def test_procurement_manager_cannot_approve_supplier_returns_403():
 
 
 def test_admin_can_approve_supplier_returns_204():
+    """Task 2.4: admin succeeds with a valid justification body."""
+    from app.db.models import SupplierStatus
+
     admin = _fake_user(UserRole.admin)
     app.dependency_overrides[get_current_user] = lambda: admin
 
-    mock_result = MagicMock()
-    mock_result.rowcount = 1
+    discovered_supplier = SimpleNamespace(
+        id=uuid4(),
+        status=SupplierStatus.discovered,
+        approved_by_user_id=None,
+        approved_at=None,
+        approval_justification=None,
+        approval_action=None,
+        approval_decided_at=None,
+    )
+
+    fake_select_result = MagicMock()
+    fake_select_result.scalar_one_or_none.return_value = discovered_supplier
+
     fake_session = MagicMock()
-    fake_session.execute = AsyncMock(return_value=mock_result)
+    fake_session.execute = AsyncMock(return_value=fake_select_result)
+    fake_session.add = MagicMock()
     fake_session.commit = AsyncMock()
 
     async def session_override():
@@ -214,11 +229,76 @@ def test_admin_can_approve_supplier_returns_204():
     app.dependency_overrides[get_db] = session_override
 
     client = TestClient(app)
-    response = client.post(f"/api/v1/suppliers/{uuid4()}/approve")
+    response = client.post(
+        f"/api/v1/suppliers/{discovered_supplier.id}/approve",
+        json={"justification": "Verified AS9100 cert via cert body lookup."},
+    )
 
     assert response.status_code == 204, (
         f"admin should succeed; got {response.status_code} {response.text}"
     )
+    assert discovered_supplier.approval_action == "approved"
+    assert discovered_supplier.approval_justification.startswith("Verified AS9100")
+    fake_session.add.assert_called_once()
+    audit_entry = fake_session.add.call_args[0][0]
+    assert audit_entry.agent_name == "human_admin"
+    assert audit_entry.action == "supplier_approved"
+
+
+def test_approve_without_body_returns_422():
+    """Justification is required — missing body must fail validation."""
+    admin = _fake_user(UserRole.admin)
+    app.dependency_overrides[get_current_user] = lambda: admin
+
+    client = TestClient(app)
+    response = client.post(f"/api/v1/suppliers/{uuid4()}/approve")
+
+    assert response.status_code == 422
+
+
+def test_approve_with_short_justification_returns_422():
+    """min_length=20 floors out rubber-stamp justifications like 'ok'."""
+    admin = _fake_user(UserRole.admin)
+    app.dependency_overrides[get_current_user] = lambda: admin
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/suppliers/{uuid4()}/approve",
+        json={"justification": "ok"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_approve_non_discovered_supplier_returns_409():
+    """An already-approved supplier cannot be re-approved (idempotency guard)."""
+    from app.db.models import SupplierStatus
+
+    admin = _fake_user(UserRole.admin)
+    app.dependency_overrides[get_current_user] = lambda: admin
+
+    approved_supplier = SimpleNamespace(
+        id=uuid4(),
+        status=SupplierStatus.approved,
+    )
+
+    fake_select_result = MagicMock()
+    fake_select_result.scalar_one_or_none.return_value = approved_supplier
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(return_value=fake_select_result)
+
+    async def session_override():
+        yield fake_session
+
+    app.dependency_overrides[get_db] = session_override
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/suppliers/{approved_supplier.id}/approve",
+        json={"justification": "Already vetted; legacy approval."},
+    )
+
+    assert response.status_code == 409
 
 
 def test_procurement_manager_cannot_reject_supplier_returns_403():
@@ -227,6 +307,9 @@ def test_procurement_manager_cannot_reject_supplier_returns_403():
     app.dependency_overrides[get_current_user] = lambda: manager
 
     client = TestClient(app)
-    response = client.post(f"/api/v1/suppliers/{uuid4()}/reject")
+    response = client.post(
+        f"/api/v1/suppliers/{uuid4()}/reject",
+        json={"justification": "Manager attempting reject — expected 403."},
+    )
 
     assert response.status_code == 403

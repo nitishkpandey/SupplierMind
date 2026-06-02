@@ -14,10 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, update, delete, func
 
 from app.api.deps import get_current_user, require_admin, require_manager
-from app.db.models import Supplier, User, SupplierStatus, UserSupplierSave
+from app.db.models import AuditLog, Supplier, User, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import get_db
-from app.schemas.supplier import SupplierCreate, SupplierListResponse, SupplierResponse
+from app.schemas.supplier import (
+    SupplierApprovalRequest,
+    SupplierCreate,
+    SupplierListResponse,
+    SupplierResponse,
+)
 
 router = APIRouter()
 
@@ -218,6 +223,54 @@ async def unsave_supplier(
     await db.commit()
 
 
+async def _record_admin_decision(
+    db: AsyncSession,
+    supplier: Supplier,
+    admin: User,
+    new_status: SupplierStatus,
+    action_label: str,
+    justification: str,
+) -> None:
+    """
+    Apply an admin decision (approve or reject) to a supplier and persist
+    the rationale alongside it. Writes a parallel audit_logs row with
+    agent_name='human_admin' so the same audit query that surfaces agent
+    reasoning also surfaces human reasoning — the HITL audit trail lives
+    in one table.
+    """
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    previous_status = supplier.status.value if supplier.status else None
+
+    supplier.status = new_status
+    supplier.approved_by_user_id = admin.id
+    supplier.approved_at = now if new_status == SupplierStatus.approved else supplier.approved_at
+    supplier.approval_justification = justification
+    supplier.approval_action = action_label
+    supplier.approval_decided_at = now
+
+    db.add(
+        AuditLog(
+            query_id=None,
+            agent_name="human_admin",
+            action=f"supplier_{action_label}",
+            input_snapshot={
+                "supplier_id": str(supplier.id),
+                "previous_status": previous_status,
+            },
+            output_snapshot={
+                "new_status": new_status.value,
+                "justification": justification,
+            },
+            reasoning=f"Admin {admin.email} {action_label} supplier: {justification}",
+            duration_ms=0,
+        )
+    )
+
+    await db.commit()
+
+
 @router.post(
     "/{supplier_id}/approve",
     summary="Promote a supplier to Approved (Tier 1)",
@@ -225,6 +278,7 @@ async def unsave_supplier(
 )
 async def approve_supplier(
     supplier_id: uuid.UUID,
+    payload: SupplierApprovalRequest,
     current_user: Annotated[User, Depends(require_admin)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -233,21 +287,30 @@ async def approve_supplier(
     Admin only: promotion is an org-wide governance event that affects every
     user's 'approved_only' searches. procurement_managers use Tier 2 (saves)
     for personal shortlists.
+
+    Requires a justification body (min 20 chars). The rationale is persisted
+    on the supplier row AND written into audit_logs alongside agent decisions.
     """
-    from datetime import datetime, timezone
-    
-    result = await db.execute(
-        update(Supplier)
-        .where(Supplier.id == supplier_id)
-        .values(
-            status=SupplierStatus.approved,
-            approved_by_user_id=current_user.id,
-            approved_at=datetime.now(timezone.utc),
-        )
-    )
-    if result.rowcount == 0:
+    supplier = (
+        await db.execute(select(Supplier).where(Supplier.id == supplier_id))
+    ).scalar_one_or_none()
+    if supplier is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    await db.commit()
+    if supplier.status != SupplierStatus.discovered:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot approve supplier in '{supplier.status.value}' state; "
+                   "only 'discovered' suppliers are eligible for promotion.",
+        )
+
+    await _record_admin_decision(
+        db,
+        supplier=supplier,
+        admin=current_user,
+        new_status=SupplierStatus.approved,
+        action_label="approved",
+        justification=payload.justification,
+    )
 
 
 @router.post(
@@ -257,6 +320,7 @@ async def approve_supplier(
 )
 async def reject_supplier(
     supplier_id: uuid.UUID,
+    payload: SupplierApprovalRequest,
     current_user: Annotated[User, Depends(require_admin)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -264,12 +328,26 @@ async def reject_supplier(
     Mark a discovered supplier as rejected. Admin only — same governance
     rationale as approve: rejection removes the supplier from every user's
     discovery results, not just the caller's.
+
+    Requires a justification body (min 20 chars), recorded on the supplier
+    row and in audit_logs.
     """
-    result = await db.execute(
-        update(Supplier)
-        .where(Supplier.id == supplier_id)
-        .values(status=SupplierStatus.rejected)
-    )
-    if result.rowcount == 0:
+    supplier = (
+        await db.execute(select(Supplier).where(Supplier.id == supplier_id))
+    ).scalar_one_or_none()
+    if supplier is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    await db.commit()
+    if supplier.status not in (SupplierStatus.discovered, SupplierStatus.approved):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot reject supplier in '{supplier.status.value}' state.",
+        )
+
+    await _record_admin_decision(
+        db,
+        supplier=supplier,
+        admin=current_user,
+        new_status=SupplierStatus.rejected,
+        action_label="rejected",
+        justification=payload.justification,
+    )

@@ -317,6 +317,14 @@ async def get_query(
             "explanation": explanation_text,
             "explanation_detail": explanation_detail,
             "distance_km": r.distance_km,
+            # Task 2.4: HITL approval rationale — only present after an admin decision.
+            "approval_justification": supplier.approval_justification if supplier else None,
+            "approval_action": supplier.approval_action if supplier else None,
+            "approval_decided_at": (
+                supplier.approval_decided_at.isoformat()
+                if supplier and supplier.approval_decided_at
+                else None
+            ),
         }
 
     return {
