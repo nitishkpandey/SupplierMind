@@ -102,8 +102,10 @@ export const supplierWorkflowService = {
   getMyList: (page = 1) => api.get(`/suppliers/my-list?offset=${(page - 1) * 20}&limit=20`),
   save: (id: string) => api.post(`/suppliers/${id}/save`),
   unsave: (id: string) => api.delete(`/suppliers/${id}/save`),
-  approve: (id: string) => api.post(`/suppliers/${id}/approve`),
-  reject: (id: string) => api.post(`/suppliers/${id}/reject`),
+  approve: (id: string, justification: string) =>
+    api.post(`/suppliers/${id}/approve`, { justification }),
+  reject: (id: string, justification: string) =>
+    api.post(`/suppliers/${id}/reject`, { justification }),
 };
 
 // Auth service methods

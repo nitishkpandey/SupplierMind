@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ChevronDown,
   ChevronUp,
@@ -18,11 +28,15 @@ import {
   CheckCircle2,
   Trash2,
   ShieldCheck,
-  Bookmark
+  Bookmark,
+  Gavel,
 } from "lucide-react";
 import type { QueryResult } from "@/types";
 import { supplierWorkflowService } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
+
+const JUSTIFICATION_MIN = 20;
+const JUSTIFICATION_MAX = 1000;
 
 interface SupplierCardProps {
   result: QueryResult;
@@ -71,6 +85,17 @@ export function SupplierCard({ result }: SupplierCardProps) {
   const [tier, setTier] = useState(result.tier || result.supplier_status);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Task 2.4 — HITL justification modal state
+  const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
+  const [justification, setJustification] = useState("");
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [recordedJustification, setRecordedJustification] = useState<string | null>(
+    result.approval_justification ?? null
+  );
+  const [recordedAction, setRecordedAction] = useState<'approved' | 'rejected' | null>(
+    result.approval_action ?? null
+  );
+
   const scorePercent = Math.round(result.total_score * 100);
   const scoreColor =
     scorePercent >= 80 ? "text-green-600" : scorePercent >= 60 ? "text-yellow-600" : "text-red-600";
@@ -85,7 +110,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
 
   const isAdmin = user?.role === "admin";
 
-  const handleAction = async (action: 'save' | 'unsave' | 'approve' | 'reject') => {
+  const handleAction = async (action: 'save' | 'unsave') => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
@@ -95,12 +120,6 @@ export function SupplierCard({ result }: SupplierCardProps) {
       } else if (action === 'unsave') {
         await supplierWorkflowService.unsave(result.supplier_id);
         setTier('discovered');
-      } else if (action === 'approve') {
-        await supplierWorkflowService.approve(result.supplier_id);
-        setTier('approved');
-      } else if (action === 'reject') {
-        await supplierWorkflowService.reject(result.supplier_id);
-        setTier('rejected');
       }
     } catch (e) {
       console.error(e);
@@ -108,6 +127,50 @@ export function SupplierCard({ result }: SupplierCardProps) {
       setIsProcessing(false);
     }
   };
+
+  const openDecisionDialog = (decision: 'approve' | 'reject') => {
+    setPendingDecision(decision);
+    setJustification("");
+    setDecisionError(null);
+  };
+
+  const closeDecisionDialog = () => {
+    if (isProcessing) return;
+    setPendingDecision(null);
+    setJustification("");
+    setDecisionError(null);
+  };
+
+  const submitDecision = async () => {
+    if (!pendingDecision) return;
+    const text = justification.trim();
+    if (text.length < JUSTIFICATION_MIN) return;
+    setIsProcessing(true);
+    setDecisionError(null);
+    try {
+      if (pendingDecision === 'approve') {
+        await supplierWorkflowService.approve(result.supplier_id, text);
+        setTier('approved');
+        setRecordedAction('approved');
+      } else {
+        await supplierWorkflowService.reject(result.supplier_id, text);
+        setTier('rejected');
+        setRecordedAction('rejected');
+      }
+      setRecordedJustification(text);
+      setPendingDecision(null);
+      setJustification("");
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail ?? "Request failed. Try again.";
+      setDecisionError(typeof msg === 'string' ? msg : "Request failed.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const justificationLength = justification.trim().length;
+  const submitDisabled =
+    isProcessing || justificationLength < JUSTIFICATION_MIN || justificationLength > JUSTIFICATION_MAX;
 
   if (tier === 'rejected') return null; // Hide rejected from view
 
@@ -327,11 +390,11 @@ export function SupplierCard({ result }: SupplierCardProps) {
             )}
 
             {isAdmin && tier !== 'approved' && (
-              <Button 
-                variant="default" 
-                size="sm" 
+              <Button
+                variant="default"
+                size="sm"
                 className="gap-1.5"
-                onClick={() => handleAction('approve')}
+                onClick={() => openDecisionDialog('approve')}
                 disabled={isProcessing}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -340,11 +403,11 @@ export function SupplierCard({ result }: SupplierCardProps) {
             )}
 
             {isAdmin && tier !== 'approved' && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => handleAction('reject')}
+                onClick={() => openDecisionDialog('reject')}
                 disabled={isProcessing}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -352,7 +415,90 @@ export function SupplierCard({ result }: SupplierCardProps) {
             )}
           </div>
         </div>
+
+        {/* Task 2.4 — HITL rationale on approved/rejected suppliers */}
+        {recordedJustification && recordedAction === 'approved' && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <Gavel className="w-3.5 h-3.5" />
+              Approval rationale
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {recordedJustification}
+            </p>
+          </div>
+        )}
       </CardContent>
+
+      {/* HITL justification dialog — admin approve/reject flow */}
+      <Dialog
+        open={pendingDecision !== null}
+        onOpenChange={(open) => {
+          if (!open) closeDecisionDialog();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingDecision === 'approve' ? 'Approve' : 'Reject'}{' '}
+              {result.supplier_name ?? 'supplier'}?
+            </DialogTitle>
+            <DialogDescription>
+              {pendingDecision === 'approve'
+                ? 'Promotes to Tier 1 (approved) and surfaces this supplier in every user\'s search.'
+                : 'Removes from discovery results for every user.'}{' '}
+              Record why this decision is correct — the rationale is persisted in the audit log.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="justification">Justification</Label>
+            <Textarea
+              id="justification"
+              value={justification}
+              onChange={(e) => setJustification(e.target.value.slice(0, JUSTIFICATION_MAX))}
+              placeholder="e.g. Verified AS9100 certification via cert body lookup; confirmed Bavaria facility matches query."
+              rows={5}
+              disabled={isProcessing}
+              autoFocus
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span
+                className={
+                  justificationLength < JUSTIFICATION_MIN ? 'text-destructive' : ''
+                }
+              >
+                Minimum {JUSTIFICATION_MIN} characters
+                {justificationLength < JUSTIFICATION_MIN &&
+                  ` (${JUSTIFICATION_MIN - justificationLength} more)`}
+              </span>
+              <span>
+                {justificationLength}/{JUSTIFICATION_MAX}
+              </span>
+            </div>
+            {decisionError && (
+              <p className="text-xs text-destructive">{decisionError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={closeDecisionDialog}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={pendingDecision === 'reject' ? 'destructive' : 'default'}
+              onClick={submitDecision}
+              disabled={submitDisabled}
+            >
+              {pendingDecision === 'approve' ? 'Approve supplier' : 'Reject supplier'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

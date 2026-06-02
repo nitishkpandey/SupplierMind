@@ -70,6 +70,10 @@ export interface QueryResult {
   explanation: string;
   explanation_detail: ExplanationDetail | null;
   distance_km: number | null;
+  // Task 2.4 — HITL admin rationale, only present on approved/rejected suppliers.
+  approval_justification?: string | null;
+  approval_action?: 'approved' | 'rejected' | null;
+  approval_decided_at?: string | null;
 }
 
 export interface Supplier {
