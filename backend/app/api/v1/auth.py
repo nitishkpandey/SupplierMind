@@ -50,13 +50,15 @@ async def dev_login(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """
+    Available in development environment only. Returns 404 elsewhere.
+
     Issues a JWT without OAuth. Only works when APP_ENV=development.
     Redirects to /auth/callback like OAuth, so AuthCallbackPage handles it.
     """
     if not settings.is_development:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Dev login is only available in development mode.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Endpoint not available in this environment",
         )
 
     user = await _get_or_create_user(
