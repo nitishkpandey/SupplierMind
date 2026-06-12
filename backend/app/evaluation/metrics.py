@@ -38,6 +38,9 @@ class QueryMetrics:
     constraint_satisfaction_rate: float  # Average CSR across returned suppliers
     execution_time_ms: int             # How long did this query take?
     compliance_data: Optional[list[dict]] = field(default=None)  # From SupplierMind only
+    cost_usd: Optional[float] = field(default=None)        # LLM spend attributed to this call
+    raw_names: Optional[list[str]] = field(default=None)   # Names as the model emitted them (P1/P2)
+    reasoning: Optional[str] = field(default=None)         # Model-stated reasoning (P1/P2)
 
 
 @dataclass

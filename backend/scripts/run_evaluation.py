@@ -48,6 +48,11 @@ async def main() -> None:
         action="store_true",
         help="Generate report from existing results (no evaluation run)",
     )
+    parser.add_argument(
+        "--paradigms",
+        action="store_true",
+        help="Also run the P1 (single-prompt) and P2 (RAG) paradigm baselines",
+    )
     args = parser.parse_args()
 
     if args.report_only:
@@ -56,8 +61,8 @@ async def main() -> None:
         generate_thesis_report()
         return
 
-    # Initialize vector store (required for SupplierMind)
-    if not args.baselines_only:
+    # Initialize vector store (required for SupplierMind and P2)
+    if not args.baselines_only or args.paradigms:
         logger.info("Initializing vector store...")
         from app.core.config import settings
         from app.core.vector_store import create_vector_store, set_vector_store_instance
@@ -75,6 +80,7 @@ async def main() -> None:
         run_suppliermind=not args.baselines_only,
         run_baselines=True,
         query_limit=args.limit,
+        run_paradigm_baselines=args.paradigms,
     )
 
     logger.info("Generating thesis report...")

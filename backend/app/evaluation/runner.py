@@ -112,10 +112,126 @@ async def run_baseline_queries(
     }
 
 
+# ── Phase-2 paradigm baselines (Development Plan) ─────────────────────
+
+
+def _normalise_name(name: str) -> str:
+    return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+
+async def _load_supplier_name_index(db: AsyncSession) -> dict[str, str]:
+    """Map normalised supplier name -> supplier id, for P1 name matching.
+
+    P1 never sees the corpus, so it can only be scored by matching the names
+    it suggests against corpus supplier names. Exact-after-normalisation is
+    deliberately strict: generous fuzzy matching would flatter the parametric
+    baseline.
+    """
+    from sqlalchemy import select
+
+    from app.db.models import Supplier
+
+    result = await db.execute(select(Supplier.id, Supplier.name))
+    return {_normalise_name(name): str(sid) for sid, name in result.all() if name}
+
+
+async def _fetch_supplier_dicts(ids: list[str], db: AsyncSession) -> list[dict]:
+    from sqlalchemy import select
+
+    from app.db.models import Supplier
+
+    if not ids:
+        return []
+    result = await db.execute(select(Supplier).where(Supplier.id.in_(ids)))
+    rows = {str(s.id): s for s in result.scalars().all()}
+    out = []
+    for sid in ids:
+        s = rows.get(sid)
+        if s is None:
+            continue
+        out.append({
+            "id": str(s.id),
+            "name": s.name,
+            "country": s.country,
+            "city": s.city,
+            "certifications": list(s.certifications or []),
+            "capacity_value": s.capacity_value,
+            "capacity_unit": s.capacity_unit,
+            "lead_time_days": s.lead_time_days,
+            "latitude": s.latitude,
+            "longitude": s.longitude,
+        })
+    return out
+
+
+def _llm_total_cost() -> float:
+    """Process-wide LLM spend so far; used to attribute cost per call."""
+    try:
+        from app.core.llm import get_llm_client
+
+        return float(get_llm_client().total_cost_usd)
+    except Exception:
+        return 0.0
+
+
+async def run_paradigm_queries(
+    raw_query: str,
+    constraints: dict,
+    db: AsyncSession,
+    name_index: dict[str, str],
+) -> dict:
+    """Run one benchmark query through the P1 and P2 baselines.
+
+    Returns the same shape run_baseline_queries uses so the main loop can
+    treat all systems uniformly.
+    """
+    from experiments.paradigm1_singleprompt import run_paradigm1
+    from experiments.paradigm2_rag import run_paradigm2
+
+    cost_before = _llm_total_cost()
+    p1 = await asyncio.to_thread(run_paradigm1, raw_query)
+    p1_cost = _llm_total_cost() - cost_before
+    p1_ids = [
+        name_index[_normalise_name(n)]
+        for n in p1.supplier_names
+        if _normalise_name(n) in name_index
+    ]
+    p1_suppliers = await _fetch_supplier_dicts(p1_ids, db)
+
+    cost_before = _llm_total_cost()
+    p2 = await run_paradigm2(raw_query)
+    p2_cost = _llm_total_cost() - cost_before
+    p2_suppliers = await _fetch_supplier_dicts(p2.supplier_ids, db)
+
+    return {
+        "p1_singleprompt": {
+            "ids": p1_ids,
+            "suppliers": p1_suppliers,
+            "csr": constraint_satisfaction_rate_from_suppliers(p1_suppliers, constraints),
+            "exec_ms": p1.exec_ms,
+            "raw_names": p1.supplier_names,
+            "reasoning": "; ".join(p1.reasoning) if p1.reasoning else None,
+            "cost_usd": p1_cost,
+            "error": p1.error,
+        },
+        "p2_rag": {
+            "ids": p2.supplier_ids,
+            "suppliers": p2_suppliers,
+            "csr": constraint_satisfaction_rate_from_suppliers(p2_suppliers, constraints),
+            "exec_ms": p2.exec_ms,
+            "raw_names": p2.supplier_names,
+            "reasoning": "; ".join(p2.reasoning) if p2.reasoning else None,
+            "cost_usd": p2_cost,
+            "error": p2.error,
+        },
+    }
+
+
 async def run_full_evaluation(
     run_suppliermind: bool = True,
     run_baselines: bool = True,
     query_limit: int | None = None,
+    run_paradigm_baselines: bool = False,
 ) -> dict:
     """
     Run the complete SupplierBench evaluation.
@@ -153,6 +269,14 @@ async def run_full_evaluation(
     sm_metrics: list[QueryMetrics] = []
     kw_metrics: list[QueryMetrics] = []
     manual_metrics: list[QueryMetrics] = []
+    p1_metrics: list[QueryMetrics] = []
+    p2_metrics: list[QueryMetrics] = []
+
+    name_index: dict[str, str] = {}
+    if run_paradigm_baselines:
+        async with AsyncSessionLocal() as db:
+            name_index = await _load_supplier_name_index(db)
+        logger.info("Loaded %d supplier names for P1 matching", len(name_index))
 
     for i, query in enumerate(benchmark_queries, 1):
         q_id = query["id"]
@@ -170,9 +294,11 @@ async def run_full_evaluation(
         if run_suppliermind:
             logger.info("  Running SupplierMind...")
             try:
+                sm_cost_before = _llm_total_cost()
                 sm_ids, sm_compliance, sm_ms = await run_suppliermind_query(
                     raw_query, constraints, f"eval-{q_id}"
                 )
+                sm_cost = _llm_total_cost() - sm_cost_before
                 sm_p5 = precision_at_k(sm_ids, ground_truth_ids, k=5)
                 sm_rr = reciprocal_rank(sm_ids, ground_truth_ids)
                 sm_csr = constraint_satisfaction_rate_from_compliance(sm_compliance)
@@ -189,6 +315,7 @@ async def run_full_evaluation(
                     constraint_satisfaction_rate=sm_csr,
                     execution_time_ms=sm_ms,
                     compliance_data=sm_compliance,
+                    cost_usd=sm_cost,
                 ))
                 logger.info(
                     "  SupplierMind: P@5=%.2f CSR=%.2f MRR=%.2f time=%dms",
@@ -242,6 +369,36 @@ async def run_full_evaluation(
                 kw_p5, manual_p5
             )
 
+        # ── Run P1 / P2 paradigm baselines (Development Plan, Phase 3) ──
+        if run_paradigm_baselines:
+            async with AsyncSessionLocal() as db:
+                paradigm_results = await run_paradigm_queries(
+                    raw_query, constraints, db, name_index
+                )
+            for system_name, metrics_list in (
+                ("p1_singleprompt", p1_metrics),
+                ("p2_rag", p2_metrics),
+            ):
+                pr = paradigm_results[system_name]
+                p5 = precision_at_k(pr["ids"], ground_truth_ids, k=5)
+                rr = reciprocal_rank(pr["ids"], ground_truth_ids)
+                metrics_list.append(QueryMetrics(
+                    query_id=q_id, query_number=query["query_number"],
+                    difficulty=difficulty, system_name=system_name,
+                    retrieved_ids=pr["ids"], ground_truth_ids=list(ground_truth_ids),
+                    precision_at_5=p5, reciprocal_rank=rr,
+                    constraint_satisfaction_rate=pr["csr"],
+                    execution_time_ms=pr["exec_ms"],
+                    cost_usd=pr["cost_usd"],
+                    raw_names=pr["raw_names"],
+                    reasoning=pr["reasoning"],
+                ))
+                logger.info(
+                    "  %s: P@5=%.2f CSR=%.2f time=%dms%s",
+                    system_name, p5, pr["csr"], pr["exec_ms"],
+                    f" ERROR={pr['error']}" if pr["error"] else "",
+                )
+
     # ── Aggregate Results ─────────────────────────────────────────────
     aggregated: dict[str, SystemMetrics] = {}
     if sm_metrics:
@@ -250,6 +407,10 @@ async def run_full_evaluation(
         aggregated["keyword_sql"] = aggregate_metrics(kw_metrics, "keyword_sql")
     if manual_metrics:
         aggregated["manual_simulation"] = aggregate_metrics(manual_metrics, "manual_simulation")
+    if p1_metrics:
+        aggregated["p1_singleprompt"] = aggregate_metrics(p1_metrics, "p1_singleprompt")
+    if p2_metrics:
+        aggregated["p2_rag"] = aggregate_metrics(p2_metrics, "p2_rag")
 
     results = {
         "run_id": str(uuid.uuid4()),
@@ -260,6 +421,8 @@ async def run_full_evaluation(
             "suppliermind": [asdict(m) for m in sm_metrics],
             "keyword_sql": [asdict(m) for m in kw_metrics],
             "manual_simulation": [asdict(m) for m in manual_metrics],
+            "p1_singleprompt": [asdict(m) for m in p1_metrics],
+            "p2_rag": [asdict(m) for m in p2_metrics],
         },
         "aggregated": {k: asdict(v) for k, v in aggregated.items()},
     }
@@ -303,13 +466,15 @@ def _print_summary(aggregated: dict[str, SystemMetrics]) -> None:
     print(f"{'System':<25} {'P@5':>8} {'CSR':>8} {'MRR':>8} {'Time(ms)':>12}")
     print("-" * 80)
 
-    order = ["suppliermind", "manual_simulation", "keyword_sql"]
+    order = ["suppliermind", "p2_rag", "p1_singleprompt", "manual_simulation", "keyword_sql"]
     for key in order:
         if key not in aggregated:
             continue
         m = aggregated[key]
         name = {
-            "suppliermind": "SupplierMind",
+            "suppliermind": "P3: SupplierMind",
+            "p2_rag": "P2: RAG baseline",
+            "p1_singleprompt": "P1: Single-prompt LLM",
             "keyword_sql": "Baseline A: Keyword SQL",
             "manual_simulation": "Baseline B: Manual Sim",
         }.get(key, key)
