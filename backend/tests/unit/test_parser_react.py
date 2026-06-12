@@ -290,7 +290,11 @@ def test_same_args_dedup_intercepts_repeat_call():
 
 
 def test_max_iteration_termination_runs_fallback():
-    geocoder = _FakeGeocoder((52.52, 13.405))
+    # Failing geocoder: the trace recovers NOTHING concrete, so the fallback
+    # must keep its clarification (Task 3.4 added a proceed-with-recovery
+    # path for productive traces — pinned separately in
+    # test_fallback_proceeds_when_trace_recovered_product_and_constraint).
+    geocoder = _FakeGeocoder(RuntimeError("nominatim down"))
     registry = _build_registry(geocoder=geocoder)
 
     # LLM never emits Finish — every response is the same tool call with
@@ -358,3 +362,123 @@ def test_react_trace_lands_in_audit_log_output_snapshot():
     assert out_snap["tools_called"] == ["geocode_location"]
     assert isinstance(out_snap["trace"], list)
     assert out_snap["trace"][-1]["action"] == "Finish"
+
+
+# -- Hallucinated-Observation hardening (Task 3.4 smoke regression) ----------
+#
+# llama-3.1 frequently emits the Observation (and follow-up commentary) inside
+# its own completion. The Task 3.4 smoke run burned 4 of 6 iterations on
+# "Action Input is not valid JSON: Extra data" because the old regex captured
+# everything from the first { to the last } in the response. These tests pin
+# the two defense layers: truncation at a hallucinated "Observation:" and
+# first-JSON-value parsing that ignores trailing junk.
+
+
+def test_parse_react_response_ignores_hallucinated_observation():
+    from app.agents.parser_agent import _parse_react_response
+
+    text = (
+        "Thought: I need to infer the industry context for packaging.\n"
+        "Action: infer_industry_context\n"
+        'Action Input: {"product_description": "packaging"}\n'
+        "\n"
+        'Observation: {"industry_name": "packaging", "certs": ["ISO 9001:2015"]}'
+    )
+    step = _parse_react_response(text)
+    assert step.action == "infer_industry_context"
+    assert step.action_input == {"product_description": "packaging"}
+
+
+def test_parse_react_response_ignores_trailing_commentary_after_json():
+    from app.agents.parser_agent import _parse_react_response
+
+    text = (
+        "Thought: canonicalize the certification.\n"
+        "Action: canonicalize_certification\n"
+        'Action Input: {"cert_name": "ISO certified"}\n'
+        "\n"
+        "(I will make sure to follow the format correctly this time)"
+    )
+    step = _parse_react_response(text)
+    assert step.action == "canonicalize_certification"
+    assert step.action_input == {"cert_name": "ISO certified"}
+
+
+def test_parse_react_response_still_rejects_truly_broken_json():
+    from app.agents.parser_agent import _parse_react_response
+
+    text = (
+        "Thought: broken.\n"
+        "Action: geocode_location\n"
+        'Action Input: {"location_name": "Bavaria"'  # unterminated object
+    )
+    with pytest.raises(ValueError, match="not valid JSON"):
+        _parse_react_response(text)
+
+
+# -- Task 3.4 loop hygiene: per-tool budget + forced finish + fallback -------
+
+
+def test_third_call_to_same_tool_is_intercepted_even_with_different_args():
+    """Exact-args dedup is dodged by argument variations; the per-tool
+    budget (2 executions) must intercept the third call regardless."""
+    registry = _build_registry(geocoder=_FakeGeocoder((48.1, 11.5)))
+
+    finish_payload = {"product_type": "packaging", "confidence": 0.8,
+                      "clarification_needed": False, "query_type": "general"}
+    llm = _FakeLLM([
+        'Thought: a.\nAction: infer_industry_context\nAction Input: {"product_description": "packaging one"}',
+        'Thought: b.\nAction: infer_industry_context\nAction Input: {"product_description": "packaging two"}',
+        'Thought: c.\nAction: infer_industry_context\nAction Input: {"product_description": "packaging three"}',
+        f'Thought: ok.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+    out = parser.execute(_make_state("packaging suppliers with ISO 9001 in Hamburg"))
+
+    trace = out["react_trace"]
+    third = trace[2]
+    assert third["action"] == "infer_industry_context"
+    assert third["observation"].get("error") == "tool_budget_exhausted"
+    assert out["react_terminated_by"] == "finish"
+
+
+def test_final_iteration_receives_force_finish_instruction():
+    """On the last allowed iteration the model must be told that only
+    Action: Finish is acceptable."""
+    registry = _build_registry(geocoder=_FakeGeocoder((48.1, 11.5)))
+    # Default response keeps calling a tool with fresh args each time so the
+    # loop spins to the cap (vary via responses list).
+    responses = [
+        f'Thought: spin {i}.\nAction: geocode_location\nAction Input: {{"location_name": "city {i}"}}'
+        for i in range(MAX_REACT_ITERATIONS)
+    ]
+    llm = _FakeLLM(responses)
+    parser = _make_parser(llm, registry)
+    parser.execute(_make_state("suppliers of industrial gaskets near Cologne"))
+
+    final_call_messages = llm.calls[-1]
+    assert any(
+        "FINAL step" in (m.get("content") or "") for m in final_call_messages
+    ), "last LLM call must carry the force-finish instruction"
+
+
+def test_fallback_proceeds_when_trace_recovered_product_and_constraint():
+    """Task 3.4: a max-iterations run whose trace holds a real product label
+    (infer_industry_context action_input) plus a concrete constraint must
+    proceed instead of asking the user again."""
+    registry = _build_registry(geocoder=_FakeGeocoder((50.9, 6.9)))
+    responses = [
+        'Thought: industry.\nAction: infer_industry_context\nAction Input: {"product_description": "stainless steel fasteners"}',
+        'Thought: where.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+    ] + [
+        f'Thought: spin {i}.\nAction: infer_industry_context\nAction Input: {{"product_description": "stainless steel fasteners variant {i}"}}'
+        for i in range(MAX_REACT_ITERATIONS)
+    ]
+    llm = _FakeLLM(responses)
+    parser = _make_parser(llm, registry)
+    out = parser.execute(_make_state("we need fastener supply for construction in Germany"))
+
+    assert out["react_terminated_by"] == "max_iterations"
+    assert out["needs_clarification"] is False
+    assert out["parsed_constraints"]["product_type"] == "stainless steel fasteners"
+    assert out["parsed_constraints"]["location_country"] == "Germany"

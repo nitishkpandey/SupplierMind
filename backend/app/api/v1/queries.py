@@ -14,13 +14,23 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.orchestrator import run_pipeline
+from app.agents.orchestrator import resume_pipeline, run_pipeline
 from app.api.deps import assert_owner_or_admin, get_current_user, require_manager
 from app.core.config import settings
 from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User
+from app.db.repositories.clarification_repo import (
+    ClarificationAlreadyResolved,
+    ClarificationRepository,
+    MaxTurnsReached,
+)
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import get_db
-from app.schemas.query import QueryCreate, QueryResponse
+from app.schemas.query import (
+    ClarificationAnswerRequest,
+    ClarificationView,
+    QueryCreate,
+    QueryResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -181,7 +191,10 @@ async def stream_query_progress(
                 event_type = event.get("type", "agent_update")
                 yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
                 sent_count += 1
-                if event_type in ("complete", "error"):
+                # Task 3.3 — `needs_clarification` also terminates the stream:
+                # the frontend renders the question, the user answers, the
+                # /clarify endpoint resumes and the client re-subscribes.
+                if event_type in ("complete", "error", "needs_clarification"):
                     return
 
             await asyncio.sleep(0.5)
@@ -388,6 +401,256 @@ async def get_audit_trail(
     }
 
 
+# ── Task 3.3 — Multi-turn clarification endpoints ────────────────────
+
+
+@router.get(
+    "/{query_id}/clarification",
+    response_model=ClarificationView,
+    summary="Get the open clarification question for a query, if any",
+)
+async def get_pending_clarification(
+    query_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> ClarificationView:
+    """Returns the still-open clarification on this query, or 404 if none.
+
+    404 is also returned on cross-user access (the row exists but is not
+    yours) — leaking existence is its own privacy bug.
+    """
+    try:
+        qid = uuid.UUID(query_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid query ID format")
+
+    repo = ClarificationRepository(db)
+    pc = await repo.get_open_for_query(qid)
+    if pc is None:
+        raise HTTPException(status_code=404, detail="No pending clarification")
+
+    # Owner check: deliberately return 404 (not 403) on cross-user access
+    # so a probe cannot distinguish "not yours" from "doesn't exist".
+    if str(pc.user_id) != str(current_user.id) and current_user.role.value != "admin":
+        raise HTTPException(status_code=404, detail="No pending clarification")
+
+    from app.db.repositories.clarification_repo import MAX_CLARIFICATION_TURNS
+    return ClarificationView(
+        id=str(pc.id),
+        question=pc.clarification_question,
+        turn_number=pc.turn_number,
+        max_turns=MAX_CLARIFICATION_TURNS,
+        created_at=pc.created_at.isoformat(),
+    )
+
+
+@router.post(
+    "/{query_id}/clarify",
+    status_code=status.HTTP_200_OK,
+    summary="Submit a clarification answer and resume the pipeline",
+)
+async def submit_clarification_answer(
+    query_id: str,
+    payload: ClarificationAnswerRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Submit the user's answer to the current clarification.
+
+    Marks the pending row resolved, then resumes the pipeline in the
+    background (the SSE stream the client is already subscribed to
+    delivers the rest). Returns immediately with the next-turn descriptor.
+
+    Returns 404 (NOT 403) on cross-user access — see
+    `assert_owner_or_admin`'s comment for the existence-leak rationale.
+    Returns 409 when the cap or already-resolved state blocks resumption.
+    """
+    try:
+        qid = uuid.UUID(query_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid query ID format")
+
+    repo = ClarificationRepository(db)
+    pc = await repo.get_open_for_query(qid)
+    if pc is None:
+        raise HTTPException(status_code=404, detail="No pending clarification")
+    if str(pc.user_id) != str(current_user.id) and current_user.role.value != "admin":
+        raise HTTPException(status_code=404, detail="No pending clarification")
+
+    answer = payload.answer.strip()
+    if not answer:
+        raise HTTPException(status_code=400, detail="Answer cannot be empty")
+
+    clarification_id = str(pc.id)
+
+    # Re-mount the SSE buffer for this query so progress events from the
+    # resumed pipeline reach the existing EventSource client.
+    if query_id not in _sse_events:
+        _sse_events[query_id] = []
+    _sse_events[query_id].append({
+        "type": "agent_update",
+        "agent": "clarification_handler",
+        "status": "resumed",
+        "message": f"Resuming with user answer (turn {pc.turn_number + 1})",
+    })
+
+    # Update Query.status so polling clients see the resume.
+    from sqlalchemy import update
+    await db.execute(
+        update(Query)
+        .where(Query.id == qid)
+        .values(status=QueryStatus.processing)
+    )
+    await db.commit()
+
+    background_tasks.add_task(
+        _resume_pipeline_background,
+        clarification_id=clarification_id,
+        user_answer=answer,
+        query_id=query_id,
+    )
+
+    return {
+        "id": clarification_id,
+        "query_id": query_id,
+        "status": "resuming",
+        "turn_number": pc.turn_number,
+    }
+
+
+async def _resume_pipeline_background(
+    clarification_id: str,
+    user_answer: str,
+    query_id: str,
+) -> None:
+    """Background task: resume the pipeline after a clarification answer."""
+    from app.db.session import AsyncSessionLocal
+
+    def _push(event_type: str, data: dict) -> None:
+        if query_id in _sse_events:
+            _sse_events[query_id].append({"type": event_type, **data})
+
+    start_time = time.time()
+    try:
+        final_state = await resume_pipeline(clarification_id, user_answer)
+    except MaxTurnsReached as e:
+        logger.warning("[resume] max turns reached for query=%s: %s", query_id, e)
+        _push("error", {"message": "Maximum clarification turns reached."})
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import update
+            await db.execute(
+                update(Query)
+                .where(Query.id == uuid.UUID(query_id))
+                .values(
+                    status=QueryStatus.failed,
+                    error_message="Max clarification turns reached.",
+                    completed_at=datetime.now(timezone.utc),
+                )
+            )
+            await db.commit()
+        return
+    except ClarificationAlreadyResolved as e:
+        logger.warning("[resume] already resolved for query=%s: %s", query_id, e)
+        _push("error", {"message": "Clarification already resolved."})
+        return
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[resume] pipeline failed for query=%s", query_id)
+        _push("error", {"message": f"Resume error: {str(e)[:200]}"})
+        return
+
+    execution_time_ms = int((time.time() - start_time) * 1000)
+
+    # If the Parser re-clarified, surface the new question and stop here.
+    # Same guard as _run_pipeline_background: only pause when a resumable
+    # pending_clarifications row exists; degraded re-parses fall through
+    # and fail with the question as the user-facing message.
+    if final_state.get("needs_clarification") and not final_state.get("clarification_id"):
+        final_state["error"] = (
+            final_state.get("clarification_question")
+            or "The query could not be parsed confidently. Please "
+               "rephrase with more detail and resubmit."
+        )
+    elif final_state.get("needs_clarification"):
+        _push("agent_update", {
+            "agent": "clarification_handler",
+            "status": "needs_clarification",
+            "message": final_state.get("clarification_question") or "",
+        })
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import update
+            await db.execute(
+                update(Query)
+                .where(Query.id == uuid.UUID(query_id))
+                .values(status=QueryStatus.pending)  # pending again — awaiting next answer
+            )
+            await db.commit()
+        return
+
+    # Otherwise the pipeline completed: persist results + emit completion.
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import update
+        new_status = (
+            QueryStatus.completed
+            if not final_state.get("error")
+            else QueryStatus.failed
+        )
+        await db.execute(
+            update(Query)
+            .where(Query.id == uuid.UUID(query_id))
+            .values(
+                status=new_status,
+                detected_language=final_state.get("detected_language", "en"),
+                parsed_constraints=final_state.get("parsed_constraints"),
+                execution_time_ms=execution_time_ms,
+                completed_at=datetime.now(timezone.utc),
+                error_message=final_state.get("error"),
+            )
+        )
+        for ranked in final_state.get("ranked_suppliers", []):
+            result = QueryResult(
+                query_id=uuid.UUID(query_id),
+                supplier_id=uuid.UUID(ranked["supplier_id"]),
+                rank=ranked["rank"],
+                total_score=ranked["total_score"],
+                constraint_score=ranked["constraint_score"],
+                semantic_score=ranked["semantic_score"],
+                proximity_score=ranked.get("proximity_score"),
+                completeness_score=ranked["completeness_score"],
+                compliance_matrix=ranked["compliance_matrix"],
+                explanation=ranked["explanation"],
+                distance_km=ranked.get("distance_km"),
+            )
+            db.add(result)
+        for entry in final_state.get("audit_log", []):
+            input_snap = entry.get("input_snapshot") or {
+                "summary": entry.get("input_summary", "")
+            }
+            output_snap = entry.get("output_snapshot") or {
+                "summary": entry.get("output_summary", "")
+            }
+            log = AuditLog(
+                query_id=uuid.UUID(query_id),
+                agent_name=entry["agent_name"],
+                action=entry["action"],
+                reasoning=entry.get("reasoning"),
+                input_snapshot=input_snap,
+                output_snapshot=output_snap,
+                duration_ms=entry.get("duration_ms", 0),
+            )
+            db.add(log)
+        await db.commit()
+
+    if final_state.get("error"):
+        _push("error", {"message": final_state["error"]})
+    else:
+        _push("complete", {
+            "query_id": query_id,
+            "result_count": len(final_state.get("ranked_suppliers", [])),
+            "execution_time_ms": execution_time_ms,
+        })
+
+
 async def _run_pipeline_background(
     query_id: str,
     raw_query: str,
@@ -438,6 +701,61 @@ async def _run_pipeline_background(
                 "message": entry.get("output_summary", "")[:100],
                 "duration_ms": entry.get("duration_ms", 0),
             })
+
+        # Task 3.3 — pause for clarification. Don't write QueryResult rows,
+        # don't mark the query completed; instead leave status=pending and
+        # surface the question via SSE + audit log persistence.
+        #
+        # Pause ONLY when a pending_clarifications row exists
+        # (clarification_id set). The degraded Parser paths
+        # (max_iterations / llm_error fallback) also set
+        # needs_clarification but persist no resumable row — pausing
+        # there would strand the query in `pending` with no /clarify
+        # target. Those fall through and fail gracefully below.
+        if final_state.get("needs_clarification") and not final_state.get("clarification_id"):
+            final_state["error"] = (
+                final_state.get("clarification_question")
+                or "The query could not be parsed confidently. Please "
+                   "rephrase with more detail and resubmit."
+            )
+        elif final_state.get("needs_clarification"):
+            async with AsyncSessionLocal() as db:
+                from sqlalchemy import update
+                await db.execute(
+                    update(Query)
+                    .where(Query.id == uuid.UUID(query_id))
+                    .values(
+                        status=QueryStatus.pending,
+                        parsed_constraints=final_state.get("parsed_constraints"),
+                        detected_language=final_state.get("detected_language", "en"),
+                    )
+                )
+                for entry in final_state.get("audit_log", []):
+                    input_snap = entry.get("input_snapshot") or {
+                        "summary": entry.get("input_summary", "")
+                    }
+                    output_snap = entry.get("output_snapshot") or {
+                        "summary": entry.get("output_summary", "")
+                    }
+                    log = AuditLog(
+                        query_id=uuid.UUID(query_id),
+                        agent_name=entry["agent_name"],
+                        action=entry["action"],
+                        reasoning=entry.get("reasoning"),
+                        input_snapshot=input_snap,
+                        output_snapshot=output_snap,
+                        duration_ms=entry.get("duration_ms", 0),
+                    )
+                    db.add(log)
+                await db.commit()
+
+            _push("needs_clarification", {
+                "query_id": query_id,
+                "clarification_id": final_state.get("clarification_id"),
+                "question": final_state.get("clarification_question") or "",
+                "turn_number": final_state.get("turn_number") or 1,
+            })
+            return
 
         # Save results to database
         async with AsyncSessionLocal() as db:

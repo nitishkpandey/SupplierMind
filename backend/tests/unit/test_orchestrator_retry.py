@@ -21,9 +21,12 @@ def test_retry_routes_to_discovery_not_external():
     assert after_evaluator(state) == "discovery_node"
 
 
-def test_no_retry_routes_to_end():
+def test_no_retry_routes_to_finalize():
+    # Task 3.2: instead of routing directly to END, a non-retry pass now
+    # routes through the finalize_node so the memory write hook can fire.
+    # The finalize_node itself terminates the graph (graph.add_edge → END).
     state = {"evaluator_should_retry": False, "candidate_supplier_ids": ["a"]}
-    assert after_evaluator(state) == END
+    assert after_evaluator(state) == "finalize_node"
 
 
 def test_retry_logs_reuse_line_with_candidate_count(caplog):

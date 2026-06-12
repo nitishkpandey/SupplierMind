@@ -89,6 +89,24 @@ export const queryService = {
 
   getAuditTrail: (queryId: string) =>
     api.get(`/queries/${queryId}/audit`),
+
+  // Task 3.3 — multi-turn clarification dialogue
+  getClarification: (queryId: string) =>
+    api.get<{
+      id: string;
+      question: string;
+      turn_number: number;
+      max_turns: number;
+      created_at: string;
+    }>(`/queries/${queryId}/clarification`),
+
+  submitClarification: (queryId: string, answer: string) =>
+    api.post<{
+      id: string;
+      query_id: string;
+      status: string;
+      turn_number: number;
+    }>(`/queries/${queryId}/clarify`, { answer }),
 };
 
 // Supplier service methods

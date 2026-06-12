@@ -19,6 +19,7 @@ from typing import Optional
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum as SAEnum,
     Float,
@@ -30,7 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text as sa_text
 
 
 class Base(DeclarativeBase):
@@ -367,6 +368,57 @@ class AuditLog(Base):
     __table_args__ = (
         Index("ix_audit_logs_query_id", "query_id"),
         Index("ix_audit_logs_agent_name", "agent_name"),
+    )
+
+
+# ── PendingClarification ──────────────────────────────────────────────
+class PendingClarification(Base):
+    """
+    Task 3.3 — Pause-and-resume state for multi-turn clarification dialogues.
+
+    One row per open clarification (resolved_at IS NULL). When the Parser
+    decides a query is too ambiguous to proceed, the orchestrator persists
+    a row here with the partial constraints + ReAct trace, then returns the
+    question to the API. When the user POSTs an answer, the orchestrator
+    fetches this row, augments the original query with the answer, and
+    re-runs the pipeline. The row's resolved_at is then stamped.
+
+    The CHECK constraint on turn_number is a hard 3-turn cap enforced at the
+    database level — even if app code drifts, the DB refuses to insert a
+    fourth turn.
+    """
+    __tablename__ = "pending_clarifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    query_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    raw_query: Mapped[str] = mapped_column(Text, nullable=False)
+    clarification_question: Mapped[str] = mapped_column(Text, nullable=False)
+    partial_constraints: Mapped[dict] = mapped_column(JSON, nullable=False)
+    react_trace: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    turn_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("turn_number <= 3", name="max_turns"),
+        Index("ix_pending_clarifications_query_id", "query_id"),
+        Index(
+            "ix_pending_clarifications_user_unresolved",
+            "user_id",
+            postgresql_where=sa_text("resolved_at IS NULL"),
+        ),
     )
 
 

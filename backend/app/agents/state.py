@@ -125,6 +125,16 @@ class AgentState(TypedDict):
     needs_clarification: bool
     clarification_question: Optional[str]
 
+    # ── Task 3.3 — Multi-turn clarification dialogue ──────────────────
+    # Populated by parser_node when the Parser raises a clarification: the
+    # DB row id under which the partial state has been persisted, so the
+    # API layer can hand it back to the user. `turn_number` is 1 on first
+    # ask, 2/3 on resumed re-asks. `previous_partial_constraints` is the
+    # hint the resumed Parser prompt uses to avoid starting from scratch.
+    clarification_id: Optional[str]
+    turn_number: int
+    previous_partial_constraints: Optional[ParsedConstraints]
+
     # ── External Discovery Agent output ───────────────────────────────
     newly_discovered_supplier_ids: list[str]
     external_discovery_stats: dict

@@ -71,11 +71,15 @@ class ToolRegistry:
 
 
 def build_default_registry() -> ToolRegistry:
-    """Wire the five standard Parser tools.
+    """Wire the five standard Parser tools — no user context (stub memory).
 
     Kept here (not in __init__) so callers that need an empty registry for
     tests can construct one without triggering the imports of every tool
     module (some pull in services that touch the network on import).
+
+    The `lookup_past_query` tool wired in here is the no-op stub. Production
+    paths route through `build_user_registry()` which binds a real memory
+    service to the request's `user_id` (Task 3.2 / Component C).
     """
     from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
@@ -89,4 +93,53 @@ def build_default_registry() -> ToolRegistry:
     reg.register(infer_industry_context_tool())
     reg.register(parse_quantity_unit_tool())
     reg.register(lookup_past_query_tool())
+    return reg
+
+
+def build_user_registry(
+    user_id: str,
+    memory_service=None,
+    *,
+    lookup_min_similarity: float | None = None,
+) -> ToolRegistry:
+    """Wire the five Parser tools with a real, per-user `lookup_past_query`.
+
+    Task 3.2: the Parser is user-scoped at construction. `current_user_id` is
+    closure-bound on the lookup tool so the LLM cannot search another user's
+    memory regardless of the Action Input it emits.
+
+    `lookup_min_similarity` is an optional override of the cosine threshold
+    on the memory search. The default (0.65 in past_query.py) is intentionally
+    conservative; the live demo uses a lower value while the threshold is
+    being tuned against real query distributions.
+    """
+    from app.agents.tools.geocode import geocode_location_tool
+    from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+    from app.agents.tools.industry_context import infer_industry_context_tool
+    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
+    from app.agents.tools.past_query import (
+        _DEFAULT_MIN_SIMILARITY,
+        make_lookup_past_query_tool,
+    )
+    from app.services.query_memory import get_memory_service
+
+    svc = memory_service if memory_service is not None else get_memory_service()
+    min_sim = (
+        lookup_min_similarity
+        if lookup_min_similarity is not None
+        else _DEFAULT_MIN_SIMILARITY
+    )
+
+    reg = ToolRegistry()
+    reg.register(geocode_location_tool())
+    reg.register(canonicalize_certification_tool())
+    reg.register(infer_industry_context_tool())
+    reg.register(parse_quantity_unit_tool())
+    reg.register(
+        make_lookup_past_query_tool(
+            memory_service=svc,
+            current_user_id=str(user_id or ""),
+            min_similarity=min_sim,
+        )
+    )
     return reg

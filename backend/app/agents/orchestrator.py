@@ -43,12 +43,15 @@ PRODUCTION V2 PIPELINE:
 
 import asyncio
 import logging
-from typing import Literal
+import time
+import uuid as _uuid
+from typing import Any, Literal, Optional
 
 from langgraph.graph import StateGraph, END
 
 from app.agents.state import AgentState
 from app.agents.parser_agent import ParserAgent
+from app.agents.tools import build_user_registry
 from app.agents.external_discovery_agent import ExternalDiscoveryAgent
 from app.agents.discovery_agent import DiscoveryAgent
 from app.agents.compliance_agent import ComplianceAgent
@@ -59,9 +62,20 @@ logger = logging.getLogger(__name__)
 
 
 def _create_initial_state(
-    raw_query: str, query_id: str, user_id: str, search_scope: str
+    raw_query: str,
+    query_id: str,
+    user_id: str,
+    search_scope: str,
+    *,
+    turn_number: int = 1,
+    previous_partial_constraints: Optional[dict] = None,
 ) -> AgentState:
-    """Create initial AgentState with all defaults."""
+    """Create initial AgentState with all defaults.
+
+    Task 3.3 — turn_number and previous_partial_constraints are populated
+    only on resume_pipeline() calls; first-turn submissions leave them at
+    their defaults.
+    """
     return AgentState(
         # Input
         raw_query=raw_query,
@@ -74,6 +88,11 @@ def _create_initial_state(
         detected_language="en",
         needs_clarification=False,
         clarification_question=None,
+
+        # Task 3.3 — clarification dialogue
+        clarification_id=None,
+        turn_number=turn_number,
+        previous_partial_constraints=previous_partial_constraints,
 
         # External Discovery defaults
         newly_discovered_supplier_ids=[],
@@ -107,7 +126,175 @@ def _create_initial_state(
 
 # ── Node functions ────────────────────────────────────────────────────
 def parser_node(state: AgentState) -> AgentState:
-    return ParserAgent().run(state)
+    # Per-Task 3.2, the Parser is user-scoped at construction so the
+    # closure-bound `lookup_past_query` tool can only ever see this user's
+    # memory. If memory infra is unreachable, fall back to the default
+    # registry (whose lookup tool is the no-op stub) so the Parser still
+    # runs end-to-end.
+    user_id = state.get("user_id") or ""
+    try:
+        registry = build_user_registry(user_id=user_id)
+        agent = ParserAgent(tool_registry=registry)
+    except Exception as e:  # noqa: BLE001 — never fail the Parser on memory init
+        logger.warning(
+            "[orchestrator] build_user_registry failed (%s); falling back to "
+            "the default tool registry without semantic memory.",
+            e,
+        )
+        agent = ParserAgent()
+
+    state = agent.run(state)
+
+    # Task 3.3 — persist pause state when the Parser raised a clarification
+    # on a clean `finish` termination, or via the Task 3.4 pre-loop gate
+    # (contentless query, no ReAct run). The fallback/degraded paths also
+    # set needs_clarification=True but those carry no resumable state —
+    # they just degrade gracefully — so we skip persistence there.
+    if state.get("needs_clarification") and state.get("react_terminated_by") in (
+        "finish",
+        "pre_loop_clarification",
+    ):
+        try:
+            _persist_clarification_for_state(state)
+        except Exception as e:  # noqa: BLE001 — persistence must never crash pipeline
+            logger.error(
+                "[orchestrator] failed to persist pending_clarification for "
+                "query_id=%s: %s",
+                state.get("query_id"), e,
+            )
+
+    return state
+
+
+def _persist_clarification_for_state(state: AgentState) -> None:
+    """Write one pending_clarifications row from the current paused state.
+
+    Populates state["clarification_id"] in-place so the API layer can hand
+    it back to the user.
+    """
+    from app.db.session import SyncSessionLocal
+    from app.db.repositories.clarification_repo import (
+        persist_pending_clarification_sync,
+        MAX_CLARIFICATION_TURNS,
+    )
+
+    query_id = state.get("query_id")
+    user_id = state.get("user_id")
+    if not query_id or not user_id:
+        logger.warning(
+            "[orchestrator] cannot persist clarification: missing query_id/user_id"
+        )
+        return
+
+    turn_number = int(state.get("turn_number") or 1)
+    if turn_number > MAX_CLARIFICATION_TURNS:
+        logger.warning(
+            "[orchestrator] turn_number=%d exceeds cap=%d; refusing to persist",
+            turn_number, MAX_CLARIFICATION_TURNS,
+        )
+        return
+
+    with SyncSessionLocal() as db:
+        pc_id = persist_pending_clarification_sync(
+            db,
+            query_id=_uuid.UUID(str(query_id)),
+            user_id=_uuid.UUID(str(user_id)),
+            raw_query=state.get("raw_query") or "",
+            clarification_question=state.get("clarification_question") or "",
+            partial_constraints=dict(state.get("parsed_constraints") or {}),
+            react_trace=list(state.get("react_trace") or []),
+            turn_number=turn_number,
+        )
+    state["clarification_id"] = str(pc_id)
+    logger.info(
+        "[orchestrator] Persisted pending_clarification id=%s turn=%d query=%s",
+        pc_id, turn_number, query_id,
+    )
+
+
+def finalize_node(state: AgentState) -> AgentState:
+    """Pipeline-completion hook (Task 3.2 / Component B).
+
+    Persists a query to long-term memory only when the Evaluator accepted
+    the run. Memory write failures NEVER propagate — the user response is
+    the critical path; memory is progressive enhancement.
+    """
+    verdict = (state.get("evaluator_verdict") or "").lower()
+    if verdict not in {"accepted", "accept", "auto_accept"}:
+        # Don't remember rejected, retried, or failed queries.
+        return state
+
+    user_id = state.get("user_id") or ""
+    raw_query = state.get("raw_query") or ""
+    constraints = state.get("parsed_constraints") or {}
+    if not user_id or not raw_query or not constraints:
+        return state
+
+    start = time.time()
+    try:
+        from app.services.query_memory import get_memory_service
+
+        memory_id = get_memory_service().write(
+            user_id=str(user_id),
+            query_text=raw_query,
+            parsed_constraints=dict(constraints),
+        )
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(
+            "[finalize] Wrote query memory user=%s memory_id=%s (%dms)",
+            user_id,
+            memory_id,
+            duration_ms,
+        )
+        _append_audit(
+            state,
+            agent_name="memory_service",
+            action="memory_written",
+            duration_ms=duration_ms,
+            reasoning=(
+                f"Stored query for future semantic recall, memory_id={memory_id}"
+            ),
+            output_summary=f"memory_id={memory_id}",
+        )
+    except Exception as e:  # noqa: BLE001 — memory write must be failsafe
+        duration_ms = int((time.time() - start) * 1000)
+        logger.warning("[finalize] memory_write_failed: %s", e)
+        _append_audit(
+            state,
+            agent_name="memory_service",
+            action="memory_write_failed",
+            duration_ms=duration_ms,
+            reasoning=str(e),
+            output_summary=f"FAILED: {type(e).__name__}",
+        )
+    return state
+
+
+def _append_audit(
+    state: AgentState,
+    *,
+    agent_name: str,
+    action: str,
+    duration_ms: int,
+    reasoning: str,
+    output_summary: str,
+) -> None:
+    """Lightweight audit-log appender for the finalize_node (no BaseAgent
+    indirection because finalize is a free function, not an agent)."""
+    from datetime import datetime, timezone
+
+    entry = {
+        "agent_name": agent_name,
+        "action": action,
+        "reasoning": reasoning,
+        "input_summary": "",
+        "output_summary": output_summary,
+        "duration_ms": duration_ms,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if "audit_log" not in state or state["audit_log"] is None:
+        state["audit_log"] = []
+    state["audit_log"].append(entry)
 
 
 def external_discovery_node(state: AgentState) -> AgentState:
@@ -177,7 +364,7 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
     return "compliance_node"
 
 
-def after_evaluator(state: AgentState) -> Literal["discovery_node", "__end__"]:
+def after_evaluator(state: AgentState) -> Literal["discovery_node", "finalize_node", "__end__"]:
     if state.get("evaluator_should_retry"):
         n_candidates = len(state.get("candidate_supplier_ids", []))
         logger.info(
@@ -186,7 +373,7 @@ def after_evaluator(state: AgentState) -> Literal["discovery_node", "__end__"]:
             n_candidates,
         )
         return "discovery_node"
-    return END
+    return "finalize_node"
 
 
 # ── Build the graph ───────────────────────────────────────────────────
@@ -199,6 +386,7 @@ def build_pipeline():
     graph.add_node("compliance_node", compliance_node)
     graph.add_node("ranking_node", ranking_node)
     graph.add_node("evaluator_node", evaluator_node)
+    graph.add_node("finalize_node", finalize_node)
 
     graph.set_entry_point("parser_node")
 
@@ -234,8 +422,12 @@ def build_pipeline():
     graph.add_conditional_edges(
         "evaluator_node",
         after_evaluator,
-        {"discovery_node": "discovery_node", END: END},
+        {
+            "discovery_node": "discovery_node",
+            "finalize_node": "finalize_node",
+        },
     )
+    graph.add_edge("finalize_node", END)
 
     return graph.compile()
 
@@ -252,7 +444,13 @@ def get_pipeline():
 
 
 async def run_pipeline(
-    raw_query: str, query_id: str, user_id: str, search_scope: str = "approved_only"
+    raw_query: str,
+    query_id: str,
+    user_id: str,
+    search_scope: str = "approved_only",
+    *,
+    turn_number: int = 1,
+    previous_partial_constraints: Optional[dict] = None,
 ) -> AgentState:
     """
     Main entry point for running the full agent pipeline.
@@ -262,16 +460,25 @@ async def run_pipeline(
         query_id: UUID of the Query record in PostgreSQL
         user_id: UUID of the requesting user
         search_scope: 'approved_only' or 'both'
+        turn_number: Task 3.3 — 1 on first submission, 2/3 on resumed turns.
+        previous_partial_constraints: Task 3.3 — hint for the Parser on resume.
 
     Returns:
         Final AgentState with ranked_suppliers and audit_log populated
     """
     logger.info(
-        "[orchestrator] Starting pipeline for query_id=%s, scope=%s: %r",
-        query_id, search_scope, raw_query[:80],
+        "[orchestrator] Starting pipeline for query_id=%s, scope=%s, turn=%d: %r",
+        query_id, search_scope, turn_number, raw_query[:80],
     )
 
-    initial_state = _create_initial_state(raw_query, query_id, user_id, search_scope)
+    initial_state = _create_initial_state(
+        raw_query,
+        query_id,
+        user_id,
+        search_scope,
+        turn_number=turn_number,
+        previous_partial_constraints=previous_partial_constraints,
+    )
     pipeline = get_pipeline()
 
     # The LangGraph pipeline uses synchronous tools and database access.
@@ -290,3 +497,87 @@ async def run_pipeline(
     )
 
     return final_state
+
+
+async def resume_pipeline(
+    clarification_id: str,
+    user_answer: str,
+) -> AgentState:
+    """Task 3.3 — Resume a paused pipeline after the user answers.
+
+    Loads the persisted pending_clarifications row, marks it resolved,
+    augments the original query with the user's answer, and re-enters
+    the pipeline with turn_number incremented. The Parser may either
+    finish on this turn or raise another clarification, up to the
+    3-turn DB-enforced cap.
+
+    Raises:
+        ValueError: if the clarification row is missing, already resolved,
+            or would exceed the max-turns cap.
+    """
+    from app.db.session import SyncSessionLocal
+    from app.db.repositories.clarification_repo import (
+        get_pending_clarification_sync,
+        mark_resolved_sync,
+        MAX_CLARIFICATION_TURNS,
+        MaxTurnsReached,
+        ClarificationAlreadyResolved,
+    )
+
+    try:
+        pc_uuid = _uuid.UUID(str(clarification_id))
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"Invalid clarification_id: {clarification_id!r}") from e
+
+    def _load_and_mark() -> dict[str, Any]:
+        from app.db.models import Query
+
+        with SyncSessionLocal() as db:
+            pc = get_pending_clarification_sync(db, pc_uuid)
+            if pc is None:
+                raise ValueError(f"No pending clarification: {clarification_id}")
+            if pc.resolved_at is not None:
+                raise ClarificationAlreadyResolved(
+                    f"Clarification {clarification_id} already resolved"
+                )
+            next_turn = int(pc.turn_number) + 1
+            if next_turn > MAX_CLARIFICATION_TURNS:
+                raise MaxTurnsReached(
+                    f"Cannot resume: next turn {next_turn} exceeds cap "
+                    f"{MAX_CLARIFICATION_TURNS}."
+                )
+            # Preserve the original submission's search scope so a resumed
+            # 'both'-scoped query doesn't silently fall back to approved_only.
+            original_query = db.get(Query, pc.query_id)
+            search_scope = (
+                original_query.search_scope
+                if original_query is not None
+                else "approved_only"
+            )
+            mark_resolved_sync(
+                db,
+                clarification_id=pc_uuid,
+                user_answer=user_answer,
+            )
+            return {
+                "query_id": str(pc.query_id),
+                "user_id": str(pc.user_id),
+                "raw_query": pc.raw_query,
+                "partial_constraints": dict(pc.partial_constraints or {}),
+                "turn_number": next_turn,
+                "search_scope": search_scope,
+            }
+
+    payload = await asyncio.get_running_loop().run_in_executor(None, _load_and_mark)
+
+    augmented_query = (
+        f"{payload['raw_query']}\n\nUser clarification: {user_answer.strip()}"
+    )
+    return await run_pipeline(
+        augmented_query,
+        payload["query_id"],
+        payload["user_id"],
+        search_scope=payload["search_scope"],
+        turn_number=payload["turn_number"],
+        previous_partial_constraints=payload["partial_constraints"],
+    )

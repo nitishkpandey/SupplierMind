@@ -8,6 +8,16 @@ Public entry points:
     from app.agents.tools import build_default_registry, Tool, ToolRegistry
 """
 
-from app.agents.tools.registry import Tool, ToolRegistry, build_default_registry
+from app.agents.tools.registry import (
+    Tool,
+    ToolRegistry,
+    build_default_registry,
+    build_user_registry,
+)
 
-__all__ = ["Tool", "ToolRegistry", "build_default_registry"]
+__all__ = [
+    "Tool",
+    "ToolRegistry",
+    "build_default_registry",
+    "build_user_registry",
+]

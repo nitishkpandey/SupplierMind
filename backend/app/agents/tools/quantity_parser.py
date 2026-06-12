@@ -57,8 +57,11 @@ _RE = re.compile(
 def _normalise_unit(unit: str | None) -> str | None:
     if not unit:
         return None
-    u = re.sub(r"\s+", "", unit).strip(".").lower()
-    # Map common aliases.
+    u = unit.strip().lower()
+    # "units per month" → "units/month" before whitespace is stripped, so the
+    # natural-language form collapses to the same canonical key as "units/mo".
+    u = re.sub(r"\s+per\s+", "/", u)
+    u = re.sub(r"\s+", "", u).strip(".")
     aliases = {
         "u/mo": "units/month",
         "u/month": "units/month",

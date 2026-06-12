@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryService } from "@/services/api";
 import { useSSE } from "@/hooks/useSSE";
 import { SupplierCard } from "@/features/suppliers/SupplierCard";
 import { SupplierMap } from "@/features/suppliers/SupplierMap";
 import { AuditTrail } from "@/features/queries/AuditTrail";
+import { ClarificationCard } from "@/features/queries/ClarificationCard";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +31,21 @@ export default function ResultsPage() {
   const [showAudit, setShowAudit] = useState(false);
 
   // SSE for live progress
-  const { events, isComplete, error: sseError } = useSSE(queryId ?? null);
+  const queryClient = useQueryClient();
+  const [resumeCount, setResumeCount] = useState(0);
+  const { events, isComplete, error: sseError, clarification, reset: resetSSE } =
+    useSSE(queryId ?? null);
+
+  // After the user answers a clarification we re-subscribe to the same
+  // stream so the resumed pipeline's events flow through this hook. The
+  // `resumeCount` bump forces the SSE useEffect to re-run.
+  useEffect(() => {
+    if (resumeCount > 0) {
+      resetSSE();
+      queryClient.invalidateQueries({ queryKey: ["queryResult", queryId] });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeCount]);
 
   // Derived state for completed agents
   const completedAgents = useMemo(() => {
@@ -72,6 +87,32 @@ export default function ResultsPage() {
     a.download = `suppliermind_${queryId?.slice(0, 8)}.csv`;
     a.click();
   };
+
+  // ── Clarification state (Task 3.3) ───────────────────────────────
+  // Surfaces when the Parser pauses with a question. The card renders
+  // beneath the agent-steps strip so the user sees the pipeline made
+  // progress before being asked for more input.
+  if (clarification && queryId) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto space-y-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 mb-2">
+            <Brain className="w-7 h-7 text-primary" />
+          </div>
+          <h2 className="text-xl font-semibold">One quick clarification</h2>
+          <p className="text-sm text-muted-foreground">
+            The Parser needs a detail to narrow the search.
+          </p>
+        </div>
+        <ClarificationCard
+          queryId={queryId}
+          question={clarification.question}
+          turnNumber={clarification.turn_number}
+          onAnswered={() => setResumeCount((c) => c + 1)}
+        />
+      </div>
+    );
+  }
 
   // ── Processing state ─────────────────────────────────────────────
   if (!isComplete) {

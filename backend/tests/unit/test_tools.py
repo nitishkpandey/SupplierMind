@@ -172,6 +172,10 @@ def test_infer_industry_context_empty_input_short_circuits():
         ("500 kg", 500.0, "kg"),
         ("1,200 units/year", 1200.0, "units/year"),
         ("42", 42.0, None),
+        # 3.2 pre-flight regression — natural-language "per" must collapse to
+        # "units/month", not "unitspermonth". Caught in the live 3.1 demo.
+        ("10000 units per month", 10000.0, "units/month"),
+        ("500 tons per year", 500.0, "tons/year"),
     ],
 )
 def test_parse_quantity_unit_known_shapes(text, value, normalized_unit):
