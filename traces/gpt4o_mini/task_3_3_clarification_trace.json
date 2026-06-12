@@ -1,0 +1,305 @@
+{
+  "demo_id": "51a96184",
+  "captured_at": "2026-06-13T00:06:36+0200",
+  "turns": [
+    {
+      "raw_query": "I need suppliers for our project",
+      "turn_number": 1,
+      "elapsed_ms": 1857,
+      "terminated_by": "pre_loop_clarification",
+      "iterations": 0,
+      "tools_called": [],
+      "needs_clarification": true,
+      "clarification_question": "What type of product are you looking for suppliers for, such as electronics, construction materials, or food items?",
+      "parsed_constraints": {
+        "product_type": null,
+        "product_keywords": [],
+        "industry_context": null,
+        "buyer_intent": "any",
+        "category_hint": null,
+        "location_name": null,
+        "location_city": null,
+        "location_country": null,
+        "location_region": null,
+        "location_lat": null,
+        "location_lng": null,
+        "location_radius_km": null,
+        "certifications": [],
+        "capacity_min": null,
+        "capacity_unit": null,
+        "lead_time_max_days": null,
+        "query_type": "general",
+        "complexity": "medium",
+        "original_language": "en"
+      },
+      "react_trace": [],
+      "audit_entries": [
+        {
+          "agent_name": "parser",
+          "action": "react_loop_skipped",
+          "duration_ms": 1857,
+          "output_summary": "contentless query; clarification raised pre-loop"
+        },
+        {
+          "agent_name": "clarification_handler",
+          "action": "clarification_raised",
+          "duration_ms": 0,
+          "output_summary": "What type of product are you looking for suppliers for, such as electronics, construction materials, or food items?"
+        }
+      ],
+      "clarification_handler_entries": [
+        {
+          "agent_name": "clarification_handler",
+          "action": "clarification_raised",
+          "reasoning": "Pre-loop gate fired: contentless query, no memory help",
+          "input_summary": "I need suppliers for our project",
+          "output_summary": "What type of product are you looking for suppliers for, such as electronics, construction materials, or food items?",
+          "duration_ms": 0,
+          "timestamp": "2026-06-12T22:06:25.287197+00:00"
+        }
+      ]
+    },
+    {
+      "raw_query": "I need suppliers for our project\n\nUser clarification: packaging materials",
+      "turn_number": 2,
+      "elapsed_ms": 3400,
+      "terminated_by": "finish",
+      "iterations": 1,
+      "tools_called": [],
+      "needs_clarification": true,
+      "clarification_question": "What country or region are you looking for suppliers of packaging materials in, like the USA, Europe, or Asia?",
+      "parsed_constraints": {
+        "product_type": "packaging materials",
+        "product_keywords": [
+          "packaging",
+          "materials",
+          "suppliers",
+          "project",
+          "packaging solutions"
+        ],
+        "industry_context": null,
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_name": null,
+        "location_city": null,
+        "location_country": null,
+        "location_region": null,
+        "location_lat": null,
+        "location_lng": null,
+        "location_radius_km": null,
+        "certifications": [],
+        "capacity_min": null,
+        "capacity_unit": null,
+        "lead_time_max_days": null,
+        "query_type": "general",
+        "complexity": "medium",
+        "original_language": "en"
+      },
+      "react_trace": [
+        {
+          "iteration": 0,
+          "thought": "I need to identify the specific product type and keywords related to packaging materials.",
+          "action": "Finish",
+          "action_input": {
+            "product_type": "packaging materials",
+            "product_keywords": [
+              "packaging",
+              "materials",
+              "suppliers",
+              "project",
+              "packaging solutions"
+            ],
+            "industry_context": null,
+            "buyer_intent": "any",
+            "category_hint": "packaging",
+            "location_city": null,
+            "location_country": null,
+            "location_region": null,
+            "location_lat": null,
+            "location_lng": null,
+            "location_radius_km": null,
+            "certifications": [],
+            "capacity_min": null,
+            "capacity_unit": null,
+            "lead_time_max_days": null,
+            "query_type": "general",
+            "complexity": "medium",
+            "original_language": "en",
+            "confidence": 0.8,
+            "clarification_needed": false,
+            "clarification_question": null
+          },
+          "observation": {
+            "status": "finished"
+          }
+        }
+      ],
+      "audit_entries": [
+        {
+          "agent_name": "parser",
+          "action": "react_loop_completed",
+          "duration_ms": 3400,
+          "output_summary": "react iterations=1 terminated_by=finish tools=[] confidence=0.80"
+        },
+        {
+          "agent_name": "clarification_handler",
+          "action": "clarification_raised",
+          "duration_ms": 0,
+          "output_summary": "What country or region are you looking for suppliers of packaging materials in, like the USA, Europe, or Asia?"
+        }
+      ],
+      "clarification_handler_entries": [
+        {
+          "agent_name": "clarification_handler",
+          "action": "clarification_raised",
+          "reasoning": "Post-loop trigger fired: confidence=0.80, product_type='packaging materials'",
+          "input_summary": "I need suppliers for our project\n\nUser clarification: packaging materials",
+          "output_summary": "What country or region are you looking for suppliers of packaging materials in, like the USA, Europe, or Asia?",
+          "duration_ms": 0,
+          "timestamp": "2026-06-12T22:06:28.688193+00:00"
+        }
+      ]
+    },
+    {
+      "raw_query": "I need suppliers for our project\n\nUser clarification: packaging materials\n\nUser clarification: anywhere in EU with ISO 9001",
+      "turn_number": 3,
+      "elapsed_ms": 7662,
+      "terminated_by": "finish",
+      "iterations": 3,
+      "tools_called": [
+        "geocode_location",
+        "canonicalize_certification"
+      ],
+      "needs_clarification": false,
+      "clarification_question": null,
+      "parsed_constraints": {
+        "product_type": "packaging materials",
+        "product_keywords": [
+          "packaging",
+          "materials",
+          "suppliers",
+          "project",
+          "packaging solutions"
+        ],
+        "industry_context": null,
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_name": "EU",
+        "location_city": null,
+        "location_country": "EU",
+        "location_region": null,
+        "location_lat": 50.0491699,
+        "location_lng": 1.4175744,
+        "location_radius_km": null,
+        "certifications": [
+          "ISO 9001"
+        ],
+        "capacity_min": null,
+        "capacity_unit": null,
+        "lead_time_max_days": null,
+        "query_type": "general",
+        "complexity": "medium",
+        "original_language": "en"
+      },
+      "react_trace": [
+        {
+          "iteration": 0,
+          "thought": "I need to geocode the location \"EU\" to get the relevant geographical information. Additionally, I should canonicalize the certification \"ISO 9001\" to ensure compliance checks are accurate.",
+          "action": "geocode_location",
+          "action_input": {
+            "location_name": "EU"
+          },
+          "observation": {
+            "found": true,
+            "lat": 50.0491699,
+            "lng": 1.4175744,
+            "city": null,
+            "country": "EU"
+          }
+        },
+        {
+          "iteration": 1,
+          "thought": "I have the geographical coordinates for the EU, now I will canonicalize the certification \"ISO 9001\" to get its standardized name and any superseding certifications.",
+          "action": "canonicalize_certification",
+          "action_input": {
+            "cert_name": "ISO 9001"
+          },
+          "observation": {
+            "resolved": true,
+            "input": "ISO 9001",
+            "canonical": "ISO 9001",
+            "category": "quality_management",
+            "full_name": "ISO 9001:2015 Quality Management Systems",
+            "supersedes": [],
+            "not_equivalent_to": [
+              "ISO 14001",
+              "ISO 27001",
+              "ISO 45001",
+              "ISO 22000"
+            ],
+            "common_in_industries": [
+              "manufacturing",
+              "general",
+              "services"
+            ]
+          }
+        },
+        {
+          "iteration": 2,
+          "thought": "I have the canonical certification name \"ISO 9001\" and its details. Now I will update the constraints with the geolocation data and the certification information.",
+          "action": "Finish",
+          "action_input": {
+            "product_type": "packaging materials",
+            "product_keywords": [
+              "packaging",
+              "materials",
+              "suppliers",
+              "project",
+              "packaging solutions"
+            ],
+            "industry_context": null,
+            "buyer_intent": "any",
+            "category_hint": "packaging",
+            "location_city": null,
+            "location_country": "EU",
+            "location_region": null,
+            "location_lat": 50.0491699,
+            "location_lng": 1.4175744,
+            "location_radius_km": null,
+            "certifications": [
+              "ISO 9001"
+            ],
+            "capacity_min": null,
+            "capacity_unit": null,
+            "lead_time_max_days": null,
+            "query_type": "general",
+            "complexity": "medium",
+            "original_language": "en",
+            "confidence": 1.0,
+            "clarification_needed": false,
+            "clarification_question": null
+          },
+          "observation": {
+            "status": "finished"
+          }
+        }
+      ],
+      "audit_entries": [
+        {
+          "agent_name": "parser",
+          "action": "react_loop_completed",
+          "duration_ms": 7662,
+          "output_summary": "react iterations=3 terminated_by=finish tools=['geocode_location', 'canonicalize_certification'] confidence=1.00"
+        }
+      ],
+      "clarification_handler_entries": []
+    }
+  ],
+  "verification": {
+    "turn1_raised_clarification": true,
+    "turn1_question_mentions_product": true,
+    "turn2_progress_or_complete": true,
+    "turn3_state_complete": true,
+    "turn3_has_certification": true
+  }
+}

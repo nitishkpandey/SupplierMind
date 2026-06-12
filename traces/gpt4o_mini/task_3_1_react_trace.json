@@ -1,0 +1,933 @@
+{
+  "summary": {
+    "queries_run": 3,
+    "ok_count": 3,
+    "mean_latency_ms": 9459,
+    "median_latency_ms": 9439,
+    "max_latency_ms": 9540,
+    "min_latency_ms": 9398
+  },
+  "runs": [
+    {
+      "raw_query": "ISO 9001 certified packaging supplier in Germany",
+      "elapsed_ms": 9540,
+      "terminated_by": "finish",
+      "iterations": 4,
+      "tools_called": [
+        "geocode_location",
+        "canonicalize_certification",
+        "infer_industry_context"
+      ],
+      "parsed_constraints": {
+        "product_type": "packaging supplier",
+        "product_keywords": [
+          "ISO 9001",
+          "certified",
+          "packaging",
+          "supplier",
+          "Germany"
+        ],
+        "industry_context": "packaging",
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_name": "Germany",
+        "location_city": null,
+        "location_country": "Germany",
+        "location_region": null,
+        "location_lat": 51.1638175,
+        "location_lng": 10.4478313,
+        "location_radius_km": null,
+        "certifications": [
+          "ISO 9001"
+        ],
+        "capacity_min": null,
+        "capacity_unit": "units/month",
+        "lead_time_max_days": null,
+        "query_type": "compliance_critical",
+        "complexity": "simple",
+        "original_language": "en"
+      },
+      "needs_clarification": false,
+      "react_trace": [
+        {
+          "iteration": 0,
+          "thought": "I need to geocode the location \"Germany\" to get its latitude and longitude.",
+          "action": "geocode_location",
+          "action_input": {
+            "location_name": "Germany"
+          },
+          "observation": {
+            "found": true,
+            "lat": 51.1638175,
+            "lng": 10.4478313,
+            "city": null,
+            "country": "Germany"
+          }
+        },
+        {
+          "iteration": 1,
+          "thought": "Now I will canonicalize the certification \"ISO 9001\" to get its standardized name.",
+          "action": "canonicalize_certification",
+          "action_input": {
+            "cert_name": "ISO 9001"
+          },
+          "observation": {
+            "resolved": true,
+            "input": "ISO 9001",
+            "canonical": "ISO 9001",
+            "category": "quality_management",
+            "full_name": "ISO 9001:2015 Quality Management Systems",
+            "supersedes": [],
+            "not_equivalent_to": [
+              "ISO 14001",
+              "ISO 27001",
+              "ISO 45001",
+              "ISO 22000"
+            ],
+            "common_in_industries": [
+              "manufacturing",
+              "general",
+              "services"
+            ]
+          }
+        },
+        {
+          "iteration": 2,
+          "thought": "I need to infer the industry context for \"packaging\" to gather more details about common certifications and capacity units.",
+          "action": "infer_industry_context",
+          "action_input": {
+            "product_description": "packaging"
+          },
+          "observation": {
+            "industry": "packaging",
+            "common_certs": [
+              "ISO 9001",
+              "FSC Certification",
+              "BRCGS Packaging",
+              "ISO 14001"
+            ],
+            "typical_units": "units/month"
+          }
+        },
+        {
+          "iteration": 3,
+          "thought": "I have gathered enough information to extract the constraints.",
+          "action": "Finish",
+          "action_input": {
+            "product_type": "packaging supplier",
+            "product_keywords": [
+              "ISO 9001",
+              "certified",
+              "packaging",
+              "supplier",
+              "Germany"
+            ],
+            "industry_context": "packaging",
+            "buyer_intent": "any",
+            "category_hint": "packaging",
+            "location_city": null,
+            "location_country": "Germany",
+            "location_region": null,
+            "location_lat": 51.1638175,
+            "location_lng": 10.4478313,
+            "location_radius_km": null,
+            "certifications": [
+              "ISO 9001"
+            ],
+            "capacity_min": null,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "compliance_critical",
+            "complexity": "simple",
+            "original_language": "en",
+            "confidence": 1.0,
+            "clarification_needed": false,
+            "clarification_question": null
+          },
+          "observation": {
+            "status": "finished"
+          }
+        }
+      ],
+      "audit_entry": {
+        "action": "react_loop_completed",
+        "duration_ms": 9540,
+        "input_snapshot": {
+          "raw_query": "ISO 9001 certified packaging supplier in Germany",
+          "memory_context": null,
+          "tool_registry": [
+            "geocode_location",
+            "canonicalize_certification",
+            "infer_industry_context",
+            "parse_quantity_unit",
+            "lookup_past_query"
+          ]
+        },
+        "output_snapshot": {
+          "terminated_by": "finish",
+          "iterations": 4,
+          "tools_called": [
+            "geocode_location",
+            "canonicalize_certification",
+            "infer_industry_context"
+          ],
+          "trace": [
+            {
+              "iteration": 0,
+              "thought": "I need to geocode the location \"Germany\" to get its latitude and longitude.",
+              "action": "geocode_location",
+              "action_input": {
+                "location_name": "Germany"
+              },
+              "observation": {
+                "found": true,
+                "lat": 51.1638175,
+                "lng": 10.4478313,
+                "city": null,
+                "country": "Germany"
+              }
+            },
+            {
+              "iteration": 1,
+              "thought": "Now I will canonicalize the certification \"ISO 9001\" to get its standardized name.",
+              "action": "canonicalize_certification",
+              "action_input": {
+                "cert_name": "ISO 9001"
+              },
+              "observation": {
+                "resolved": true,
+                "input": "ISO 9001",
+                "canonical": "ISO 9001",
+                "category": "quality_management",
+                "full_name": "ISO 9001:2015 Quality Management Systems",
+                "supersedes": [],
+                "not_equivalent_to": [
+                  "ISO 14001",
+                  "ISO 27001",
+                  "ISO 45001",
+                  "ISO 22000"
+                ],
+                "common_in_industries": [
+                  "manufacturing",
+                  "general",
+                  "services"
+                ]
+              }
+            },
+            {
+              "iteration": 2,
+              "thought": "I need to infer the industry context for \"packaging\" to gather more details about common certifications and capacity units.",
+              "action": "infer_industry_context",
+              "action_input": {
+                "product_description": "packaging"
+              },
+              "observation": {
+                "industry": "packaging",
+                "common_certs": [
+                  "ISO 9001",
+                  "FSC Certification",
+                  "BRCGS Packaging",
+                  "ISO 14001"
+                ],
+                "typical_units": "units/month"
+              }
+            },
+            {
+              "iteration": 3,
+              "thought": "I have gathered enough information to extract the constraints.",
+              "action": "Finish",
+              "action_input": {
+                "product_type": "packaging supplier",
+                "product_keywords": [
+                  "ISO 9001",
+                  "certified",
+                  "packaging",
+                  "supplier",
+                  "Germany"
+                ],
+                "industry_context": "packaging",
+                "buyer_intent": "any",
+                "category_hint": "packaging",
+                "location_city": null,
+                "location_country": "Germany",
+                "location_region": null,
+                "location_lat": 51.1638175,
+                "location_lng": 10.4478313,
+                "location_radius_km": null,
+                "certifications": [
+                  "ISO 9001"
+                ],
+                "capacity_min": null,
+                "capacity_unit": "units/month",
+                "lead_time_max_days": null,
+                "query_type": "compliance_critical",
+                "complexity": "simple",
+                "original_language": "en",
+                "confidence": 1.0,
+                "clarification_needed": false,
+                "clarification_question": null
+              },
+              "observation": {
+                "status": "finished"
+              }
+            }
+          ],
+          "parsed_constraints": {
+            "product_type": "packaging supplier",
+            "product_keywords": [
+              "ISO 9001",
+              "certified",
+              "packaging",
+              "supplier",
+              "Germany"
+            ],
+            "industry_context": "packaging",
+            "buyer_intent": "any",
+            "category_hint": "packaging",
+            "location_name": "Germany",
+            "location_city": null,
+            "location_country": "Germany",
+            "location_region": null,
+            "location_lat": 51.1638175,
+            "location_lng": 10.4478313,
+            "location_radius_km": null,
+            "certifications": [
+              "ISO 9001"
+            ],
+            "capacity_min": null,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "compliance_critical",
+            "complexity": "simple",
+            "original_language": "en"
+          },
+          "loop_error": null
+        }
+      }
+    },
+    {
+      "raw_query": "AS9100 aerospace machining 10k units/month Bavaria",
+      "elapsed_ms": 9398,
+      "terminated_by": "finish",
+      "iterations": 5,
+      "tools_called": [
+        "geocode_location",
+        "parse_quantity_unit",
+        "canonicalize_certification",
+        "infer_industry_context"
+      ],
+      "parsed_constraints": {
+        "product_type": "aerospace machining",
+        "product_keywords": [
+          "AS9100",
+          "aerospace",
+          "machining",
+          "precision parts",
+          "manufacturing",
+          "quality management"
+        ],
+        "industry_context": "aerospace",
+        "buyer_intent": "manufacturer",
+        "category_hint": "metals",
+        "location_name": "Bavaria",
+        "location_city": null,
+        "location_country": "Bavaria",
+        "location_region": null,
+        "location_lat": 48.9467562,
+        "location_lng": 11.4038717,
+        "location_radius_km": null,
+        "certifications": [
+          "AS9100"
+        ],
+        "capacity_min": 10000.0,
+        "capacity_unit": "units/month",
+        "lead_time_max_days": null,
+        "query_type": "capability_match",
+        "complexity": "medium",
+        "original_language": "en"
+      },
+      "needs_clarification": false,
+      "react_trace": [
+        {
+          "iteration": 0,
+          "thought": "I need to geocode the location \"Bavaria\" to get its latitude and longitude.",
+          "action": "geocode_location",
+          "action_input": {
+            "location_name": "Bavaria"
+          },
+          "observation": {
+            "found": true,
+            "lat": 48.9467562,
+            "lng": 11.4038717,
+            "city": null,
+            "country": "Bavaria"
+          }
+        },
+        {
+          "iteration": 1,
+          "thought": "I have the geolocation data for Bavaria, now I will parse the quantity and unit \"10k units/month\".",
+          "action": "parse_quantity_unit",
+          "action_input": {
+            "text": "10k units/month"
+          },
+          "observation": {
+            "parsed": true,
+            "input": "10k units/month",
+            "value": 10000.0,
+            "unit": "units/month",
+            "normalized_unit": "units/month"
+          }
+        },
+        {
+          "iteration": 2,
+          "thought": "I have parsed the quantity and unit, now I will canonicalize the certification \"AS9100\" to get its standardized form.",
+          "action": "canonicalize_certification",
+          "action_input": {
+            "cert_name": "AS9100"
+          },
+          "observation": {
+            "resolved": true,
+            "input": "AS9100",
+            "canonical": "AS9100",
+            "category": "aerospace_quality",
+            "full_name": "AS9100D Aerospace Quality Management",
+            "supersedes": [
+              "ISO 9001"
+            ],
+            "not_equivalent_to": [
+              "IATF 16949"
+            ],
+            "common_in_industries": [
+              "aerospace",
+              "metals",
+              "machinery"
+            ]
+          }
+        },
+        {
+          "iteration": 3,
+          "thought": "I have the canonical certification information for AS9100, now I will infer the industry context for the product description \"aerospace machining\".",
+          "action": "infer_industry_context",
+          "action_input": {
+            "product_description": "aerospace machining"
+          },
+          "observation": {
+            "industry": "aerospace",
+            "common_certs": [
+              "AS9100",
+              "ISO 9001",
+              "NADCAP"
+            ],
+            "typical_units": "units/month"
+          }
+        },
+        {
+          "iteration": 4,
+          "thought": "I have inferred the industry context and obtained the common certifications. Now I can compile all the gathered information into the final constraints.",
+          "action": "Finish",
+          "action_input": {
+            "product_type": "aerospace machining",
+            "product_keywords": [
+              "AS9100",
+              "aerospace",
+              "machining",
+              "precision parts",
+              "manufacturing",
+              "quality management"
+            ],
+            "industry_context": "aerospace",
+            "buyer_intent": "manufacturer",
+            "category_hint": "metals",
+            "location_city": null,
+            "location_country": "Bavaria",
+            "location_region": null,
+            "location_lat": 48.9467562,
+            "location_lng": 11.4038717,
+            "location_radius_km": null,
+            "certifications": [
+              "AS9100"
+            ],
+            "capacity_min": 10000.0,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "capability_match",
+            "complexity": "medium",
+            "original_language": "en",
+            "confidence": 1.0,
+            "clarification_needed": false,
+            "clarification_question": null
+          },
+          "observation": {
+            "status": "finished"
+          }
+        }
+      ],
+      "audit_entry": {
+        "action": "react_loop_completed",
+        "duration_ms": 9398,
+        "input_snapshot": {
+          "raw_query": "AS9100 aerospace machining 10k units/month Bavaria",
+          "memory_context": null,
+          "tool_registry": [
+            "geocode_location",
+            "canonicalize_certification",
+            "infer_industry_context",
+            "parse_quantity_unit",
+            "lookup_past_query"
+          ]
+        },
+        "output_snapshot": {
+          "terminated_by": "finish",
+          "iterations": 5,
+          "tools_called": [
+            "geocode_location",
+            "parse_quantity_unit",
+            "canonicalize_certification",
+            "infer_industry_context"
+          ],
+          "trace": [
+            {
+              "iteration": 0,
+              "thought": "I need to geocode the location \"Bavaria\" to get its latitude and longitude.",
+              "action": "geocode_location",
+              "action_input": {
+                "location_name": "Bavaria"
+              },
+              "observation": {
+                "found": true,
+                "lat": 48.9467562,
+                "lng": 11.4038717,
+                "city": null,
+                "country": "Bavaria"
+              }
+            },
+            {
+              "iteration": 1,
+              "thought": "I have the geolocation data for Bavaria, now I will parse the quantity and unit \"10k units/month\".",
+              "action": "parse_quantity_unit",
+              "action_input": {
+                "text": "10k units/month"
+              },
+              "observation": {
+                "parsed": true,
+                "input": "10k units/month",
+                "value": 10000.0,
+                "unit": "units/month",
+                "normalized_unit": "units/month"
+              }
+            },
+            {
+              "iteration": 2,
+              "thought": "I have parsed the quantity and unit, now I will canonicalize the certification \"AS9100\" to get its standardized form.",
+              "action": "canonicalize_certification",
+              "action_input": {
+                "cert_name": "AS9100"
+              },
+              "observation": {
+                "resolved": true,
+                "input": "AS9100",
+                "canonical": "AS9100",
+                "category": "aerospace_quality",
+                "full_name": "AS9100D Aerospace Quality Management",
+                "supersedes": [
+                  "ISO 9001"
+                ],
+                "not_equivalent_to": [
+                  "IATF 16949"
+                ],
+                "common_in_industries": [
+                  "aerospace",
+                  "metals",
+                  "machinery"
+                ]
+              }
+            },
+            {
+              "iteration": 3,
+              "thought": "I have the canonical certification information for AS9100, now I will infer the industry context for the product description \"aerospace machining\".",
+              "action": "infer_industry_context",
+              "action_input": {
+                "product_description": "aerospace machining"
+              },
+              "observation": {
+                "industry": "aerospace",
+                "common_certs": [
+                  "AS9100",
+                  "ISO 9001",
+                  "NADCAP"
+                ],
+                "typical_units": "units/month"
+              }
+            },
+            {
+              "iteration": 4,
+              "thought": "I have inferred the industry context and obtained the common certifications. Now I can compile all the gathered information into the final constraints.",
+              "action": "Finish",
+              "action_input": {
+                "product_type": "aerospace machining",
+                "product_keywords": [
+                  "AS9100",
+                  "aerospace",
+                  "machining",
+                  "precision parts",
+                  "manufacturing",
+                  "quality management"
+                ],
+                "industry_context": "aerospace",
+                "buyer_intent": "manufacturer",
+                "category_hint": "metals",
+                "location_city": null,
+                "location_country": "Bavaria",
+                "location_region": null,
+                "location_lat": 48.9467562,
+                "location_lng": 11.4038717,
+                "location_radius_km": null,
+                "certifications": [
+                  "AS9100"
+                ],
+                "capacity_min": 10000.0,
+                "capacity_unit": "units/month",
+                "lead_time_max_days": null,
+                "query_type": "capability_match",
+                "complexity": "medium",
+                "original_language": "en",
+                "confidence": 1.0,
+                "clarification_needed": false,
+                "clarification_question": null
+              },
+              "observation": {
+                "status": "finished"
+              }
+            }
+          ],
+          "parsed_constraints": {
+            "product_type": "aerospace machining",
+            "product_keywords": [
+              "AS9100",
+              "aerospace",
+              "machining",
+              "precision parts",
+              "manufacturing",
+              "quality management"
+            ],
+            "industry_context": "aerospace",
+            "buyer_intent": "manufacturer",
+            "category_hint": "metals",
+            "location_name": "Bavaria",
+            "location_city": null,
+            "location_country": "Bavaria",
+            "location_region": null,
+            "location_lat": 48.9467562,
+            "location_lng": 11.4038717,
+            "location_radius_km": null,
+            "certifications": [
+              "AS9100"
+            ],
+            "capacity_min": 10000.0,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "capability_match",
+            "complexity": "medium",
+            "original_language": "en"
+          },
+          "loop_error": null
+        }
+      }
+    },
+    {
+      "raw_query": "Bronze supplier within 25km of Bremen ISO 9001 certified",
+      "elapsed_ms": 9439,
+      "terminated_by": "finish",
+      "iterations": 4,
+      "tools_called": [
+        "geocode_location",
+        "canonicalize_certification",
+        "infer_industry_context"
+      ],
+      "parsed_constraints": {
+        "product_type": "Bronze supplier",
+        "product_keywords": [
+          "bronze",
+          "supplier",
+          "metal",
+          "manufacturing",
+          "ISO 9001"
+        ],
+        "industry_context": "manufacturing",
+        "buyer_intent": "any",
+        "category_hint": "metals",
+        "location_name": "Bremen",
+        "location_city": null,
+        "location_country": "Bremen",
+        "location_region": null,
+        "location_lat": 53.0758196,
+        "location_lng": 8.8071646,
+        "location_radius_km": 25,
+        "certifications": [
+          "ISO 9001"
+        ],
+        "capacity_min": null,
+        "capacity_unit": "units/month",
+        "lead_time_max_days": null,
+        "query_type": "geographic_priority",
+        "complexity": "simple",
+        "original_language": "en"
+      },
+      "needs_clarification": false,
+      "react_trace": [
+        {
+          "iteration": 0,
+          "thought": "I need to geocode the location \"Bremen\" to get its latitude and longitude for the constraints.",
+          "action": "geocode_location",
+          "action_input": {
+            "location_name": "Bremen"
+          },
+          "observation": {
+            "found": true,
+            "lat": 53.0758196,
+            "lng": 8.8071646,
+            "city": null,
+            "country": "Bremen"
+          }
+        },
+        {
+          "iteration": 1,
+          "thought": "I have the geolocation data for Bremen, now I need to canonicalize the certification \"ISO 9001\" to ensure it's correctly represented.",
+          "action": "canonicalize_certification",
+          "action_input": {
+            "cert_name": "ISO 9001"
+          },
+          "observation": {
+            "resolved": true,
+            "input": "ISO 9001",
+            "canonical": "ISO 9001",
+            "category": "quality_management",
+            "full_name": "ISO 9001:2015 Quality Management Systems",
+            "supersedes": [],
+            "not_equivalent_to": [
+              "ISO 14001",
+              "ISO 27001",
+              "ISO 45001",
+              "ISO 22000"
+            ],
+            "common_in_industries": [
+              "manufacturing",
+              "general",
+              "services"
+            ]
+          }
+        },
+        {
+          "iteration": 2,
+          "thought": "I now have the canonical certification information. Next, I need to infer the industry context for the product description \"Bronze supplier\" to gather more details about common certifications and capacity units.",
+          "action": "infer_industry_context",
+          "action_input": {
+            "product_description": "Bronze supplier"
+          },
+          "observation": {
+            "industry": "manufacturing",
+            "common_certs": [
+              "ISO 9001",
+              "ISO 14001",
+              "OHSAS 18001"
+            ],
+            "typical_units": "units/month"
+          }
+        },
+        {
+          "iteration": 3,
+          "thought": "I have enough information to extract the constraints, including the industry context and common certifications.",
+          "action": "Finish",
+          "action_input": {
+            "product_type": "Bronze supplier",
+            "product_keywords": [
+              "bronze",
+              "supplier",
+              "metal",
+              "manufacturing",
+              "ISO 9001"
+            ],
+            "industry_context": "manufacturing",
+            "buyer_intent": "any",
+            "category_hint": "metals",
+            "location_city": null,
+            "location_country": "Bremen",
+            "location_region": null,
+            "location_lat": 53.0758196,
+            "location_lng": 8.8071646,
+            "location_radius_km": 25,
+            "certifications": [
+              "ISO 9001"
+            ],
+            "capacity_min": null,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "geographic_priority",
+            "complexity": "simple",
+            "original_language": "en",
+            "confidence": 1.0,
+            "clarification_needed": false,
+            "clarification_question": null
+          },
+          "observation": {
+            "status": "finished"
+          }
+        }
+      ],
+      "audit_entry": {
+        "action": "react_loop_completed",
+        "duration_ms": 9439,
+        "input_snapshot": {
+          "raw_query": "Bronze supplier within 25km of Bremen ISO 9001 certified",
+          "memory_context": null,
+          "tool_registry": [
+            "geocode_location",
+            "canonicalize_certification",
+            "infer_industry_context",
+            "parse_quantity_unit",
+            "lookup_past_query"
+          ]
+        },
+        "output_snapshot": {
+          "terminated_by": "finish",
+          "iterations": 4,
+          "tools_called": [
+            "geocode_location",
+            "canonicalize_certification",
+            "infer_industry_context"
+          ],
+          "trace": [
+            {
+              "iteration": 0,
+              "thought": "I need to geocode the location \"Bremen\" to get its latitude and longitude for the constraints.",
+              "action": "geocode_location",
+              "action_input": {
+                "location_name": "Bremen"
+              },
+              "observation": {
+                "found": true,
+                "lat": 53.0758196,
+                "lng": 8.8071646,
+                "city": null,
+                "country": "Bremen"
+              }
+            },
+            {
+              "iteration": 1,
+              "thought": "I have the geolocation data for Bremen, now I need to canonicalize the certification \"ISO 9001\" to ensure it's correctly represented.",
+              "action": "canonicalize_certification",
+              "action_input": {
+                "cert_name": "ISO 9001"
+              },
+              "observation": {
+                "resolved": true,
+                "input": "ISO 9001",
+                "canonical": "ISO 9001",
+                "category": "quality_management",
+                "full_name": "ISO 9001:2015 Quality Management Systems",
+                "supersedes": [],
+                "not_equivalent_to": [
+                  "ISO 14001",
+                  "ISO 27001",
+                  "ISO 45001",
+                  "ISO 22000"
+                ],
+                "common_in_industries": [
+                  "manufacturing",
+                  "general",
+                  "services"
+                ]
+              }
+            },
+            {
+              "iteration": 2,
+              "thought": "I now have the canonical certification information. Next, I need to infer the industry context for the product description \"Bronze supplier\" to gather more details about common certifications and capacity units.",
+              "action": "infer_industry_context",
+              "action_input": {
+                "product_description": "Bronze supplier"
+              },
+              "observation": {
+                "industry": "manufacturing",
+                "common_certs": [
+                  "ISO 9001",
+                  "ISO 14001",
+                  "OHSAS 18001"
+                ],
+                "typical_units": "units/month"
+              }
+            },
+            {
+              "iteration": 3,
+              "thought": "I have enough information to extract the constraints, including the industry context and common certifications.",
+              "action": "Finish",
+              "action_input": {
+                "product_type": "Bronze supplier",
+                "product_keywords": [
+                  "bronze",
+                  "supplier",
+                  "metal",
+                  "manufacturing",
+                  "ISO 9001"
+                ],
+                "industry_context": "manufacturing",
+                "buyer_intent": "any",
+                "category_hint": "metals",
+                "location_city": null,
+                "location_country": "Bremen",
+                "location_region": null,
+                "location_lat": 53.0758196,
+                "location_lng": 8.8071646,
+                "location_radius_km": 25,
+                "certifications": [
+                  "ISO 9001"
+                ],
+                "capacity_min": null,
+                "capacity_unit": "units/month",
+                "lead_time_max_days": null,
+                "query_type": "geographic_priority",
+                "complexity": "simple",
+                "original_language": "en",
+                "confidence": 1.0,
+                "clarification_needed": false,
+                "clarification_question": null
+              },
+              "observation": {
+                "status": "finished"
+              }
+            }
+          ],
+          "parsed_constraints": {
+            "product_type": "Bronze supplier",
+            "product_keywords": [
+              "bronze",
+              "supplier",
+              "metal",
+              "manufacturing",
+              "ISO 9001"
+            ],
+            "industry_context": "manufacturing",
+            "buyer_intent": "any",
+            "category_hint": "metals",
+            "location_name": "Bremen",
+            "location_city": null,
+            "location_country": "Bremen",
+            "location_region": null,
+            "location_lat": 53.0758196,
+            "location_lng": 8.8071646,
+            "location_radius_km": 25,
+            "certifications": [
+              "ISO 9001"
+            ],
+            "capacity_min": null,
+            "capacity_unit": "units/month",
+            "lead_time_max_days": null,
+            "query_type": "geographic_priority",
+            "complexity": "simple",
+            "original_language": "en"
+          },
+          "loop_error": null
+        }
+      }
+    }
+  ]
+}
