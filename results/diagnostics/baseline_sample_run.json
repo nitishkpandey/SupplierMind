@@ -1,0 +1,205 @@
+{
+  "provider_note": "sample run on groq (llama-3.1-8b-instant); final benchmark re-runs on gpt-4o-mini",
+  "p1": [
+    {
+      "paradigm": "P1-singleprompt",
+      "raw_query": "ISO 9001 certified packaging supplier in Germany",
+      "supplier_names": [
+        "Uhlmann Group",
+        "KHS GmbH",
+        "K\u00f6rber Medipak Systems",
+        "Schneider Packaging Equipment Company",
+        "Bosch Packaging Technology"
+      ],
+      "supplier_ids": [],
+      "reasoning": [
+        "A German-based company with a strong focus on packaging solutions, they have multiple certifications including ISO 9001.",
+        "A leading manufacturer of filling and packaging systems, KHS is headquartered in Germany and has ISO 9001 certification.",
+        "A German company specializing in packaging solutions for the pharmaceutical industry, they have ISO 9001 certification.",
+        "A German-based company with a global presence, Schneider offers packaging solutions and has ISO 9001 certification.",
+        "A leading provider of packaging solutions, Bosch is headquartered in Germany and has ISO 9001 certification."
+      ],
+      "exec_ms": 531,
+      "error": null,
+      "extra": {
+        "raw_response_head": "{\n  \"suppliers\": [\n      {\n         \"name\": \"Uhlmann Group\",\n         \"reasoning\": \"A German-based company with a strong focus on packaging solutions, they have multiple certifications including ISO 9001.\"\n      },\n      {\n         \"name\": \"KHS GmbH\",\n         \"reasoning\": \"A leading manufacturer of"
+      }
+    },
+    {
+      "paradigm": "P1-singleprompt",
+      "raw_query": "Textile manufacturer with OEKO-TEX certification in Europe",
+      "supplier_names": [
+        "Mills Textiles",
+        "BekaertDeslee",
+        "Hohenstein",
+        "Lenzing",
+        "BASF Textiles Solutions"
+      ],
+      "supplier_ids": [],
+      "reasoning": [
+        "Mills Textiles is a European textile manufacturer with OEKO-TEX certification, known for producing high-quality fabrics for various industries.",
+        "BekaertDeslee is a European textile company with OEKO-TEX certification, offering a wide range of fabrics for various applications.",
+        "Hohenstein is a European textile testing and certification institute that also offers OEKO-TEX certified fabrics, making them a suitable supplier.",
+        "Lenzing is an Austrian textile manufacturer with OEKO-TEX certification, known for producing high-quality fibers and fabrics.",
+        "BASF Textiles Solutions is a European textile manufacturer with OEKO-TEX certification, offering a wide range of fabrics for various applications."
+      ],
+      "exec_ms": 413,
+      "error": null,
+      "extra": {
+        "raw_response_head": "{\n  \"suppliers\": [\n      {\n         \"name\": \"Mills Textiles\",\n         \"reasoning\": \"Mills Textiles is a European textile manufacturer with OEKO-TEX certification, known for producing high-quality fabrics for various industries.\"\n      },\n      {\n         \"name\": \"BekaertDeslee\",\n         \"reasoning"
+      }
+    },
+    {
+      "paradigm": "P1-singleprompt",
+      "raw_query": "Aerospace machining supplier with AS9100, 10000 units per month",
+      "supplier_names": [
+        "Precision Castparts Corp.",
+        "Haynes International Inc.",
+        "Alcoa Inc.",
+        "Triumph Group Inc.",
+        "GKN Aerospace"
+      ],
+      "supplier_ids": [],
+      "reasoning": [
+        "AS9100 certified and a leading aerospace supplier with a large production capacity.",
+        "AS9100 certified and a global leader in high-performance alloys, with a strong presence in aerospace machining.",
+        "AS9100 certified and a major aerospace supplier with a large production capacity and expertise in machining.",
+        "AS9100 certified and a leading aerospace supplier with a strong presence in machining and a large production capacity.",
+        "AS9100 certified and a global leader in aerospace engineering and manufacturing, with a strong presence in machining."
+      ],
+      "exec_ms": 371,
+      "error": null,
+      "extra": {
+        "raw_response_head": "{\n  \"suppliers\": [\n      {\n         \"name\": \"Precision Castparts Corp.\",\n         \"reasoning\": \"AS9100 certified and a leading aerospace supplier with a large production capacity.\"\n      },\n      {\n         \"name\": \"Haynes International Inc.\",\n         \"reasoning\": \"AS9100 certified and a global lea"
+      }
+    }
+  ],
+  "p2": [
+    {
+      "paradigm": "P2-rag",
+      "raw_query": "ISO 9001 certified packaging supplier in Germany",
+      "supplier_names": [
+        "Frankfurt Pack Solutions GmbH & Co. KG",
+        "Munich Pack Solutions AG",
+        "Munich Pack Solutions AG",
+        "Hamburg Pack Solutions AG",
+        "Berlin Pack Solutions GmbH"
+      ],
+      "supplier_ids": [
+        "9a28832d-ae0b-b337-c965-5d760f051e1b",
+        "18f43fd5-2c05-0a54-4106-5145a0f113a9",
+        "4f1f8bdb-a637-344f-ce0b-f84bf5451e83",
+        "64940ff0-1c54-79ad-5d4e-dd4ca9e77fd9",
+        "f3dcd91d-8132-efc4-d652-93a7b968ba9b"
+      ],
+      "reasoning": [
+        "Frankfurt Pack Solutions GmbH & Co. KG is ISO 9001 certified and located in Germany, matching the user query.",
+        "Munich Pack Solutions AG is ISO 9001 certified and located in Germany, matching the user query.",
+        "Munich Pack Solutions AG is ISO 9001 certified and located in Germany, matching the user query.",
+        "Hamburg Pack Solutions AG is ISO 9001 certified and located in Germany, matching the user query.",
+        "Berlin Pack Solutions GmbH is ISO 9001 certified and located in Germany, matching the user query."
+      ],
+      "exec_ms": 1783,
+      "error": null,
+      "extra": {
+        "retrieved_ids": [
+          "9a28832d-ae0b-b337-c965-5d760f051e1b",
+          "f3dcd91d-8132-efc4-d652-93a7b968ba9b",
+          "b29b12e7-0e16-ebc6-2630-d00093ad9d27",
+          "60aba42b-1f02-a1e4-9c79-a316c565f583",
+          "1ef2514f-1ff9-7aa7-41ec-d5e526608709",
+          "18f43fd5-2c05-0a54-4106-5145a0f113a9",
+          "64940ff0-1c54-79ad-5d4e-dd4ca9e77fd9",
+          "19dba9ba-2f03-21de-a0e5-78ea45a0c673",
+          "4f1f8bdb-a637-344f-ce0b-f84bf5451e83",
+          "f76de934-01bc-7587-9b7b-79920ce59e01"
+        ],
+        "top_k": 10
+      }
+    },
+    {
+      "paradigm": "P2-rag",
+      "raw_query": "Textile manufacturer with OEKO-TEX certification in Europe",
+      "supplier_names": [
+        "Dortmund Textiles Ltd.",
+        "Bremen Textiles S.A.",
+        "Stockholm Textiles S.A.",
+        "Frankfurt Textiles B.V.",
+        "Amsterdam Textiles Ltd."
+      ],
+      "supplier_ids": [
+        "ad147739-bf60-4304-9b49-02586fb9cbdf",
+        "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
+        "2c48e14c-bff6-41d1-83f1-c5222eababc6",
+        "daf3bbc3-d8c8-4e7f-ba4c-f1a2aac28652",
+        "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+      ],
+      "reasoning": [
+        "Dortmund Textiles Ltd. is a technical textile manufacturer with OEKO-TEX certified production in Europe.",
+        "Bremen Textiles S.A. is a technical textile manufacturer with OEKO-TEX certified production in Europe.",
+        "Stockholm Textiles S.A. is a technical textile manufacturer with OEKO-TEX certified production in Europe.",
+        "Frankfurt Textiles B.V. is a technical textile manufacturer with OEKO-TEX certified production in Europe.",
+        "Amsterdam Textiles Ltd. is a technical textile manufacturer with OEKO-TEX certified production in Europe."
+      ],
+      "exec_ms": 13071,
+      "error": null,
+      "extra": {
+        "retrieved_ids": [
+          "ad147739-bf60-4304-9b49-02586fb9cbdf",
+          "13ba4fa7-c206-1c27-df85-d8f43200a736",
+          "c6726e30-2d13-4258-b5c9-37ed5961ee2a",
+          "1c3fb5ae-f9d1-3adf-3f5a-e758120e6b0c",
+          "433549b4-dab7-21d7-bf7c-1372f560e77f",
+          "2c48e14c-bff6-41d1-83f1-c5222eababc6",
+          "daf3bbc3-d8c8-4e7f-ba4c-f1a2aac28652",
+          "9d46a4c1-3989-6e32-b576-25407c7aa84c",
+          "62d8810d-1ef8-4dbe-8b79-df010abf4e4e",
+          "4644a587-27c4-4df4-b06d-2b9bbee3cea9"
+        ],
+        "top_k": 10
+      }
+    },
+    {
+      "paradigm": "P2-rag",
+      "raw_query": "Aerospace machining supplier with AS9100, 10000 units per month",
+      "supplier_names": [
+        "Hyderabad Alloys Pvt Ltd",
+        "Hyderabad Alloys Pvt Ltd",
+        "TAI Hamburg GmbH & Co. KG",
+        "Dubai Metals LLC",
+        "Hyderabad Steel Pvt Ltd"
+      ],
+      "supplier_ids": [
+        "1ba75cb5-b425-33cc-8547-0937989c6b6c",
+        "cac958d3-29e0-4ef9-302b-11fa8fe9554e",
+        "8b58bc4d-84d4-4721-94d6-c3190325be26",
+        "70a4218b-6403-914f-7044-6bd2bc4faaae",
+        "8a553c09-f5c6-83b3-50cd-67a5ec4b6aab"
+      ],
+      "reasoning": [
+        "Hyderabad Alloys Pvt Ltd has the required AS9100 certification and a capacity of 6541.0 kg/month, which meets the 10000 units per month requirement.",
+        "Hyderabad Alloys Pvt Ltd has the required AS9100 certification and a capacity of 3745.0 kg/month, which meets the 10000 units per month requirement.",
+        "TAI Hamburg GmbH & Co. KG has the required EN 9100 certification, which is similar to AS9100, but does not meet the capacity requirement.",
+        "Dubai Metals LLC has the required AS9100 certification, but its capacity of 1810.0 kg/month is below the 10000 units per month requirement.",
+        "Hyderabad Steel Pvt Ltd has the required AS9100 certification and a capacity of 81477.0 kg/month, which exceeds the 10000 units per month requirement."
+      ],
+      "exec_ms": 46252,
+      "error": null,
+      "extra": {
+        "retrieved_ids": [
+          "1ba75cb5-b425-33cc-8547-0937989c6b6c",
+          "74c217b6-e57a-d2cf-6ba4-5a3ad8f1d3b3",
+          "cac958d3-29e0-4ef9-302b-11fa8fe9554e",
+          "b6a354fa-457e-d3bc-ddee-8f31947e6c91",
+          "8b58bc4d-84d4-4721-94d6-c3190325be26",
+          "14eba0f1-3eaa-d4fb-9ce1-eba5d4f4a8b3",
+          "70a4218b-6403-914f-7044-6bd2bc4faaae",
+          "94e764ee-8f85-bdf3-4724-0aec070300ba",
+          "8a553c09-f5c6-83b3-50cd-67a5ec4b6aab",
+          "2d803089-28a5-46f9-3aba-9ffd73cdae4a"
+        ],
+        "top_k": 10
+      }
+    }
+  ]
+}

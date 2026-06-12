@@ -1,0 +1,16 @@
+% scale_comparison_table.tex — Chapter 5 evidence
+\begin{table}[h]
+\centering
+\caption{SupplierBench-25 results at 100 vs 10{,}000 supplier scale}
+\label{tab:scale}
+\begin{tabular}{lcccccc}
+\hline
+ & \multicolumn{3}{c}{100 suppliers} & \multicolumn{3}{c}{10{,}000 suppliers} \\
+\textbf{System} & P@5 & CSR & MRR & P@5 & CSR & MRR \\
+\hline
+SupplierMind (ours) & 0.336 & 0.686 & 0.640 & 0.168 & 0.872 & 0.326 \\
+Baseline B: Manual Sim & 0.328 & 0.650 & 0.513 & 0.024 & 0.680 & 0.080 \\
+Baseline A: Keyword SQL & 0.024 & 0.283 & 0.050 & 0.000 & 0.268 & 0.000 \\
+\hline
+\end{tabular}
+\end{table}
