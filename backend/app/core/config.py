@@ -45,9 +45,15 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5433
 
     # ── LLM ──────────────────────────────────────────────────────────
+    # LLM_PROVIDER selects the PRIMARY provider. With "openai", Groq acts as
+    # the automatic fallback on retryable failures when GROQ_API_KEY is set
+    # (Development Plan, Phase 1).
     LLM_PROVIDER: Literal["groq", "anthropic", "openai"] = "groq"
     LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
     GROQ_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
+    GROQ_FALLBACK_MODEL_NAME: str = "llama-3.1-8b-instant"
 
     # ── Embeddings ───────────────────────────────────────────────────
     EMBEDDING_PROVIDER: Literal["voyage", "openai"] = "voyage"

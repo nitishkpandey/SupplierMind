@@ -169,6 +169,19 @@ async def get_admin_metrics(
         for row in error_rows
     ]
 
+    # Active LLM provider + running cost (Development Plan, Phase 1).
+    from app.core.llm import get_llm_client
+
+    try:
+        llm = get_llm_client()
+        llm_info = {
+            "provider": getattr(llm, "provider_name", "unknown"),
+            "last_provider_used": getattr(llm, "last_provider_used", None),
+            "estimated_cost_usd": round(getattr(llm, "total_cost_usd", 0.0), 4),
+        }
+    except Exception as e:  # noqa: BLE001 — metrics must not 500 on LLM config issues
+        llm_info = {"provider": "unavailable", "error": str(e)[:200]}
+
     return {
         "window_hours": window_hours,
         "as_of": datetime.now(timezone.utc).isoformat(),
@@ -176,4 +189,5 @@ async def get_admin_metrics(
         "agent_latency": agent_latency,
         "throttle_events": throttle_events,
         "recent_errors": recent_errors,
+        "llm": llm_info,
     }

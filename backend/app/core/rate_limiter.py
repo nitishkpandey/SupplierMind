@@ -36,6 +36,9 @@ SAFETY_MARGIN = 0.85
 GROQ_RATE_LIMITS: dict[str, dict[str, int]] = {
     "llama-3.1-8b-instant": {"rpm": 30, "tpm": 6_000},
     "llama-3.3-70b-versatile": {"rpm": 30, "tpm": 12_000},
+    # OpenAI paid tier 1 (Development Plan, Phase 1). Conservative vs the
+    # published 500 RPM / 200K TPM so bursts never 429.
+    "gpt-4o-mini": {"rpm": 400, "tpm": 180_000},
 }
 
 # Used when a model is not in GROQ_RATE_LIMITS — conservative so an unknown

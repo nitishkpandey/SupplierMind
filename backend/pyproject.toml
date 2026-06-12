@@ -50,6 +50,7 @@ dependencies = [
     "tavily-python==0.3.3",
     "beautifulsoup4==4.12.3",
     "lxml==5.2.2",
+    "openai>=2.41.1",
 ]
 
 [dependency-groups]
@@ -60,6 +61,7 @@ dev = [
     "ruff==0.4.10",
     "pre-commit==3.7.1",
     "mypy==1.10.0",
+    "matplotlib>=3.10.9",
 ]
 
 [tool.ruff]
