@@ -117,3 +117,59 @@ uv run python scripts/run_evaluation.py --baselines-only
 # Full evaluation including SupplierMind (~15 minutes)
 uv run python scripts/run_evaluation.py
 ```
+```bash
+# Three-paradigm run (P1 single-prompt + P2 RAG + P3 SupplierMind)
+uv run python scripts/run_evaluation.py --paradigms
+```
+
+---
+
+## The Three Paradigms
+
+The thesis benchmarks three ways of answering the same procurement query:
+
+| Paradigm | Method | Code |
+|---|---|---|
+| **P1** | Single-prompt LLM, parametric knowledge only — no corpus, no tools | `backend/experiments/paradigm1_singleprompt.py` |
+| **P2** | Minimal RAG: Voyage + Milvus top-10 retrieval, one prompt, pick 5 | `backend/experiments/paradigm2_rag.py` |
+| **P3** | SupplierMind: five-agent LangGraph system with ReAct tool use, semantic memory, multi-turn clarification, compliance gating and auditable ranking | `backend/app/` |
+
+Design decisions and the shared output contract are documented in
+`backend/experiments/README.md`. Architecture detail per paradigm:
+[ARCHITECTURE.md](ARCHITECTURE.md). Benchmark protocol and reproduction:
+[BENCHMARK.md](BENCHMARK.md).
+
+## Repository Map
+
+```
+SupplierMind/
+|- backend/
+|  |- app/                  FastAPI application (P3: the five-agent system)
+|  |  |- agents/            Parser (ReAct), Discovery, Compliance, Ranking, Evaluator
+|  |  |- agents/tools/      Tool registry + the 5 Parser tools
+|  |  |- api/v1/            REST + SSE endpoints (queries, clarifications, admin)
+|  |  |- core/              LLM providers, embeddings, vector store, rate limiter
+|  |  |- db/                SQLAlchemy models, repositories, Alembic migrations
+|  |  |- evaluation/        SupplierBench-25 harness, metrics, report
+|  |  '- services/          Geocoding, ingestion, query memory (Milvus)
+|  |- experiments/          P1 + P2 baseline paradigms
+|  |- data/                 Synthetic corpus generators (fixed seed 42) + benchmark queries
+|  |- scripts/              Drivers: evaluation, smoke tests, demos, diagnostics
+|  '- tests/unit/           173+ deterministic unit tests (no live LLM needed)
+|- frontend/                React + TypeScript + Tailwind UI
+|- traces/                  Captured agentic traces (groq/, gpt4o_mini/)
+|- results/                 Benchmark archives + diagnostics (cert prevalence, samples)
+|- Documents/               Thesis evidence, plans, defence notes
+'- docker-compose.yml       Postgres + Milvus + Redis + MinIO + etcd
+```
+
+## Thesis
+
+Link to the thesis document: _placeholder — added on submission._
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — the five agents, data flow, three-tier governance, audit log
+- [BENCHMARK.md](BENCHMARK.md) — SupplierBench-25, metrics, end-to-end reproduction
+- [CONTRIBUTING.md](CONTRIBUTING.md) — code style, tests, commit conventions
+- [LICENSE](LICENSE) — MIT
