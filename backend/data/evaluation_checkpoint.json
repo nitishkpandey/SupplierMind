@@ -1,8 +1,7 @@
 {
-  "run_id": "77e41957-9464-4883-860f-fe76155eed06",
-  "timestamp": "2026-06-13T00:58:59.065562+00:00",
-  "query_count": 25,
-  "benchmark_file": "D:\\Nitish - Projects\\SupplierMind\\backend\\data\\queries_benchmark.json",
+  "completed_queries": 25,
+  "total_queries": 25,
+  "timestamp": "2026-06-13T00:58:59.002070+00:00",
   "per_query_metrics": {
     "suppliermind": [
       {
@@ -9566,82 +9565,5 @@
         "reasoning": "Wroclaw Agro S.A. has ISO 22000 certification and a capacity of 45505.0 tonnes/month, well above the required 2000+ kg/month.; Wroclaw Agro S.A. has ISO 22000 and BRC certifications, with a capacity of 4490.0 tonnes/month, meeting the user's requirements.; Krakow Food Sp. z o.o. holds multiple certifications including ISO 22000 and has a capacity of 5207.0 tonnes/month, suitable for the user's needs.; Warsaw Food S.A. has HACCP, FDA, and BRC certifications, with a capacity of 4570.0 tonnes/month, making it a viable option.; Wroclaw Agro S.A. has ISO 22000 and a very high capacity of 1192237.0 tonnes/month, far exceeding the user's requirements."
       }
     ]
-  },
-  "aggregated": {
-    "suppliermind": {
-      "system_name": "suppliermind",
-      "query_count": 25,
-      "mean_precision_at_5": 0.07200000000000001,
-      "std_precision_at_5": 0.12754084313139327,
-      "mean_csr": 0.6631333333333334,
-      "std_csr": 0.2970851137549891,
-      "mean_reciprocal_rank": 0.15133333333333332,
-      "std_mrr": 0.29868229125797047,
-      "mean_execution_time_ms": 39823.0,
-      "std_execution_time_ms": 18426.19048166676,
-      "simple_p5": 0.025,
-      "medium_p5": 0.16,
-      "hard_p5": 0.0
-    },
-    "keyword_sql": {
-      "system_name": "keyword_sql",
-      "query_count": 25,
-      "mean_precision_at_5": 0.0,
-      "std_precision_at_5": 0.0,
-      "mean_csr": 0.2683333333333333,
-      "std_csr": 0.24407326617075303,
-      "mean_reciprocal_rank": 0.0,
-      "std_mrr": 0.0,
-      "mean_execution_time_ms": 14.4,
-      "std_execution_time_ms": 16.570556216775987,
-      "simple_p5": 0.0,
-      "medium_p5": 0.0,
-      "hard_p5": 0.0
-    },
-    "manual_simulation": {
-      "system_name": "manual_simulation",
-      "query_count": 25,
-      "mean_precision_at_5": 0.024,
-      "std_precision_at_5": 0.066332495807108,
-      "mean_csr": 0.6804,
-      "std_csr": 0.19512832909348354,
-      "mean_reciprocal_rank": 0.08,
-      "std_mrr": 0.23629078131263043,
-      "mean_execution_time_ms": 13.8,
-      "std_execution_time_ms": 25.40505199102467,
-      "simple_p5": 0.025,
-      "medium_p5": 0.04,
-      "hard_p5": 0.0
-    },
-    "p1_singleprompt": {
-      "system_name": "p1_singleprompt",
-      "query_count": 25,
-      "mean_precision_at_5": 0.0,
-      "std_precision_at_5": 0.0,
-      "mean_csr": 0.0,
-      "std_csr": 0.0,
-      "mean_reciprocal_rank": 0.0,
-      "std_mrr": 0.0,
-      "mean_execution_time_ms": 4770.64,
-      "std_execution_time_ms": 1238.7479862075795,
-      "simple_p5": 0.0,
-      "medium_p5": 0.0,
-      "hard_p5": 0.0
-    },
-    "p2_rag": {
-      "system_name": "p2_rag",
-      "query_count": 25,
-      "mean_precision_at_5": 0.056,
-      "std_precision_at_5": 0.10832051206181281,
-      "mean_csr": 0.7773333333333333,
-      "std_csr": 0.2637702949888757,
-      "mean_reciprocal_rank": 0.13466666666666666,
-      "std_mrr": 0.2928910807538959,
-      "mean_execution_time_ms": 4427.12,
-      "std_execution_time_ms": 2034.4480275167184,
-      "simple_p5": 0.05,
-      "medium_p5": 0.1,
-      "hard_p5": 0.0
-    }
   }
 }

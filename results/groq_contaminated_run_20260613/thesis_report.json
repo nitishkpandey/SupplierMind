@@ -1,26 +1,26 @@
 {
   "metadata": {
-    "run_id": "77e41957-9464-4883-860f-fe76155eed06",
-    "timestamp": "2026-06-13T00:58:59.065562+00:00",
+    "run_id": "ee3d708b-db5a-4859-9ef7-9056bb74a0de",
+    "timestamp": "2026-06-13T00:24:24.634904+00:00",
     "query_count": 25
   },
   "rq2_performance_comparison": {
     "suppliermind": {
       "precision_at_5": {
-        "mean": 0.072,
-        "std": 0.1275
+        "mean": 0.136,
+        "std": 0.1497
       },
       "constraint_satisfaction_rate": {
-        "mean": 0.6631,
-        "std": 0.2971
+        "mean": 0.8313,
+        "std": 0.255
       },
       "mean_reciprocal_rank": {
-        "mean": 0.1513,
-        "std": 0.2987
+        "mean": 0.2893,
+        "std": 0.3665
       },
       "execution_time_ms": {
-        "mean": 39823.0,
-        "std": 18426.0
+        "mean": 200553.0,
+        "std": 77347.0
       }
     },
     "manual_simulation": {
@@ -37,8 +37,8 @@
         "std": 0.2363
       },
       "execution_time_ms": {
-        "mean": 14.0,
-        "std": 25.0
+        "mean": 139.0,
+        "std": 405.0
       }
     },
     "keyword_sql": {
@@ -55,15 +55,15 @@
         "std": 0.0
       },
       "execution_time_ms": {
-        "mean": 14.0,
-        "std": 17.0
+        "mean": 166.0,
+        "std": 568.0
       }
     }
   },
   "difficulty_breakdown": {
     "suppliermind": {
-      "simple_p5": 0.025,
-      "medium_p5": 0.16,
+      "simple_p5": 0.2,
+      "medium_p5": 0.18,
       "hard_p5": 0.0
     }
   },
@@ -77,43 +77,13 @@
         "reason": "No relevant suppliers in top-5 results"
       },
       {
-        "query_number": 2,
-        "difficulty": "simple",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
-        "query_number": 3,
-        "difficulty": "simple",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
-        "query_number": 5,
-        "difficulty": "simple",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
         "query_number": 6,
         "difficulty": "simple",
         "precision_at_5": 0.0,
         "reason": "No relevant suppliers in top-5 results"
       },
       {
-        "query_number": 7,
-        "difficulty": "simple",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
-        "query_number": 8,
-        "difficulty": "simple",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
-        "query_number": 11,
+        "query_number": 9,
         "difficulty": "medium",
         "precision_at_5": 0.0,
         "reason": "No relevant suppliers in top-5 results"
@@ -125,13 +95,7 @@
         "reason": "No relevant suppliers in top-5 results"
       },
       {
-        "query_number": 14,
-        "difficulty": "medium",
-        "precision_at_5": 0.0,
-        "reason": "No relevant suppliers in top-5 results"
-      },
-      {
-        "query_number": 18,
+        "query_number": 15,
         "difficulty": "medium",
         "precision_at_5": 0.0,
         "reason": "No relevant suppliers in top-5 results"
@@ -179,66 +143,24 @@
         "reason": "No relevant suppliers in top-5 results"
       }
     ],
-    "zero_precision_count": 18,
+    "zero_precision_count": 12,
     "low_csr_queries": [
       {
-        "query_number": 3,
-        "difficulty": "simple",
-        "csr": 0.307,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 4,
-        "difficulty": "simple",
-        "csr": 0.333,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 5,
+        "query_number": 6,
         "difficulty": "simple",
         "csr": 0.0,
         "reason": "Constraint satisfaction below 60%"
       },
       {
-        "query_number": 6,
-        "difficulty": "simple",
-        "csr": 0.5,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 7,
-        "difficulty": "simple",
-        "csr": 0.3,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 11,
-        "difficulty": "medium",
-        "csr": 0.4,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 14,
-        "difficulty": "medium",
-        "csr": 0.48,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
         "query_number": 20,
         "difficulty": "hard",
-        "csr": 0.45,
-        "reason": "Constraint satisfaction below 60%"
-      },
-      {
-        "query_number": 22,
-        "difficulty": "hard",
-        "csr": 0.575,
+        "csr": 0.55,
         "reason": "Constraint satisfaction below 60%"
       },
       {
         "query_number": 23,
         "difficulty": "hard",
-        "csr": 0.4,
+        "csr": 0.533,
         "reason": "Constraint satisfaction below 60%"
       },
       {
@@ -251,65 +173,141 @@
     "slow_queries": [
       {
         "query_number": 1,
-        "execution_time_ms": 59596,
+        "execution_time_ms": 69948,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 2,
+        "execution_time_ms": 124249,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 3,
-        "execution_time_ms": 68775,
+        "execution_time_ms": 253180,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 4,
-        "execution_time_ms": 48376,
+        "execution_time_ms": 106931,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 5,
+        "execution_time_ms": 165645,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 6,
+        "execution_time_ms": 227069,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 7,
-        "execution_time_ms": 58375,
+        "execution_time_ms": 123370,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 8,
+        "execution_time_ms": 124210,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 9,
-        "execution_time_ms": 54927,
+        "execution_time_ms": 184158,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 10,
+        "execution_time_ms": 234508,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 11,
-        "execution_time_ms": 74529,
+        "execution_time_ms": 367691,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 12,
+        "execution_time_ms": 183685,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 13,
-        "execution_time_ms": 55630,
+        "execution_time_ms": 133279,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 14,
-        "execution_time_ms": 50312,
+        "execution_time_ms": 372219,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 15,
+        "execution_time_ms": 175931,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 16,
-        "execution_time_ms": 57072,
+        "execution_time_ms": 184730,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 17,
+        "execution_time_ms": 184269,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       },
       {
         "query_number": 18,
-        "execution_time_ms": 53578,
+        "execution_time_ms": 175762,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 19,
+        "execution_time_ms": 243665,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 20,
+        "execution_time_ms": 306138,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 21,
+        "execution_time_ms": 134277,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 22,
+        "execution_time_ms": 244231,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 23,
+        "execution_time_ms": 302900,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 24,
+        "execution_time_ms": 184483,
+        "reason": "Execution > 45 seconds (likely LLM rate limit)"
+      },
+      {
+        "query_number": 25,
+        "execution_time_ms": 207302,
         "reason": "Execution > 45 seconds (likely LLM rate limit)"
       }
     ],
     "performance_degradation_by_difficulty": {
-      "simple": 0.025,
-      "medium": 0.16,
+      "simple": 0.2,
+      "medium": 0.18,
       "hard": 0.0
     },
     "observations": [
-      "18 queries returned zero Precision@5. 7 of these were hard queries with 5+ constraints, suggesting constraint combination complexity is a primary failure mode.",
-      "11 queries had CSR below 60%, indicating the compliance agent struggled with multi-constraint satisfaction on complex queries."
+      "12 queries returned zero Precision@5. 7 of these were hard queries with 5+ constraints, suggesting constraint combination complexity is a primary failure mode.",
+      "4 queries had CSR below 60%, indicating the compliance agent struggled with multi-constraint satisfaction on complex queries.",
+      "Performance degrades with query complexity: simple queries achieve P@5=0.20 vs hard queries at P@5=0.00 (delta=0.20). This is expected behaviour \u2014 more constraints create a harder search problem."
     ]
   },
   "statistical_note": "Results are based on 25 queries across 3 difficulty levels. Standard deviations are provided per metric. This is a proof-of-concept scale evaluation appropriate for an MSc thesis. Production evaluation would require a larger benchmark with expert annotation.",
-  "thesis_table": "% Copy this into your thesis LaTeX (Chapter 5: Results)\n\\begin{table}[h]\n\\centering\n\\caption{Evaluation Results: SupplierMind vs Baselines on SupplierBench-25}\n\\label{tab:results}\n\\begin{tabular}{lccc}\n\\hline\n\\textbf{System} & \\textbf{P@5} & \\textbf{CSR} & \\textbf{MRR} \\\\\n\\hline\nSupplierMind (ours) & 0.072 & 0.663 & 0.151 \\\\\nBaseline B: Manual Simulation & 0.024 & 0.680 & 0.080 \\\\\nBaseline A: Keyword SQL & 0.000 & 0.268 & 0.000 \\\\\n\\hline\n\\end{tabular}\n\\end{table}"
+  "thesis_table": "% Copy this into your thesis LaTeX (Chapter 5: Results)\n\\begin{table}[h]\n\\centering\n\\caption{Evaluation Results: SupplierMind vs Baselines on SupplierBench-25}\n\\label{tab:results}\n\\begin{tabular}{lccc}\n\\hline\n\\textbf{System} & \\textbf{P@5} & \\textbf{CSR} & \\textbf{MRR} \\\\\n\\hline\nSupplierMind (ours) & 0.136 & 0.831 & 0.289 \\\\\nBaseline B: Manual Simulation & 0.024 & 0.680 & 0.080 \\\\\nBaseline A: Keyword SQL & 0.000 & 0.268 & 0.000 \\\\\n\\hline\n\\end{tabular}\n\\end{table}"
 }

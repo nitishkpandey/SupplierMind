@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 BENCHMARK_FILE = Path(__file__).parent.parent.parent / "data" / "queries_benchmark.json"
 RESULTS_FILE = Path(__file__).parent.parent.parent / "data" / "evaluation_results.json"
+CHECKPOINT_FILE = Path(__file__).parent.parent.parent / "data" / "evaluation_checkpoint.json"
 
 # Discovery casts user_id to UUID in the user-saves subquery, so the eval must
 # pass a real UUID (a non-UUID label raises a SQL error and zeroes every
@@ -398,6 +399,23 @@ async def run_full_evaluation(
                     system_name, p5, pr["csr"], pr["exec_ms"],
                     f" ERROR={pr['error']}" if pr["error"] else "",
                 )
+
+        # A full run takes ~35 min and an interrupted process otherwise loses
+        # everything; the checkpoint makes partial results recoverable.
+        checkpoint = {
+            "completed_queries": i,
+            "total_queries": total,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "per_query_metrics": {
+                "suppliermind": [asdict(m) for m in sm_metrics],
+                "keyword_sql": [asdict(m) for m in kw_metrics],
+                "manual_simulation": [asdict(m) for m in manual_metrics],
+                "p1_singleprompt": [asdict(m) for m in p1_metrics],
+                "p2_rag": [asdict(m) for m in p2_metrics],
+            },
+        }
+        with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+            json.dump(checkpoint, f, indent=2, default=str)
 
     # ── Aggregate Results ─────────────────────────────────────────────
     aggregated: dict[str, SystemMetrics] = {}
