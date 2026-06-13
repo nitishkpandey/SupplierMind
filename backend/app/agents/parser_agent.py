@@ -23,6 +23,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from app.agents.audit_log import append_audit_entry
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState
 from app.agents.tools import ToolRegistry, build_default_registry
@@ -789,20 +790,15 @@ class ParserAgent(BaseAgent):
         """Audit-log appender that lets us record entries under a different
         agent_name than self (e.g. 'clarification_handler' is not a real
         agent, it's a sub-decision inside the Parser)."""
-        from datetime import datetime, timezone
-
-        entry = {
-            "agent_name": agent_name,
-            "action": action,
-            "reasoning": reasoning,
-            "input_summary": input_summary,
-            "output_summary": output_summary,
-            "duration_ms": duration_ms,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-        if "audit_log" not in state or state["audit_log"] is None:
-            state["audit_log"] = []
-        state["audit_log"].append(entry)
+        append_audit_entry(
+            state,
+            agent_name=agent_name,
+            action=action,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            duration_ms=duration_ms,
+            reasoning=reasoning,
+        )
 
     def _build_initial_user_message(
         self,

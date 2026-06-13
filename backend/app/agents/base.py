@@ -15,10 +15,10 @@ BaseAgent writes them once. Each agent inherits.
 import logging
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from typing import Optional
 
-from app.agents.state import AgentState, AuditEntry
+from app.agents.audit_log import append_audit_entry
+from app.agents.state import AgentState
 from app.core.llm import LLMClient, get_llm_client
 
 logger = logging.getLogger(__name__)
@@ -97,23 +97,17 @@ class BaseAgent(ABC):
         as the ReAct trace; the API flush stage prefers them when present
         and falls back to the plain summaries otherwise.
         """
-        entry: AuditEntry = {
-            "agent_name": self.agent_name,
-            "action": action,
-            "reasoning": reasoning,
-            "input_summary": input_summary,
-            "output_summary": output_summary,
-            "duration_ms": duration_ms,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-        if input_snapshot is not None:
-            entry["input_snapshot"] = input_snapshot
-        if output_snapshot is not None:
-            entry["output_snapshot"] = output_snapshot
-
-        if "audit_log" not in state or state["audit_log"] is None:
-            state["audit_log"] = []
-        state["audit_log"].append(entry)
+        append_audit_entry(
+            state,
+            agent_name=self.agent_name,
+            action=action,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            duration_ms=duration_ms,
+            reasoning=reasoning,
+            input_snapshot=input_snapshot,
+            output_snapshot=output_snapshot,
+        )
 
     def _fetch_suppliers(self, supplier_ids: list[str]) -> list[dict]:
         """Fetch supplier data using sync DB session (no async conflicts)."""

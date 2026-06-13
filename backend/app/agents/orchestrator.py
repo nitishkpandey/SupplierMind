@@ -50,6 +50,7 @@ from typing import Any, Literal, Optional
 from langgraph.graph import StateGraph, END
 
 from app.agents.state import AgentState
+from app.agents.audit_log import append_audit_entry
 from app.agents.parser_agent import ParserAgent
 from app.agents.tools import build_user_registry
 from app.agents.external_discovery_agent import ExternalDiscoveryAgent
@@ -281,20 +282,15 @@ def _append_audit(
 ) -> None:
     """Lightweight audit-log appender for the finalize_node (no BaseAgent
     indirection because finalize is a free function, not an agent)."""
-    from datetime import datetime, timezone
-
-    entry = {
-        "agent_name": agent_name,
-        "action": action,
-        "reasoning": reasoning,
-        "input_summary": "",
-        "output_summary": output_summary,
-        "duration_ms": duration_ms,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    if "audit_log" not in state or state["audit_log"] is None:
-        state["audit_log"] = []
-    state["audit_log"].append(entry)
+    append_audit_entry(
+        state,
+        agent_name=agent_name,
+        action=action,
+        input_summary="",
+        output_summary=output_summary,
+        duration_ms=duration_ms,
+        reasoning=reasoning,
+    )
 
 
 def external_discovery_node(state: AgentState) -> AgentState:
