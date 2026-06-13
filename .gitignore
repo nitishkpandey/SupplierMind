@@ -61,3 +61,14 @@ coverage/
 backend/data/bulk_ingest_checkpoint.json
 backend/data/bulk_ingest.log
 
+# --- INTERNAL PLANNING / PROCESS DOCS (never commit) ---
+docs/audits/
+docs/verification/07_*
+docs/verification/08_*
+docs/verification/09_*
+docs/superpowers/
+codebase_walkthrough.md
+known_bugs_to_triage.md
+*_sprint_plan.md
+*_plan.md
+
