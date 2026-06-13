@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini-2024-07-18"
     GROQ_FALLBACK_MODEL_NAME: str = "llama-3.1-8b-instant"
 
     # ── Embeddings ───────────────────────────────────────────────────

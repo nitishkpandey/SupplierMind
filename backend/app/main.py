@@ -43,8 +43,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ── Model config guardrails (Audit H) ─────────────────────────────
     # Fail loud at boot rather than silently billing $0 mid-run on a model
     # that is missing from the cost table.
-    from app.core.llm import model_cost_is_known
+    from app.core.llm import is_pinned_snapshot, model_cost_is_known
     _model = settings.OPENAI_MODEL_NAME
+    if not is_pinned_snapshot(_model):
+        raise RuntimeError(
+            f"OPENAI_MODEL_NAME={_model!r} is a floating alias. Refusing to "
+            f"start: the primary model must be a pinned dated snapshot "
+            f"(e.g. gpt-4o-mini-2024-07-18) for reproducibility. See "
+            f"docs/adr/ADR-001-model-pinning.md."
+        )
     if not model_cost_is_known(_model):
         raise RuntimeError(
             f"OPENAI_MODEL_NAME={_model!r} has no cost-table entry (exact or "
@@ -52,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             f"would bill $0 silently and corrupt cost metrics. Add it to "
             f"_COST_PER_MTOK_USD."
         )
-    logger.info("LLM model   : %s (cost-table OK)", _model)
+    logger.info("LLM model   : %s (pinned snapshot, cost-table OK)", _model)
 
     # Initialize cache
     from app.core.cache import InMemoryCache, RedisCache, set_cache_instance

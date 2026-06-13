@@ -21,6 +21,7 @@ spend per paradigm.
 """
 
 import logging
+import re
 import threading
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
@@ -93,6 +94,17 @@ def model_cost_is_known(model: str) -> bool:
         return True
     except UnknownModelCostError:
         return False
+
+
+# A pinned snapshot ends in a dated suffix, e.g. gpt-4o-mini-2024-07-18.
+# Floating aliases (gpt-4o-mini) are rejected for the primary model so the
+# benchmark is reproducible against an exact model build (Audit H / ADR-001).
+_SNAPSHOT_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+
+
+def is_pinned_snapshot(model: str) -> bool:
+    """True iff `model` names a dated snapshot, not a floating alias."""
+    return bool(_SNAPSHOT_RE.search(model or ""))
 
 
 def estimate_message_tokens(messages: list[dict[str, str]], max_tokens: int = 0) -> int:

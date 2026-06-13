@@ -105,7 +105,7 @@ recent errors, and the active LLM provider with estimated spend.
 ## LLM provider layer
 
 `backend/app/core/llm.py`: `LLMProvider` protocol; `OpenAIProvider`
-(gpt-4o-mini, primary for the benchmark) with `GroqProvider`
+(gpt-4o-mini-2024-07-18, pinned snapshot, primary for the benchmark) with `GroqProvider`
 (llama-3.1-8b-instant) as automatic fallback on retryable failures only —
 auth errors surface immediately. Per-call cost estimates accumulate into a
 process-wide total. Free-tier pacing lives in `rate_limiter.py` (per-model

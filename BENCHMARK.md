@@ -44,7 +44,7 @@ Groq fallback — see `backend/app/core/llm.py`).
 
 | Component | Model | Notes |
 |---|---|---|
-| Primary LLM | `gpt-4o-mini` (OpenAI) | benchmark runs |
+| Primary LLM | `gpt-4o-mini-2024-07-18` (OpenAI) | pinned snapshot for reproducibility (see `docs/adr/ADR-001-model-pinning.md`) |
 | Fallback LLM | `llama-3.1-8b-instant` (Groq) | retryable-failure fallback; Groq-era archive in `results/groq_baseline_v0/` |
 | Embeddings | `voyage-3-lite` (512-dim) | both retrieval and query memory |
 

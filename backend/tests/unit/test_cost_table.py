@@ -5,6 +5,7 @@ import pytest
 from app.core.llm import (
     UnknownModelCostError,
     estimate_call_cost_usd,
+    is_pinned_snapshot,
     model_cost_is_known,
     resolve_cost_rates,
 )
@@ -44,3 +45,26 @@ def test_startup_guard_predicate():
 def test_groq_free_tier_is_zero_not_unknown():
     assert resolve_cost_rates("llama-3.1-8b-instant") == (0.0, 0.0)
     assert estimate_call_cost_usd("llama-3.1-8b-instant", 1_000_000, 1_000_000) == 0.0
+
+
+# ── snapshot pinning guard (3c) ───────────────────────────────────────
+def test_is_pinned_snapshot_accepts_dated_and_rejects_alias():
+    assert is_pinned_snapshot("gpt-4o-mini-2024-07-18") is True
+    assert is_pinned_snapshot("gpt-4o-mini-2025-01-01") is True
+    # floating aliases rejected — the startup assertion refuses to boot on these
+    assert is_pinned_snapshot("gpt-4o-mini") is False
+    assert is_pinned_snapshot("gpt-4o") is False
+    assert is_pinned_snapshot("") is False
+
+
+def test_rate_limiter_dated_snapshot_inherits_family_caps():
+    # a pinned snapshot must resolve to gpt-4o-mini's generous caps, not the
+    # conservative default (Audit H rate-limiter coupling).
+    from app.core.rate_limiter import GroqRateLimiter
+
+    limiter = GroqRateLimiter()
+    family = limiter._caps("gpt-4o-mini")
+    snapshot = limiter._caps("gpt-4o-mini-2024-07-18")
+    default = limiter._caps("some-unknown-model")
+    assert snapshot == family
+    assert snapshot != default

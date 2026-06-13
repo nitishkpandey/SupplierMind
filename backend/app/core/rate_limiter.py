@@ -74,7 +74,17 @@ class GroqRateLimiter:
         self._token_log: dict[str, deque[list]] = defaultdict(deque)
 
     def _caps(self, model: str) -> tuple[float, float]:
-        limit = self._limits.get(model, self._default)
+        limit = self._limits.get(model)
+        if limit is None:
+            # Prefix fallback: a dated snapshot (gpt-4o-mini-2024-07-18)
+            # inherits its family's limits (gpt-4o-mini) so pinning the model
+            # does not silently drop to the conservative default (Audit H).
+            for family, lim in self._limits.items():
+                if model.startswith(family):
+                    limit = lim
+                    break
+        if limit is None:
+            limit = self._default
         return limit["rpm"] * self._margin, limit["tpm"] * self._margin
 
     def _prune(self, model: str, now: float) -> None:
