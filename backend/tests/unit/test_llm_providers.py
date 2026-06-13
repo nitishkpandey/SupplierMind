@@ -209,5 +209,7 @@ def test_cost_estimate_gpt4o_mini():
     assert estimate_call_cost_usd("gpt-4o-mini", 1_000_000, 1_000_000) == pytest.approx(0.75)
     # Groq free tier costs nothing
     assert estimate_call_cost_usd("llama-3.1-8b-instant", 50_000, 10_000) == 0.0
-    # Unknown models cost 0 rather than crashing
-    assert estimate_call_cost_usd("mystery-model", 1000, 1000) == 0.0
+    # Unknown models now FAIL LOUD (Audit H) — no silent $0 that corrupts spend.
+    from app.core.llm import UnknownModelCostError
+    with pytest.raises(UnknownModelCostError):
+        estimate_call_cost_usd("mystery-model", 1000, 1000)

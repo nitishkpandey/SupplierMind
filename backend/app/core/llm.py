@@ -49,12 +49,50 @@ DEFAULT_MAX_TOKENS = 2048
 _CHARS_PER_TOKEN = 3.5
 
 # USD per 1M tokens (prompt, completion). Groq free tier costs nothing but
-# keeping an entry makes the cost report uniform across paradigms.
+# keeping an entry makes the cost report uniform across paradigms. Pinned
+# OpenAI snapshots are listed explicitly; the prefix fallback in
+# resolve_cost_rates also catches future dated snapshots of a known family.
 _COST_PER_MTOK_USD: dict[str, tuple[float, float]] = {
     "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o-mini-2024-07-18": (0.15, 0.60),
     "llama-3.1-8b-instant": (0.0, 0.0),
     "llama-3.3-70b-versatile": (0.0, 0.0),
 }
+
+
+class UnknownModelCostError(KeyError):
+    """Raised when a model has no cost-table entry (exact or prefix).
+
+    Loud by design: a missing entry must NOT silently bill $0, which would
+    corrupt the benchmark spend numbers (Audit H).
+    """
+
+
+def resolve_cost_rates(model: str) -> tuple[float, float]:
+    """Return (prompt, completion) $/1M-token rates for a model.
+
+    Exact match first, then a prefix fallback so a dated snapshot
+    (``gpt-4o-mini-2024-07-18``) resolves to its family (``gpt-4o-mini``).
+    Raises UnknownModelCostError if neither matches — never returns a silent 0.
+    """
+    if model in _COST_PER_MTOK_USD:
+        return _COST_PER_MTOK_USD[model]
+    for family, rates in _COST_PER_MTOK_USD.items():
+        if model.startswith(family):
+            return rates
+    raise UnknownModelCostError(
+        f"No cost-table entry for model {model!r} (no exact or prefix match). "
+        f"Add it to _COST_PER_MTOK_USD in app/core/llm.py."
+    )
+
+
+def model_cost_is_known(model: str) -> bool:
+    """True iff `model` resolves in the cost table (exact or prefix)."""
+    try:
+        resolve_cost_rates(model)
+        return True
+    except UnknownModelCostError:
+        return False
 
 
 def estimate_message_tokens(messages: list[dict[str, str]], max_tokens: int = 0) -> int:
@@ -64,10 +102,9 @@ def estimate_message_tokens(messages: list[dict[str, str]], max_tokens: int = 0)
 
 
 def estimate_call_cost_usd(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """Estimated USD cost of one call. Unknown models cost 0 (logged once)."""
-    rates = _COST_PER_MTOK_USD.get(model)
-    if rates is None:
-        return 0.0
+    """Estimated USD cost of one call. Raises UnknownModelCostError on an
+    unknown model rather than silently returning 0 (Audit H)."""
+    rates = resolve_cost_rates(model)
     return (prompt_tokens * rates[0] + completion_tokens * rates[1]) / 1_000_000
 
 

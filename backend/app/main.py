@@ -40,6 +40,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Vector DB   : %s", settings.effective_vector_db)
     logger.info("Lite Mode   : %s", settings.LITE_MODE)
 
+    # ── Model config guardrails (Audit H) ─────────────────────────────
+    # Fail loud at boot rather than silently billing $0 mid-run on a model
+    # that is missing from the cost table.
+    from app.core.llm import model_cost_is_known
+    _model = settings.OPENAI_MODEL_NAME
+    if not model_cost_is_known(_model):
+        raise RuntimeError(
+            f"OPENAI_MODEL_NAME={_model!r} has no cost-table entry (exact or "
+            f"prefix) in app/core/llm.py. Refusing to start: an unknown model "
+            f"would bill $0 silently and corrupt cost metrics. Add it to "
+            f"_COST_PER_MTOK_USD."
+        )
+    logger.info("LLM model   : %s (cost-table OK)", _model)
+
     # Initialize cache
     from app.core.cache import InMemoryCache, RedisCache, set_cache_instance
     if settings.LITE_MODE:
