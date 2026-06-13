@@ -20,7 +20,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import GeocodeCache
 
 logger = logging.getLogger(__name__)
 

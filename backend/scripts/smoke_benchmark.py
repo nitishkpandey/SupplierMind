@@ -39,7 +39,7 @@ async def main() -> None:
         run_paradigm_queries,
         run_suppliermind_query,
     )
-    from app.evaluation.metrics import precision_at_k, reciprocal_rank
+    from app.evaluation.metrics import precision_at_k
 
     set_cache_instance(InMemoryCache())
     set_vector_store_instance(create_vector_store())

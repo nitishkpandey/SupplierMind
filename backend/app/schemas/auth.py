@@ -6,7 +6,7 @@ Pydantic schemas serve two purposes:
 2. Serialization: outgoing response data is formatted consistently
 """
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class TokenResponse(BaseModel):

@@ -87,8 +87,7 @@ async def recapture_traces() -> None:
     """Re-run the three Week-3 demo drivers; their outputs ARE the traces."""
     TRACES_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Task 3.1 — ReAct parser trace (direct ParserAgent runs)
-    from scripts.parser_react_demo import main as react_demo  # type: ignore[attr-defined]
+    # Task 3.1 — ReAct parser trace (direct ParserAgent runs).
     # Task 3.2 / 3.3 demos are also importable mains; they write their JSONs
     # into Documents/thesis_evidence/week_3_agentic/ — copy results over.
     logger.info("Re-capture: drive the three demo scripts manually if their "
