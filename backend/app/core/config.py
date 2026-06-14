@@ -93,6 +93,10 @@ class Settings(BaseSettings):
 
     # ── Pipeline tuning ───────────────────────────────────────────────
     EVALUATOR_MAX_RETRIES: int = 1
+    # Benchmark-only: when true, any embedding failure aborts the run loudly
+    # (EmbeddingFatal) instead of degrading to empty semantic results. Off in
+    # production so the discovery agent keeps its graceful-degradation path.
+    EMBED_FAIL_FAST: bool = False
     SSE_TIMEOUT_SECONDS: int = 300
     SSE_CLEANUP_DELAY_SECONDS: int = 300
     QUERY_MIN_LENGTH: int = 10

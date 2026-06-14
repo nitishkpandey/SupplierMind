@@ -52,6 +52,26 @@ _EMBED_CACHE_MAX_ENTRIES = 5000
 _EMBED_CACHE: dict[str, tuple[list[float], float]] = {}
 
 
+class EmbeddingUpstreamError(RuntimeError):
+    """Voyage returned a malformed/empty response (not a rate limit).
+
+    A real upstream failure, distinct from the transient RateLimitError that the
+    retry decorator handles. Raised loudly so a benchmark never indexes or
+    searches against a silently-empty embedding.
+    """
+
+
+class EmbeddingFatal(BaseException):
+    """Fail-fast abort signal for a benchmark run (settings.EMBED_FAIL_FAST).
+
+    Deliberately derives from BaseException, not Exception, so it bypasses the
+    broad ``except Exception`` handlers in the discovery agent and BaseAgent.run
+    and propagates all the way out — stopping the run immediately rather than
+    letting a degraded (empty-semantic) query silently corrupt the numbers.
+    Production (fail-fast off) keeps the original graceful-degradation path.
+    """
+
+
 class EmbeddingClient:
     """
     Wrapper around Voyage AI embeddings API.
@@ -90,7 +110,7 @@ class EmbeddingClient:
 
     @retry(
         retry=retry_if_exception_type(RateLimitError),
-        stop=stop_after_attempt(4),
+        stop=stop_after_attempt(8),
         wait=wait_exponential(multiplier=4, min=4, max=30),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
@@ -104,15 +124,34 @@ class EmbeddingClient:
         Raw API call to Voyage AI.
 
         Retries specifically on RateLimitError with a long backoff. The free
-        tier allows only 3 requests/minute, so a 1-second retry is pointless —
-        waits ramp up to 30s to actually clear the rolling window.
+        tier allows only 3 requests/minute (one slot frees every ~20s), so a
+        short retry is pointless. Budget: 8 attempts = 7 retries with waits
+        4, 8, 16, 30, 30, 30, 30s (~148s total). From the 4th retry the wait is
+        pinned at the 30s ceiling, which always exceeds the ~20s rolling window,
+        so a purely rate-limited call is guaranteed to clear before the budget
+        is exhausted — retry exhaustion is impossible when the bottleneck is the
+        free-tier throttle (transient), only a permanent upstream fault would
+        surface, and that is caught below as a loud EmbeddingUpstreamError.
         """
         result = self._client.embed(
             texts,
             model=EMBEDDING_MODEL,
             input_type=input_type,
         )
-        return result.embeddings
+        vectors = result.embeddings
+        # Loud-fail on a malformed/empty upstream response (Methods guarantee 2):
+        # never let a benchmark index or search against a silently-empty vector.
+        if (
+            not vectors
+            or len(vectors) != len(texts)
+            or any(v is None or len(v) != EMBEDDING_DIM for v in vectors)
+        ):
+            raise EmbeddingUpstreamError(
+                f"Voyage returned a malformed embedding response: "
+                f"{0 if not vectors else len(vectors)} vectors for {len(texts)} "
+                f"texts (expected {len(texts)} vectors of dim {EMBEDDING_DIM})."
+            )
+        return vectors
 
     def embed_batch(
         self,
@@ -157,7 +196,35 @@ class EmbeddingClient:
             fresh: list[list[float]] = []
             for i in range(0, len(miss_texts), MAX_BATCH_SIZE):
                 batch = miss_texts[i : i + MAX_BATCH_SIZE]
-                fresh.extend(self._call_api(batch, input_type))
+                _t0 = time.time()
+                try:
+                    vectors = self._call_api(batch, input_type)
+                except BaseException as e:  # noqa: BLE001 — see EmbeddingFatal below
+                    # Per-call latency line is still emitted for the failure so
+                    # the throttle/failure distribution is complete in the log.
+                    logger.info(
+                        "[embed-latency] n=%d input_type=%s elapsed_ms=%d status=FAILED err=%s",
+                        len(batch), input_type, int((time.time() - _t0) * 1000),
+                        type(e).__name__,
+                    )
+                    # Fail-fast (benchmark): convert any embedding failure into a
+                    # BaseException that bypasses every `except Exception` and
+                    # stops the run immediately — loud-fail, not silent-degrade.
+                    if settings.EMBED_FAIL_FAST and not isinstance(e, EmbeddingFatal):
+                        raise EmbeddingFatal(
+                            f"EMBED_FAIL_FAST: embedding call failed "
+                            f"({type(e).__name__}: {e}); aborting run."
+                        ) from e
+                    raise
+                _elapsed_ms = int((time.time() - _t0) * 1000)
+                # Throttle-distribution log (Methods transparency): elapsed
+                # includes any rate-limit retry waits inside _call_api.
+                logger.info(
+                    "[embed-latency] n=%d input_type=%s elapsed_ms=%d status=OK%s",
+                    len(batch), input_type, _elapsed_ms,
+                    " throttled" if _elapsed_ms > 1500 else "",
+                )
+                fresh.extend(vectors)
 
             for idx, text, vector in zip(miss_indices, miss_texts, fresh):
                 results[idx] = vector
