@@ -54,10 +54,10 @@ _PLACEHOLDER_PRODUCT_RE = re.compile(
     # bare placeholder nouns, optionally with a possessive/article lead-in.
     # "supplier"/"vendor" are placeholders here: searching a supplier corpus
     # for "supplier" carries zero signal (3.4 smoke: "I need a supplier").
-    r"(?:(?:our|my|your|their|the|a|an)\s+)?(?:new\s+|own\s+)?"
-    r"(?:projects?|needs?|requirements?|business|company|order|usual|"
+    r"(?:(?:our|my|your|their|the|this|that|a|an)\s+)?(?:new\s+|own\s+)?"
+    r"(?:projects?|needs?|requirements?|tasks?|business|company|order|usual|"
     r"stuff|things?|items?|something|anything|supplies|materials|"
-    r"suppliers?|vendors?|sources?|products?)"
+    r"suppliers?|vendors?|manufacturers?|providers?|sources?|products?)"
     r"|"
     # generic noun + placeholder tail, e.g. "materials for our project"
     r"(?:stuff|things?|items?|materials|supplies|something|products?|suppliers?)\s+"
@@ -70,6 +70,21 @@ _PLACEHOLDER_PRODUCT_RE = re.compile(
 def _is_placeholder_product(value: object) -> bool:
     """True when a product_type value is a contentless placeholder."""
     return isinstance(value, str) and bool(_PLACEHOLDER_PRODUCT_RE.match(value.strip()))
+
+
+# Generic procurement nouns the LLM occasionally drops into location_country
+# ("Food ingredient suppliers ..." → location_country='suppliers'). None of
+# these are valid country names, so they are cleared (Phase E; surfaced by the
+# benchmark-v2 Q8 flake where this emptied the result set ~1/3 of the time).
+_NON_COUNTRY_TOKENS = frozenset({
+    "suppliers", "supplier", "manufacturers", "manufacturer",
+    "vendors", "vendor", "providers", "provider",
+})
+
+
+def _is_non_country_token(value: object) -> bool:
+    """True when a location_country value is a generic procurement noun."""
+    return isinstance(value, str) and value.strip().lower() in _NON_COUNTRY_TOKENS
 
 
 # Pre-loop gate vocabulary: if EVERY alphabetic token of the raw query is in
@@ -941,6 +956,12 @@ class ParserAgent(BaseAgent):
 
         location_city = raw.get("location_city")
         location_country = raw.get("location_country")
+        # Phase E (Rule 1 pollution): a generic procurement noun ("suppliers",
+        # "manufacturers", ...) is never a country — drop it so the discovery
+        # structured filter doesn't search Supplier.country == 'suppliers' and
+        # return nothing (benchmark-v2 Q8 flake).
+        if _is_non_country_token(location_country):
+            location_country = None
         # Bug 1 (Phase D): a "within Nkm of <place>" query's geocoded place is a
         # radius *centre*, not a country filter. geocode_location buckets a
         # no-comma place name ("Berlin") as a country, so a radius query arrives
