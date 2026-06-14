@@ -1,37 +1,62 @@
 # Reproduce the SupplierBench-25 three-paradigm benchmark from a clean checkout.
 # Prerequisites: Docker Desktop running, Python 3.11 + uv installed,
-# API keys in backend/.env (GROQ_API_KEY, VOYAGE_API_KEY; OPENAI_API_KEY +
+# API keys in backend/.env (VOYAGE_API_KEY for embeddings; OPENAI_API_KEY +
 # LLM_PROVIDER=openai for the canonical GPT-4o-mini run).
 #
 # Usage (from the repository root):
-#     ./scripts/reproduce_benchmark.ps1
+#     ./scripts/reproduce_benchmark.ps1                    # full run, regenerates the corpus (seed 42)
+#     ./scripts/reproduce_benchmark.ps1 -UseExistingCorpus # run on the committed corpus (no regeneration)
 #
 # Outputs land in backend/data/evaluation_results.json and
-# backend/data/thesis_report.json; archive them under results/run_YYYYMMDD/.
+# backend/data/thesis_report.json; archived under results/run_YYYYMMDD/.
+
+param([switch]$UseExistingCorpus)
 
 $ErrorActionPreference = "Stop"
+
+# Force UTF-8 so emoji / diagnostic prints don't crash under a redirected cp1252
+# console on Windows (UnicodeEncodeError). Corpus files are written with explicit
+# utf-8 regardless, so this only affects console output, not data.
+$env:PYTHONUTF8 = "1"
+
 $root = Split-Path -Parent $PSScriptRoot
+
+# $ErrorActionPreference = "Stop" does NOT catch a native command's non-zero exit
+# code, so a crashed `uv run ...` step would otherwise be ignored and the script
+# would carry on against stale data and still report success. Gate every native
+# step on its exit code explicitly.
+function Invoke-Step([string]$label, [scriptblock]$cmd) {
+    Write-Host $label
+    & $cmd
+    if ($LASTEXITCODE -ne 0) {
+        throw "Step failed (exit $LASTEXITCODE): $label"
+    }
+}
 
 Write-Host "[1/6] Starting infrastructure (Postgres, Milvus, Redis)..."
 Set-Location $root
 docker compose up -d
+if ($LASTEXITCODE -ne 0) { throw "docker compose up failed (exit $LASTEXITCODE)" }
 Start-Sleep -Seconds 25
 
-Write-Host "[2/6] Syncing pinned Python dependencies..."
 Set-Location "$root\backend"
-uv sync
+Invoke-Step "[2/6] Syncing pinned Python dependencies..." { uv sync }
+Invoke-Step "[3/6] Applying database schema..." { uv run alembic upgrade head }
 
-Write-Host "[3/6] Applying database schema..."
-uv run alembic upgrade head
+if ($UseExistingCorpus) {
+    Write-Host "[4/6] Using the committed corpus (regeneration skipped: -UseExistingCorpus)."
+} else {
+    Invoke-Step "[4/6] Generating the synthetic corpus + benchmark queries (seed 42)..." {
+        uv run python data/generate_dataset.py
+    }
+}
 
-Write-Host "[4/6] Generating the synthetic corpus + benchmark queries (seed 42)..."
-uv run python data/generate_dataset.py
-
-Write-Host "[5/6] Embedding + indexing suppliers into Milvus..."
-uv run python scripts/ingest_suppliers.py
-
-Write-Host "[6/6] Running the three-paradigm benchmark (this is the long part)..."
-uv run python scripts/run_evaluation.py --paradigms
+Invoke-Step "[5/6] Embedding + indexing suppliers into Milvus..." {
+    uv run python scripts/ingest_suppliers.py
+}
+Invoke-Step "[6/6] Running the three-paradigm benchmark (this is the long part)..." {
+    uv run python scripts/run_evaluation.py --paradigms
+}
 
 $stamp = Get-Date -Format "yyyyMMdd"
 $dest = "$root\results\run_$stamp"
