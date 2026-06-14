@@ -1,0 +1,21 @@
+{
+  "auditability_rubric": {
+    "p1_singleprompt": {
+      "score": 0,
+      "rationale": "Names generated from parametric memory; no corpus link, no evidence, reasoning is unverifiable model text."
+    },
+    "p2_rag": {
+      "score": 1,
+      "rationale": "Picks are grounded in retrieved corpus documents (IDs traceable), but there is no per-constraint verdict and no quoted evidence."
+    },
+    "suppliermind": {
+      "score": 3,
+      "rationale": "Per-constraint compliance verdicts with quoted evidence (quote-or-fail), ReAct trace and audit log per query."
+    }
+  },
+  "evidence_link_ratio": {
+    "p1_singleprompt": 0.0,
+    "p2_rag": 1.0,
+    "suppliermind": 1.0
+  }
+}
