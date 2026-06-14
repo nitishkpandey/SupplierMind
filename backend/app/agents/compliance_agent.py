@@ -440,9 +440,15 @@ class ComplianceAgent(BaseAgent):
         # mismatch is deterministic — FAIL at confidence 1.0, no LLM. Only a
         # mismatch is recorded; matches add no entry so pass_rate (and the
         # ranking score distribution) is unchanged for in-country suppliers.
+        # Bug 1 (Phase D): when a radius constraint is active, location is
+        # enforced by radius matching below — do NOT also run country-equality.
+        # The geocoded centre of a "within Nkm of <city>" query is a city, not a
+        # country, so equality would FAIL every supplier spuriously.
+        has_radius_constraint = bool(constraints.get("location_radius_km"))
         req_country = (constraints.get("location_country") or "").strip().casefold()
         sup_country = (supplier.get("country") or "").strip().casefold()
-        if req_country and sup_country and req_country != sup_country \
+        if not has_radius_constraint \
+                and req_country and sup_country and req_country != sup_country \
                 and req_country not in sup_country and sup_country not in req_country:
             results.append({
                 "constraint_name": "country",
@@ -529,23 +535,38 @@ class ComplianceAgent(BaseAgent):
             results.append(cap_result)
 
         # ── Numeric check: Lead time ──────────────────────────────────
-        if constraints.get("lead_time_max_days") and supplier.get("lead_time_days"):
+        # Bug 2 (Phase D): a specified lead-time constraint must always produce a
+        # verdict. Previously the gate only fired when the supplier reported a
+        # lead time, so suppliers with no lead_time_days silently passed. Use
+        # `is not None` so a genuine 0-day (same-day) lead time is not mistaken
+        # for a missing value.
+        if constraints.get("lead_time_max_days"):
             max_lt = constraints["lead_time_max_days"]
-            actual_lt = supplier["lead_time_days"]
-            if actual_lt <= max_lt:
+            actual_lt = supplier.get("lead_time_days")
+            if actual_lt is None:
+                status = "PARTIAL"
+                reason = (
+                    f"Supplier does not report a lead time; cannot confirm the "
+                    f"{max_lt}d limit"
+                )
+                confidence = 0.5
+            elif actual_lt <= max_lt:
                 status = "PASS"
                 reason = f"Lead time {actual_lt}d is within the {max_lt}d limit"
+                confidence = 1.0
             elif actual_lt <= max_lt * LEAD_TIME_GRACE_MULTIPLIER:
                 status = "PARTIAL"
                 reason = f"Lead time {actual_lt}d slightly exceeds {max_lt}d limit"
+                confidence = 1.0
             else:
                 status = "FAIL"
                 reason = f"Lead time {actual_lt}d exceeds {max_lt}d limit"
+                confidence = 1.0
             results.append({
                 "constraint_name": "lead_time",
                 "status": status,
                 "reason": reason,
-                "confidence": 1.0,
+                "confidence": confidence,
             })
 
         # ── Geospatial check: Radius ──────────────────────────────────
