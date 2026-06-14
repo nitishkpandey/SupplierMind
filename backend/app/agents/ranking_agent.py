@@ -133,6 +133,21 @@ def build_summary(comp_result: dict) -> str:
     return "Meets all specified requirements."
 
 
+def has_blocking_fail(comp_result: dict) -> bool:
+    """True if any compliance verdict for this candidate is FAIL.
+
+    Bug 3 (Phase D): a candidate with any FAIL verdict is hard-excluded from the
+    final result set rather than merely score-penalised, so known-non-compliant
+    suppliers never surface. The check keys on the verdict status itself, so an
+    evaluator downgrade to PARTIAL (with reasoning) lifts the block automatically
+    — a PARTIAL verdict is not a FAIL.
+    """
+    return any(
+        r.get("status") == "FAIL"
+        for r in comp_result.get("compliance_results", [])
+    )
+
+
 def build_explanation(
     supplier: dict, tier: str, comp_result: dict, semantic_score: Optional[float]
 ) -> dict:
@@ -205,8 +220,15 @@ class RankingAgent(BaseAgent):
         # ── Score each supplier ───────────────────────────────────────
         scored: list[tuple[float, SupplierComplianceResult]] = []
 
+        excluded_fail = 0
         for comp_result in compliance_results:
             sid = comp_result["supplier_id"]
+
+            # Bug 3 (Phase D): hard-exclude any candidate with a FAIL verdict.
+            if has_blocking_fail(comp_result):
+                excluded_fail += 1
+                continue
+
             supplier = supplier_map.get(sid, {})
             tier = tier_assignments.get(sid, "discovered")
 
@@ -298,7 +320,8 @@ class RankingAgent(BaseAgent):
             output_summary=(
                 f"Top {len(ranked)} results. "
                 f"Scores: {[round(r['total_score'], 2) for r in ranked]}. "
-                f"{len(scored) - len(ranked)} below threshold ({MINIMUM_SCORE})."
+                f"{len(scored) - len(ranked)} below threshold ({MINIMUM_SCORE}). "
+                f"{excluded_fail} excluded for FAIL verdict."
             ),
             duration_ms=duration_ms,
             reasoning=f"Dynamic weights: constraint={w_constraint}, "
