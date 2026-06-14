@@ -941,6 +941,17 @@ class ParserAgent(BaseAgent):
 
         location_city = raw.get("location_city")
         location_country = raw.get("location_country")
+        # Bug 1 (Phase D): a "within Nkm of <place>" query's geocoded place is a
+        # radius *centre*, not a country filter. geocode_location buckets a
+        # no-comma place name ("Berlin") as a country, so a radius query arrives
+        # with the centre sitting in location_country. Promote it to
+        # location_city and clear the country, so the compliance gate does not
+        # run a spurious country-equality check against the supplier's real
+        # country ("required country is Berlin"). A genuine country query has no
+        # radius and is left untouched.
+        if raw.get("location_radius_km") and location_country and not location_city:
+            location_city = location_country
+            location_country = None
         location_name = location_city or location_country
 
         # Rule 1 pollution guard (Task 3.4): never let a placeholder reach
