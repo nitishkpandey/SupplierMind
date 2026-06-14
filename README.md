@@ -52,7 +52,7 @@ React Frontend (TypeScript + Tailwind)
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| LLM | Groq (llama-3.3-70b) | Agent reasoning, JSON extraction |
+| LLM | OpenAI (gpt-4o-mini-2024-07-18, pinned) | Agent reasoning, JSON extraction |
 | Embeddings | Voyage AI (voyage-3-lite) | 512-dim semantic vectors |
 | Vector DB | Milvus 2.4 | Semantic similarity search |
 | Database | PostgreSQL 16 + PostGIS | Supplier data, queries, audit logs |
@@ -72,7 +72,7 @@ React Frontend (TypeScript + Tailwind)
 
 ### Prerequisites
 - Python 3.11+, Node.js 20+, Docker Desktop, Git
-- Free API keys: [Groq](https://console.groq.com), [Voyage AI](https://dash.voyageai.com)
+- API keys: [OpenAI](https://platform.openai.com) (required, paid), [Voyage AI](https://dash.voyageai.com) (free tier)
 
 ### Quick Start
 

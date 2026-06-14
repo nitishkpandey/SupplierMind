@@ -251,24 +251,24 @@ export default function AdminMetricsPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">
-                    Groq pacing events
+                    Throttle pacing events
                   </span>
                   <span className="text-lg font-semibold tabular-nums">
-                    {data.throttle_events.groq_pacing_events.toLocaleString()}
+                    {data.throttle_events.throttle_pacing_events.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">
-                    Groq 429 occurrences
+                    Throttle 429 occurrences
                   </span>
                   <span
                     className={`text-lg font-semibold tabular-nums ${
-                      data.throttle_events.groq_429_count > 0
+                      data.throttle_events.throttle_429_count > 0
                         ? "text-amber-600"
                         : ""
                     }`}
                   >
-                    {data.throttle_events.groq_429_count.toLocaleString()}
+                    {data.throttle_events.throttle_429_count.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">

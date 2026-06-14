@@ -1,5 +1,5 @@
 """
-app/core/rate_limiter.py — Proactive sliding-window throttle for the Groq client.
+app/core/rate_limiter.py — Proactive sliding-window throttle for the LLM client.
 
 WHY: Firing LLM calls with no quota awareness means the first few succeed and
 the rest get 429, after which tenacity backs off 2-15s per call. A single query
@@ -27,27 +27,26 @@ WINDOW_SECONDS = 60.0
 # drop toward 0.75 if 429s persist, creep to 0.90 if queries feel slow.
 SAFETY_MARGIN = 0.85
 
-# Per-model Groq limits, confirmed from the Groq dashboard (2026-05-29, free tier).
-# NOTE: the per-minute TOKEN limit is the binding constraint here, not RPM. An
-# earlier config used 14,400 TPM — that was actually the requests-per-DAY figure;
-# the real TPM is 6,000, so pacing was set to ~2x reality and 429s slipped through.
-#   - llama-3.1-8b-instant:     30 RPM / 6,000 TPM  (14.4K RPD / 500K TPD)
-#   - llama-3.3-70b-versatile:  30 RPM / 12,000 TPM (not used by any agent today)
-GROQ_RATE_LIMITS: dict[str, dict[str, int]] = {
-    "llama-3.1-8b-instant": {"rpm": 30, "tpm": 6_000},
-    "llama-3.3-70b-versatile": {"rpm": 30, "tpm": 12_000},
-    # OpenAI paid tier 1 (Development Plan, Phase 1). Conservative vs the
-    # published 500 RPM / 200K TPM so bursts never 429.
+# Per-model API limits. OpenAI paid tier 1 (conservative vs the published
+# 500 RPM / 200K TPM so bursts never 429). The Groq/llama entries were removed
+# in Phase C (ADR-002); the prefix fallback in _caps resolves dated snapshots
+# to their family.
+MODEL_RATE_LIMITS: dict[str, dict[str, int]] = {
     "gpt-4o-mini": {"rpm": 400, "tpm": 180_000},
 }
 
-# Used when a model is not in GROQ_RATE_LIMITS — conservative so an unknown
+# Used when a model is not in MODEL_RATE_LIMITS — conservative so an unknown
 # model under-throttles rather than 429-storms.
 DEFAULT_LIMIT: dict[str, int] = {"rpm": 30, "tpm": 6_000}
 
 
 class GroqRateLimiter:
-    """Per-model sliding-window limiter. Call acquire() before each API call."""
+    """Per-model sliding-window limiter. Call acquire() before each API call.
+
+    Name retained for git-blame continuity; post-Phase-C this is a generic
+    rate limiter (it throttles OpenAI). Proper rename deferred to post-thesis
+    cleanup.
+    """
 
     def __init__(
         self,
@@ -58,7 +57,7 @@ class GroqRateLimiter:
         sleep: Callable[[float], None] = time.sleep,
         audit_writer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
-        self._limits = limits if limits is not None else GROQ_RATE_LIMITS
+        self._limits = limits if limits is not None else MODEL_RATE_LIMITS
         self._default = default_limit if default_limit is not None else DEFAULT_LIMIT
         self._margin = margin
         self._monotonic = monotonic

@@ -2,18 +2,17 @@
 app/core/llm.py — Single LLM access layer for the entire application.
 
 DRY PRINCIPLE: Every agent imports from here.
-No agent ever imports groq or openai directly.
-Changing the provider = changing LLM_PROVIDER in .env.
+No agent ever imports openai directly.
 
-PROVIDERS (Development Plan, Phase 1):
-  - GroqProvider    llama-3.1-8b-instant via Groq (free tier, TPM-paced)
-  - OpenAIProvider  gpt-4o-mini via OpenAI (primary for the benchmark)
-  - FallbackLLMClient  OpenAI primary -> Groq on RETRYABLE failure only
-    (rate limit, transient 5xx). Auth/config errors propagate immediately —
-    falling back would mask a misconfiguration.
+PROVIDER (single-provider deployment, see docs/adr/ADR-002):
+  - OpenAIProvider  gpt-4o-mini-2024-07-18 via OpenAI — the only provider.
+    The LLMProvider Protocol is retained so a future OpenAI-compatible
+    provider (Azure OpenAI, etc.) can be swapped in without touching agents.
+    Groq was removed in Phase C; there is no fallback. An OpenAI failure that
+    survives the per-provider tenacity retries propagates as a clear error.
 
-TENACITY: Automatic retry on rate limits and transient errors inside each
-provider. The fallback wrapper only sees errors that survived the retries.
+TENACITY: Automatic retry on rate limits and transient 5xx inside the provider;
+auth/config errors propagate immediately (a fallback would mask them).
 
 COST LOGGING: every call logs estimated USD cost and accumulates a running
 per-process total (`client.total_cost_usd`) so a benchmark run can report
@@ -26,14 +25,10 @@ import threading
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
-from groq import APIStatusError as GroqAPIStatusError
-from groq import Groq
-from groq import RateLimitError as GroqRateLimitError
 from tenacity import (
     before_sleep_log,
     retry,
     retry_if_exception,
-    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
@@ -49,15 +44,12 @@ DEFAULT_MAX_TOKENS = 2048
 # throttle. Corrected to the real count via update_actual_tokens after each call.
 _CHARS_PER_TOKEN = 3.5
 
-# USD per 1M tokens (prompt, completion). Groq free tier costs nothing but
-# keeping an entry makes the cost report uniform across paradigms. Pinned
-# OpenAI snapshots are listed explicitly; the prefix fallback in
-# resolve_cost_rates also catches future dated snapshots of a known family.
+# USD per 1M tokens (prompt, completion). Pinned OpenAI snapshots are listed
+# explicitly; the prefix fallback in resolve_cost_rates also catches future
+# dated snapshots of a known family.
 _COST_PER_MTOK_USD: dict[str, tuple[float, float]] = {
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o-mini-2024-07-18": (0.15, 0.60),
-    "llama-3.1-8b-instant": (0.0, 0.0),
-    "llama-3.3-70b-versatile": (0.0, 0.0),
 }
 
 
@@ -173,106 +165,6 @@ class _UsageTracking:
             )
 
 
-class GroqProvider(_UsageTracking):
-    """Groq backend (llama-3.1-8b-instant) with retry + free-tier TPM pacing."""
-
-    provider_name = "groq"
-
-    def __init__(self, model: str | None = None) -> None:
-        super().__init__()
-        if not settings.GROQ_API_KEY:
-            raise ValueError(
-                "GROQ_API_KEY is not set. "
-                "Get your free key at https://console.groq.com"
-            )
-        self._client = Groq(api_key=settings.GROQ_API_KEY)
-        self._model = model or settings.LLM_MODEL_NAME
-        self._rate_limiter = get_rate_limiter()
-        logger.info("LLM client initialized (provider=groq, model=%s)", self._model)
-
-    @retry(
-        retry=retry_if_exception_type((GroqRateLimitError, GroqAPIStatusError)),
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=2, min=2, max=15),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
-    def complete(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        model: str | None = None,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
-        temperature: float = 0.1,
-        stop: list[str] | None = None,
-    ) -> str:
-        """Send messages to the LLM and return the response as a string.
-
-        temperature=0.1 means near-deterministic responses.
-        For agent reasoning tasks, we want consistent output, not creativity.
-        """
-        resolved_model = model or self._model
-        ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
-        )
-        response = self._client.chat.completions.create(
-            model=resolved_model,
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stop=stop,
-        )
-        self._record_usage(resolved_model, ts, response)
-        return response.choices[0].message.content or ""
-
-    @retry(
-        retry=retry_if_exception_type((GroqRateLimitError, GroqAPIStatusError)),
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=2, min=2, max=15),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True,
-    )
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        model: str | None = None,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
-        temperature: float = 0.0,
-    ) -> str:
-        """Like complete() but forces the model to return valid JSON.
-
-        Uses response_format={"type": "json_object"}. IMPORTANT: the prompt
-        must instruct the model to return JSON (OpenAI enforces the word
-        "json" appearing in a message; Groq merely recommends it).
-        """
-        resolved_model = model or self._model
-        ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
-        )
-        response = self._client.chat.completions.create(
-            model=resolved_model,
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=max_tokens,
-            temperature=temperature,
-            response_format={"type": "json_object"},
-        )
-        self._record_usage(resolved_model, ts, response)
-        return response.choices[0].message.content or "{}"
-
-    def _record_usage(self, model: str, ts: float, response: Any) -> None:
-        """Feed the real token count back to the throttle window + cost log."""
-        usage = getattr(response, "usage", None)
-        total = getattr(usage, "total_tokens", None)
-        if total is not None:
-            self._rate_limiter.update_actual_tokens(model, ts, int(total))
-        self._track(model, response)
-
-    def count_tokens_estimate(self, text: str) -> int:
-        """Rough token count estimate (1 token ~= 4 chars of English)."""
-        return len(text) // 4
-
-
 def _is_retryable_openai_error(exc: BaseException) -> bool:
     """Retry on rate limits and transient 5xx — NEVER on auth/config errors.
 
@@ -283,8 +175,7 @@ def _is_retryable_openai_error(exc: BaseException) -> bool:
 
     if isinstance(exc, openai.RateLimitError):
         # insufficient_quota is a 429 only by status code: the account is out
-        # of credits, so no amount of waiting helps. Fail fast (and let the
-        # fallback wrapper take over).
+        # of credits, so no amount of waiting helps — fail fast.
         return getattr(exc, "code", None) != "insufficient_quota"
     if isinstance(exc, openai.APIStatusError):
         return exc.status_code >= 500
@@ -294,7 +185,7 @@ def _is_retryable_openai_error(exc: BaseException) -> bool:
 
 
 class OpenAIProvider(_UsageTracking):
-    """OpenAI backend (gpt-4o-mini) — primary provider for the benchmark."""
+    """OpenAI backend (gpt-4o-mini-2024-07-18) — the only provider (ADR-002)."""
 
     provider_name = "openai"
 
@@ -302,8 +193,7 @@ class OpenAIProvider(_UsageTracking):
         super().__init__()
         if not settings.OPENAI_API_KEY:
             raise ValueError(
-                "OPENAI_API_KEY is not set but LLM_PROVIDER=openai. "
-                "Add the key to backend/.env (or switch LLM_PROVIDER back to groq)."
+                "OPENAI_API_KEY is not set. Add the key to backend/.env."
             )
         import openai
 
@@ -382,93 +272,24 @@ class OpenAIProvider(_UsageTracking):
         return len(text) // 4
 
 
-def _should_fall_back(exc: BaseException) -> bool:
-    """Fallback policy: only errors that a different provider could survive.
-
-    Rate limits and transient server errors -> yes. Authentication, invalid
-    request, etc. -> no; surfacing those immediately is a feature.
-
-    insufficient_quota is the one split case: not retryable (waiting cannot
-    refill the quota) but absolutely fallback-eligible — another provider
-    can serve the request.
-    """
-    try:
-        import openai
-
-        if isinstance(exc, openai.RateLimitError):
-            return True
-        return _is_retryable_openai_error(exc)
-    except ImportError:  # openai not installed — nothing to classify
-        return False
-
-
-class FallbackLLMClient:
-    """Primary provider with automatic fallback on retryable failure.
-
-    The primary's own tenacity retries run first; only an error that
-    SURVIVED them reaches this wrapper. `provider_name` reflects the
-    primary so metrics show intent; each call logs which provider served it.
-    """
-
-    def __init__(self, primary: Any, fallback: Any) -> None:
-        self._primary = primary
-        self._fallback = fallback
-        self.provider_name = f"{primary.provider_name}+{fallback.provider_name}-fallback"
-        self.last_provider_used: str | None = None
-
-    @property
-    def total_cost_usd(self) -> float:
-        return self._primary.total_cost_usd + self._fallback.total_cost_usd
-
-    def _dispatch(self, method: str, *args: Any, **kwargs: Any) -> str:
-        try:
-            result = getattr(self._primary, method)(*args, **kwargs)
-            self.last_provider_used = self._primary.provider_name
-            return result
-        except Exception as exc:  # noqa: BLE001 — classified right below
-            if not _should_fall_back(exc):
-                raise
-            logger.warning(
-                "[llm-fallback] %s failed on %s (%s: %s) — falling back to %s",
-                self._primary.provider_name, method, type(exc).__name__,
-                str(exc)[:160], self._fallback.provider_name,
-            )
-            result = getattr(self._fallback, method)(*args, **kwargs)
-            self.last_provider_used = self._fallback.provider_name
-            return result
-
-    def complete(self, *args: Any, **kwargs: Any) -> str:
-        return self._dispatch("complete", *args, **kwargs)
-
-    def complete_json(self, *args: Any, **kwargs: Any) -> str:
-        return self._dispatch("complete_json", *args, **kwargs)
-
-    def count_tokens_estimate(self, text: str) -> int:
-        return self._primary.count_tokens_estimate(text)
-
-
 # Backwards-compatible alias: BaseAgent and the tools type-annotate against
-# LLMClient. The Groq implementation IS the historical LLMClient.
-LLMClient = GroqProvider
+# LLMClient. Post-Phase-C the single provider is OpenAI.
+LLMClient = OpenAIProvider
 
 
 def build_llm_client() -> Any:
-    """Provider selection per settings (uncached — used by tests)."""
-    if settings.LLM_PROVIDER == "openai":
-        primary = OpenAIProvider()
-        if settings.GROQ_API_KEY:
-            fallback = GroqProvider(model=settings.GROQ_FALLBACK_MODEL_NAME)
-            return FallbackLLMClient(primary, fallback)
-        logger.warning(
-            "LLM_PROVIDER=openai with no GROQ_API_KEY — running without fallback"
+    """Build the single OpenAI provider (uncached — used by tests).
+
+    Single-provider deployment (ADR-002): OpenAI is the only backend. The
+    LLMProvider Protocol is kept so a future OpenAI-compatible provider can be
+    swapped in, but there is no runtime fallback — an OpenAI failure surfaces.
+    """
+    if settings.LLM_PROVIDER != "openai":
+        raise ValueError(
+            f"Unsupported LLM_PROVIDER={settings.LLM_PROVIDER!r}. "
+            "Only 'openai' is supported (Groq was removed in Phase C, ADR-002)."
         )
-        return primary
-    if settings.LLM_PROVIDER == "groq":
-        return GroqProvider()
-    raise ValueError(
-        f"Unsupported LLM_PROVIDER={settings.LLM_PROVIDER!r}. "
-        "Supported: groq, openai."
-    )
+    return OpenAIProvider()
 
 
 @lru_cache(maxsize=1)

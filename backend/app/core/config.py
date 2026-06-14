@@ -4,7 +4,7 @@ app/core/config.py — All application settings in one place.
 USAGE anywhere in the codebase:
     from app.core.config import settings
     print(settings.DATABASE_URL)
-    print(settings.GROQ_API_KEY)
+    print(settings.OPENAI_API_KEY)
 """
 
 import warnings
@@ -45,15 +45,12 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5433
 
     # ── LLM ──────────────────────────────────────────────────────────
-    # LLM_PROVIDER selects the PRIMARY provider. With "openai", Groq acts as
-    # the automatic fallback on retryable failures when GROQ_API_KEY is set
-    # (Development Plan, Phase 1).
-    LLM_PROVIDER: Literal["groq", "anthropic", "openai"] = "groq"
-    LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
-    GROQ_API_KEY: str = ""
+    # Single-provider deployment (ADR-002): OpenAI only. Groq was removed in
+    # Phase C. LLM_PROVIDER is kept (one valid value) so the selection seam
+    # stays for a future OpenAI-compatible provider.
+    LLM_PROVIDER: Literal["openai"] = "openai"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL_NAME: str = "gpt-4o-mini-2024-07-18"
-    GROQ_FALLBACK_MODEL_NAME: str = "llama-3.1-8b-instant"
 
     # ── Embeddings ───────────────────────────────────────────────────
     EMBEDDING_PROVIDER: Literal["voyage", "openai"] = "voyage"
@@ -135,8 +132,8 @@ class Settings(BaseSettings):
         """Crash at startup if critical keys are missing in production."""
         if self.is_production:
             missing = []
-            if not self.GROQ_API_KEY:
-                missing.append("GROQ_API_KEY")
+            if not self.OPENAI_API_KEY:
+                missing.append("OPENAI_API_KEY")
             if not self.VOYAGE_API_KEY:
                 missing.append("VOYAGE_API_KEY")
             if not self.GOOGLE_CLIENT_ID:

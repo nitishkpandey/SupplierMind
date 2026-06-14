@@ -163,8 +163,8 @@ export interface AdminMetrics {
   };
   agent_latency: AgentLatency[];
   throttle_events: {
-    groq_429_count: number;
-    groq_pacing_events: number;
+    throttle_429_count: number;
+    throttle_pacing_events: number;
     sanctions_pending_review: number;
   };
   recent_errors: Array<{

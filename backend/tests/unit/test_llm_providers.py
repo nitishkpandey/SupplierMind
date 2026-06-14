@@ -1,11 +1,12 @@
-"""Unit tests for the LLM provider abstraction (Development Plan, Phase 1).
+"""Unit tests for the LLM provider abstraction (single-provider, post-Phase-C).
 
-Pins the contracts the provider migration depends on:
-  1. Provider selection follows settings.LLM_PROVIDER.
-  2. OpenAI primary + Groq fallback wrapper is built when both keys exist.
-  3. Fallback fires on retryable errors (rate limit, 5xx) ...
-  4. ... and does NOT fire on auth errors (a bad key must surface).
-  5. Model name passthrough reaches the SDK call.
+Pins the contracts after Groq removal (ADR-002):
+  1. build_llm_client returns a bare OpenAIProvider — no fallback wrapper.
+  2. An unsupported LLM_PROVIDER raises.
+  3. Missing OPENAI_API_KEY raises.
+  4. Non-retryable OpenAI errors (auth, insufficient_quota) fail fast / propagate
+     — there is no fallback to mask them.
+  5. Model name + stop passthrough reaches the SDK call.
   6. Cost estimation math.
 
 No live API calls anywhere — SDK clients are faked.
@@ -22,9 +23,8 @@ import pytest
 
 from app.core import llm as llm_mod
 from app.core.llm import (
-    FallbackLLMClient,
-    GroqProvider,
     OpenAIProvider,
+    UnknownModelCostError,
     build_llm_client,
     estimate_call_cost_usd,
 )
@@ -37,50 +37,23 @@ def _openai_error(cls, status_code: int):
     return cls("boom", response=response, body=None)
 
 
-class _FakeProvider:
-    """Stands in for a real provider inside FallbackLLMClient tests."""
-
-    def __init__(self, name: str, result: str | None = None, error: Exception | None = None):
-        self.provider_name = name
-        self.result = result
-        self.error = error
-        self.calls: list[tuple[str, dict]] = []
-        self.total_cost_usd = 0.0
-
-    def complete(self, messages, **kwargs):
-        self.calls.append(("complete", kwargs))
-        if self.error is not None:
-            raise self.error
-        return self.result or "ok"
-
-    def complete_json(self, messages, **kwargs):
-        self.calls.append(("complete_json", kwargs))
-        if self.error is not None:
-            raise self.error
-        return self.result or "{}"
+# -- 1 + 2. Provider selection (single provider) -------------------------------
 
 
-# -- 1 + 2. Provider selection -------------------------------------------------
-
-
-def test_build_llm_client_groq_by_default():
-    with patch.object(llm_mod.settings, "LLM_PROVIDER", "groq"), \
-         patch.object(llm_mod.settings, "GROQ_API_KEY", "gsk-test"), \
-         patch.object(llm_mod, "Groq", MagicMock()):
-        client = build_llm_client()
-    assert isinstance(client, GroqProvider)
-    assert client.provider_name == "groq"
-
-
-def test_build_llm_client_openai_with_groq_fallback():
+def test_build_llm_client_returns_openai_provider():
     with patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"), \
          patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
-         patch.object(llm_mod.settings, "GROQ_API_KEY", "gsk-test"), \
-         patch.object(llm_mod, "Groq", MagicMock()), \
          patch("openai.OpenAI", MagicMock()):
         client = build_llm_client()
-    assert isinstance(client, FallbackLLMClient)
-    assert client.provider_name == "openai+groq-fallback"
+    assert isinstance(client, OpenAIProvider)
+    assert client.provider_name == "openai"
+
+
+def test_build_llm_client_unsupported_provider_raises():
+    # Groq removed (ADR-002): anything but "openai" is rejected.
+    with patch.object(llm_mod.settings, "LLM_PROVIDER", "groq"):
+        with pytest.raises(ValueError, match="Only 'openai' is supported"):
+            build_llm_client()
 
 
 def test_build_llm_client_openai_without_key_raises():
@@ -90,47 +63,34 @@ def test_build_llm_client_openai_without_key_raises():
             build_llm_client()
 
 
-# -- 3. Fallback fires on retryable failure ------------------------------------
+# -- 3. No fallback: there is no wrapper, and OpenAI failures surface -----------
 
 
-def test_fallback_fires_on_rate_limit():
-    primary = _FakeProvider("openai", error=_openai_error(openai.RateLimitError, 429))
-    fallback = _FakeProvider("groq", result="served-by-groq")
-    client = FallbackLLMClient(primary, fallback)
-
-    out = client.complete([{"role": "user", "content": "hi"}])
-
-    assert out == "served-by-groq"
-    assert client.last_provider_used == "groq"
-    assert fallback.calls, "fallback provider must have been called"
+def test_no_fallback_wrapper_built():
+    """The client IS the provider — no FallbackLLMClient layer remains."""
+    with patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"), \
+         patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
+         patch("openai.OpenAI", MagicMock()):
+        client = build_llm_client()
+    assert type(client) is OpenAIProvider
+    assert not hasattr(client, "_fallback")
 
 
-def test_fallback_fires_on_server_error():
-    primary = _FakeProvider("openai", error=_openai_error(openai.InternalServerError, 500))
-    fallback = _FakeProvider("groq", result="{}")
-    client = FallbackLLMClient(primary, fallback)
-
-    out = client.complete_json([{"role": "user", "content": "json please"}])
-
-    assert out == "{}"
-    assert client.last_provider_used == "groq"
-
-
-# -- 4. No fallback on auth error ----------------------------------------------
-
-
-def test_no_fallback_on_authentication_error():
-    primary = _FakeProvider("openai", error=_openai_error(openai.AuthenticationError, 401))
-    fallback = _FakeProvider("groq", result="should-never-be-returned")
-    client = FallbackLLMClient(primary, fallback)
-
-    with pytest.raises(openai.AuthenticationError):
-        client.complete([{"role": "user", "content": "hi"}])
-
-    assert fallback.calls == [], "auth errors must surface, not silently fall back"
+def test_authentication_error_propagates_without_retry():
+    fake_sdk = MagicMock()
+    fake_sdk.chat.completions.create.side_effect = _openai_error(
+        openai.AuthenticationError, 401
+    )
+    with patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
+         patch("openai.OpenAI", MagicMock(return_value=fake_sdk)):
+        provider = OpenAIProvider()
+        with pytest.raises(openai.AuthenticationError):
+            provider.complete([{"role": "user", "content": "hi"}])
+    assert fake_sdk.chat.completions.create.call_count == 1, \
+        "auth errors must surface immediately — no retry, no fallback to mask them"
 
 
-# -- 4b. insufficient_quota: never retry, still fall back -----------------------
+# -- 4. insufficient_quota: never retry ----------------------------------------
 
 
 def _quota_error() -> openai.RateLimitError:
@@ -162,17 +122,6 @@ def test_openai_provider_does_not_retry_insufficient_quota():
 
     assert fake_sdk.chat.completions.create.call_count == 1, \
         "insufficient_quota must fail fast — retrying cannot refill the quota"
-
-
-def test_fallback_fires_on_insufficient_quota():
-    primary = _FakeProvider("openai", error=_quota_error())
-    fallback = _FakeProvider("groq", result="served-by-groq")
-    client = FallbackLLMClient(primary, fallback)
-
-    out = client.complete([{"role": "user", "content": "hi"}])
-
-    assert out == "served-by-groq"
-    assert client.last_provider_used == "groq"
 
 
 # -- 5. Model name passthrough ---------------------------------------------------
@@ -207,9 +156,6 @@ def test_openai_provider_passes_model_and_stop_through():
 def test_cost_estimate_gpt4o_mini():
     # 1M prompt tokens at $0.15 + 1M completion at $0.60
     assert estimate_call_cost_usd("gpt-4o-mini", 1_000_000, 1_000_000) == pytest.approx(0.75)
-    # Groq free tier costs nothing
-    assert estimate_call_cost_usd("llama-3.1-8b-instant", 50_000, 10_000) == 0.0
-    # Unknown models now FAIL LOUD (Audit H) — no silent $0 that corrupts spend.
-    from app.core.llm import UnknownModelCostError
+    # Unknown models FAIL LOUD (Audit H) — no silent $0 that corrupts spend.
     with pytest.raises(UnknownModelCostError):
         estimate_call_cost_usd("mystery-model", 1000, 1000)

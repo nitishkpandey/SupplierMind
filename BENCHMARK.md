@@ -27,8 +27,11 @@ reproduce it end-to-end from a clean checkout.
 | Baseline A | Keyword SQL search (no LLM) |
 | Baseline B | Manual-process simulation (no LLM) |
 
-All LLM-bearing systems run on the same provider stack (GPT-4o-mini primary,
-Groq fallback — see `backend/app/core/llm.py`).
+All LLM-bearing systems run on the same provider (OpenAI
+`gpt-4o-mini-2024-07-18`, pinned — see `backend/app/core/llm.py`). The
+`benchmark-final-v1` run was executed with a Groq fallback armed; Groq was
+removed afterwards in Phase C (ADR-002), which does not change the locked
+numbers.
 
 ## Metrics
 
@@ -45,7 +48,7 @@ Groq fallback — see `backend/app/core/llm.py`).
 | Component | Model | Notes |
 |---|---|---|
 | Primary LLM | `gpt-4o-mini-2024-07-18` (OpenAI) | pinned snapshot for reproducibility (see `docs/adr/ADR-001-model-pinning.md`) |
-| Fallback LLM | `llama-3.1-8b-instant` (Groq) | retryable-failure fallback; Groq-era archive in `results/groq_baseline_v0/` |
+| Fallback LLM (historical) | `llama-3.1-8b-instant` (Groq) | armed during the `benchmark-final-v1` run; **removed afterwards in Phase C (ADR-002)** — no fallback now. Groq-era archive in `results/groq_baseline_v0/` |
 | Embeddings | `voyage-3-lite` (512-dim) | both retrieval and query memory |
 
 All prompts are versioned in the repository (no out-of-band prompt edits):

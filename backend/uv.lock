@@ -708,23 +708,6 @@ wheels = [
 ]
 
 [[package]]
-name = "groq"
-version = "0.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio" },
-    { name = "distro" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "sniffio" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/48/c8/5ea4aa6b329fd01795acdf4cb0c78d92860253d108eddfc008fccbe56642/groq-0.9.0.tar.gz", hash = "sha256:130ed5e35d3acfaab46b9e7a078eeaebf91052f4a9d71f86f87fb319b5fec332", size = 68728, upload-time = "2024-06-11T20:12:03.864Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/7c/81b1302925c2452d540c7d7784b316017b69e1f3f19c2996bcb09360437b/groq-0.9.0-py3-none-any.whl", hash = "sha256:d0e46f4ad645504672bb09c8100af3ced3a7db0d5119dc13e4aca535fc455874", size = 103457, upload-time = "2024-06-11T20:12:02.407Z" },
-]
-
-[[package]]
 name = "grpcio"
 version = "1.80.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2135,7 +2118,6 @@ dependencies = [
     { name = "chromadb" },
     { name = "fastapi" },
     { name = "geopy" },
-    { name = "groq" },
     { name = "httpx" },
     { name = "langchain-core" },
     { name = "langgraph" },
@@ -2177,7 +2159,6 @@ requires-dist = [
     { name = "chromadb", specifier = "==0.5.3" },
     { name = "fastapi", specifier = "==0.111.0" },
     { name = "geopy", specifier = "==2.4.1" },
-    { name = "groq", specifier = "==0.9.0" },
     { name = "httpx", specifier = "==0.27.0" },
     { name = "langchain-core", specifier = "==0.2.27" },
     { name = "langgraph", specifier = "==0.2.4" },

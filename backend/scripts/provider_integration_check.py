@@ -2,7 +2,7 @@
 
 Runs the moment OPENAI_API_KEY lands in backend/.env:
 
-  1. Verifies provider selection (expects FallbackLLMClient, openai primary).
+  1. Verifies provider selection (expects OpenAIProvider — single provider).
   2. One end-to-end pipeline query (Parser -> Discovery -> Compliance ->
      Ranking) on GPT-4o-mini.
   3. Re-captures the Task 3.1 / 3.2 / 3.3 demo traces on GPT-4o-mini and
@@ -39,7 +39,7 @@ EVAL_USER_ID = "00000000-0000-0000-0000-000000000000"
 
 def check_provider() -> None:
     from app.core.config import settings
-    from app.core.llm import FallbackLLMClient, get_llm_client
+    from app.core.llm import OpenAIProvider, get_llm_client
 
     if settings.LLM_PROVIDER != "openai":
         raise SystemExit(
@@ -48,8 +48,10 @@ def check_provider() -> None:
         )
     client = get_llm_client()
     logger.info("Active client: %s", client.provider_name)
-    if isinstance(client, FallbackLLMClient):
-        logger.info("Fallback armed: groq on retryable failures")
+    assert isinstance(client, OpenAIProvider), (
+        "single-provider deployment (ADR-002): expected OpenAIProvider, "
+        f"got {type(client).__name__}"
+    )
     # One trivial call proves auth + connectivity.
     out = client.complete(
         [{"role": "user", "content": "Reply with exactly: provider-ok"}],

@@ -161,8 +161,8 @@ def test_admin_metrics_returns_documented_shape():
         "queries_with_errors": 3,
     }
     assert body["throttle_events"] == {
-        "groq_429_count": 1,
-        "groq_pacing_events": 42,
+        "throttle_429_count": 1,
+        "throttle_pacing_events": 42,
         "sanctions_pending_review": 9,
     }
     assert len(body["recent_errors"]) == 1

@@ -136,8 +136,8 @@ async def get_admin_metrics(
     ).one()
 
     throttle_events = {
-        "groq_429_count": int(throttle_row.rate_429 or 0),
-        "groq_pacing_events": int(throttle_row.pacing or 0),
+        "throttle_429_count": int(throttle_row.rate_429 or 0),
+        "throttle_pacing_events": int(throttle_row.pacing or 0),
         "sanctions_pending_review": int(sanctions_row.cnt or 0),
     }
 

@@ -105,8 +105,12 @@ recent errors, and the active LLM provider with estimated spend.
 ## LLM provider layer
 
 `backend/app/core/llm.py`: `LLMProvider` protocol; `OpenAIProvider`
-(gpt-4o-mini-2024-07-18, pinned snapshot, primary for the benchmark) with `GroqProvider`
-(llama-3.1-8b-instant) as automatic fallback on retryable failures only —
-auth errors surface immediately. Per-call cost estimates accumulate into a
-process-wide total. Free-tier pacing lives in `rate_limiter.py` (per-model
+(gpt-4o-mini-2024-07-18, pinned snapshot) is the only provider. The
+`LLMProvider` Protocol is retained for future portability — a different
+OpenAI-compatible backend (Azure OpenAI, etc.) can be swapped in without
+touching the agents — but there is no runtime fallback: an OpenAI failure that
+survives the per-provider tenacity retries propagates as a clear error. Groq
+was removed in Phase C (see `docs/adr/ADR-002-single-provider-deployment.md`);
+auth/quota errors surface immediately. Per-call cost estimates accumulate into a
+process-wide total. Request pacing lives in `rate_limiter.py` (per-model
 sliding windows keyed by RPM + TPM).
