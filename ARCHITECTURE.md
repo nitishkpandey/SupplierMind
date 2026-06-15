@@ -11,7 +11,7 @@ the two baseline paradigms it is benchmarked against.
 user query ──> LLM (one prompt, parametric knowledge) ──> 5 names + reasoning
 ```
 
-No corpus, no tools, no retrieval. `backend/experiments/paradigm1_singleprompt.py`.
+No corpus, no tools, no retrieval. `apps/backend/experiments/paradigm1_singleprompt.py`.
 
 ### P2 — minimal RAG
 
@@ -20,7 +20,7 @@ user query ──> Voyage embed ──> Milvus top-10 ──> one LLM prompt ─
 ```
 
 Same embedding model and vector index as P3, nothing else.
-`backend/experiments/paradigm2_rag.py`.
+`apps/backend/experiments/paradigm2_rag.py`.
 
 ### P3 — SupplierMind (the system)
 
@@ -56,7 +56,7 @@ finalize (write accepted query to per-user semantic memory in Milvus)
 
 ### Parser tool registry (Task 3.1)
 
-`backend/app/agents/tools/`: `geocode_location` (Nominatim), `canonicalize_certification`
+`apps/backend/app/agents/tools/`: `geocode_location` (Nominatim), `canonicalize_certification`
 (taxonomy), `infer_industry_context` (small LLM call), `parse_quantity_unit`
 (deterministic regex), `lookup_past_query` (per-user Milvus memory, Task 3.2).
 
@@ -104,7 +104,7 @@ recent errors, and the active LLM provider with estimated spend.
 
 ## LLM provider layer
 
-`backend/app/core/llm.py`: `LLMProvider` protocol; `OpenAIProvider`
+`apps/backend/app/core/llm.py`: `LLMProvider` protocol; `OpenAIProvider`
 (gpt-4o-mini-2024-07-18, pinned snapshot) is the only provider. The
 `LLMProvider` Protocol is retained for future portability — a different
 OpenAI-compatible backend (Azure OpenAI, etc.) can be swapped in without
