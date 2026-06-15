@@ -109,8 +109,10 @@ recent errors, and the active LLM provider with estimated spend.
 `LLMProvider` Protocol is retained for future portability — a different
 OpenAI-compatible backend (Azure OpenAI, etc.) can be swapped in without
 touching the agents — but there is no runtime fallback: an OpenAI failure that
-survives the per-provider tenacity retries propagates as a clear error. Groq
-was removed in Phase C (see `docs/adr/ADR-002-single-provider-deployment.md`);
-auth/quota errors surface immediately. Per-call cost estimates accumulate into a
+survives the per-provider tenacity retries propagates as a clear error;
+auth/quota errors surface immediately. See
+`docs/adr/ADR-002-single-provider-deployment.md` for the architectural decision
+to retain the provider abstraction without a second provider wired. Per-call
+cost estimates accumulate into a
 process-wide total. Request pacing lives in `rate_limiter.py` (per-model
 sliding windows keyed by RPM + TPM).
