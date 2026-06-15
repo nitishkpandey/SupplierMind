@@ -15,6 +15,7 @@ network. All five tests cover the scenarios in Task 3.1's spec:
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import pytest
@@ -51,6 +52,18 @@ class _FakeLLM:
         if self.default is not None:
             return self.default
         raise AssertionError("FakeLLM script exhausted and no default set")
+
+
+class _FakeJSONLLM:
+    """Fake for tools that call complete_json (e.g. infer_industry_context)."""
+
+    def __init__(self, payloads: list[str]):
+        self.payloads = list(payloads)
+        self.calls: list[list[dict[str, str]]] = []
+
+    def complete_json(self, messages, **kwargs):
+        self.calls.append(messages)
+        return self.payloads.pop(0)
 
 
 class _FakeGeocoder:
@@ -142,7 +155,7 @@ def test_simple_query_single_tool_then_finish():
 
 def test_multi_tool_reasoning_chains_distinct_tools():
     geocoder = _FakeGeocoder((48.137, 11.575))
-    industry_llm = _FakeLLM([
+    industry_llm = _FakeJSONLLM([
         '{"industry":"aerospace","common_certs":["AS9100","NADCAP"],"typical_units":"units/month"}',
     ])
     registry = _build_registry(geocoder=geocoder, industry_llm=industry_llm)
@@ -170,6 +183,7 @@ def test_multi_tool_reasoning_chains_distinct_tools():
     }
     llm = _FakeLLM([
         'Thought: I should geocode Bavaria first.\nAction: geocode_location\nAction Input: {"location_name": "Bavaria"}',
+        'Thought: Infer the aerospace industry context.\nAction: infer_industry_context\nAction Input: {"product_description": "aerospace machining"}',
         'Thought: Normalise the cert name.\nAction: canonicalize_certification\nAction Input: {"cert_name": "AS9100"}',
         'Thought: Parse the quantity phrase.\nAction: parse_quantity_unit\nAction Input: {"text": "10k units/month"}',
         f'Thought: Done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
@@ -181,6 +195,7 @@ def test_multi_tool_reasoning_chains_distinct_tools():
     actions = [s["action"] for s in out["react_trace"]]
     assert actions == [
         "geocode_location",
+        "infer_industry_context",
         "canonicalize_certification",
         "parse_quantity_unit",
         "Finish",
@@ -189,7 +204,13 @@ def test_multi_tool_reasoning_chains_distinct_tools():
     constraints = out["parsed_constraints"]
     assert constraints["capacity_min"] == 10000
     assert constraints["capacity_unit"] == "units/month"
+    # AS9100 was named in the query → stays a HARD cert.
     assert "AS9100" in constraints["certifications"]
+    # NADCAP only ever came back from infer_industry_context.common_certs, so
+    # the provenance guard routes it to the SOFT list and keeps it OUT of the
+    # hard gate (previously this correct behaviour was only accidental).
+    assert "NADCAP" in constraints["industry_typical_certs"]
+    assert "NADCAP" not in constraints["certifications"]
 
 
 # ── 3. Tool failure recovery ─────────────────────────────────────────
@@ -482,3 +503,130 @@ def test_fallback_proceeds_when_trace_recovered_product_and_constraint():
     assert out["needs_clarification"] is False
     assert out["parsed_constraints"]["product_type"] == "stainless steel fasteners"
     assert out["parsed_constraints"]["location_country"] == "Germany"
+
+
+# -- Cert provenance guard (cert-hallucination fix) ---------------------------
+#
+# infer_industry_context surfaces certs "commonly required" in an industry. The
+# LLM used to copy those into `certifications` (a HARD compliance gate), which
+# FAILed every supplier that lacked the inferred certs. The provenance guard in
+# _normalise_constraints keeps user-stated certs hard, routes inference-tool
+# certs to the soft `industry_typical_certs` field, and drops certs that have no
+# provenance at all. These tests pin that split end-to-end through execute().
+
+
+def _infer_then_finish_script(product_description: str, finish_payload: dict) -> list[str]:
+    return [
+        f'Thought: infer the industry.\nAction: infer_industry_context\n'
+        f'Action Input: {{"product_description": "{product_description}"}}',
+        f'Thought: done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ]
+
+
+def _electronics_finish_payload(certifications: list[str]) -> dict:
+    return {
+        "product_type": "electronics",
+        "product_keywords": ["electronics"],
+        "industry_context": "electronics",
+        "buyer_intent": "manufacturer",
+        "category_hint": "electronics",
+        "location_city": "Frankfurt",
+        "location_country": None,
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": certifications,
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "compliance_critical",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+
+
+def test_user_stated_certs_stay_hard():
+    """Query names ISO 9001; the tool also surfaces AS9100. After the parse the
+    user-stated cert is a hard requirement and the inferred one is soft."""
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((50.1, 8.7)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"electronics","common_certs":["ISO 9001","AS9100"],"typical_units":"units/month"}'
+        ]),
+    )
+    payload = _electronics_finish_payload(["ISO 9001", "AS9100"])
+    llm = _FakeLLM(_infer_then_finish_script("electronics", payload))
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("ISO 9001 electronics suppliers near Frankfurt"))
+
+    c = out["parsed_constraints"]
+    assert c["certifications"] == ["ISO 9001"]
+    assert c["industry_typical_certs"] == ["AS9100"]
+
+
+def test_inferred_only_certs_move_to_soft():
+    """Query states no certs; every cert the tool surfaces must land in the
+    soft list, leaving the hard gate empty (the original bug scenario)."""
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((50.1, 8.7)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"electronics","common_certs":["ISO 9001","AS9100","IPC-A-610"],"typical_units":"units/month"}'
+        ]),
+    )
+    payload = _electronics_finish_payload(["ISO 9001", "AS9100", "IPC-A-610"])
+    llm = _FakeLLM(_infer_then_finish_script("electronics", payload))
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("electronics suppliers near Frankfurt"))
+
+    c = out["parsed_constraints"]
+    assert c["certifications"] == []
+    assert c["industry_typical_certs"] == ["ISO 9001", "AS9100", "IPC-A-610"]
+
+
+def test_hallucinated_certs_dropped(caplog):
+    """A cert in the Finish payload that appears neither in the query nor in any
+    tool observation has no provenance — drop it from both lists and warn."""
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((50.1, 8.7)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"electronics","common_certs":["ISO 9001"],"typical_units":null}'
+        ]),
+    )
+    payload = _electronics_finish_payload(["ISO 9001", "FAKECERT-9999"])
+    llm = _FakeLLM(_infer_then_finish_script("electronics", payload))
+    parser = _make_parser(llm, registry)
+
+    with caplog.at_level(logging.WARNING, logger="app.agents.parser_agent"):
+        out = parser.execute(_make_state("electronics suppliers near Frankfurt"))
+
+    c = out["parsed_constraints"]
+    assert "FAKECERT-9999" not in c["certifications"]
+    assert "FAKECERT-9999" not in c["industry_typical_certs"]
+    # ISO 9001 came only from the inference tool here → soft, not hard.
+    assert c["certifications"] == []
+    assert "ISO 9001" in c["industry_typical_certs"]
+    assert "FAKECERT-9999" in caplog.text
+
+
+def test_case_insensitive_matching():
+    """A lower-cased query mention of a cert still counts as user-stated; the
+    cert stays hard and is not duplicated into the soft list."""
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((50.1, 8.7)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"electronics","common_certs":["ISO 9001"],"typical_units":null}'
+        ]),
+    )
+    payload = _electronics_finish_payload(["ISO 9001"])
+    llm = _FakeLLM(_infer_then_finish_script("electronics", payload))
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("iso 9001 electronics suppliers near Frankfurt"))
+
+    c = out["parsed_constraints"]
+    assert c["certifications"] == ["ISO 9001"]
+    assert "ISO 9001" not in c["industry_typical_certs"]

@@ -144,7 +144,14 @@ FINISH_SCHEMA = {
     "location_lat": "latitude (number) or null — only if geocode_location was called",
     "location_lng": "longitude (number) or null — only if geocode_location was called",
     "location_radius_km": "radius in km (number) or null",
-    "certifications": ["explicit canonical cert names (list[str])"],
+    "certifications": [
+        "ONLY certifications the user explicitly named in the query "
+        "(canonical names, list[str]). Do NOT add certs you merely inferred."
+    ],
+    "industry_typical_certs": [
+        "certs surfaced by infer_industry_context that the user did NOT state "
+        "(list[str]). These are soft hints, never hard requirements."
+    ],
     "capacity_min": "capacity floor (number) or null",
     "capacity_unit": "capacity unit (string) or null",
     "lead_time_max_days": "lead-time ceiling in days (number) or null",
@@ -253,6 +260,11 @@ Rules:
 - If a tool fails, the Observation will contain an "error" field. Do not
   retry the same call; either try different arguments or finish.
 - Always finish with `Finish`. Never end mid-thought.
+- CERTIFICATION PROVENANCE: `certifications` is a HARD filter — put a cert there
+  ONLY if the user explicitly named it in the query. Certifications that merely
+  came back from `infer_industry_context` as commonly-required-in-this-industry
+  go in `industry_typical_certs` instead. Never copy inferred certs into
+  `certifications`; doing so wrongly rejects every supplier that lacks them.
 - The Finish Action Input MUST be a single JSON object matching this schema:
 
 {schema_block}
@@ -455,7 +467,9 @@ class ParserAgent(BaseAgent):
                     MAX_REACT_ITERATIONS,
                 )
 
-        constraints = self._normalise_constraints(final_constraints, trace)
+        constraints = self._normalise_constraints(
+            final_constraints, trace, raw_query=raw_query, prior_partial=prior_partial
+        )
         confidence = float(final_constraints.get("confidence", 0.5) or 0.5)
         legacy_clarification_needed = (
             bool(final_constraints.get("clarification_needed"))
@@ -864,7 +878,137 @@ class ParserAgent(BaseAgent):
             logger.debug("[parser] Memory load failed: %s", e)
             return None
 
-    def _normalise_constraints(self, raw: dict, trace: list[dict]) -> dict:
+    @staticmethod
+    def _normalise_cert(value: object) -> str:
+        """Case-insensitive, whitespace-collapsed cert token for comparison.
+
+        Mirrors the lenient matching compliance uses when checking certs
+        (lowercase + strip + single-space) so the provenance split lines up
+        with how the cert is later compared against supplier records.
+        """
+        if not isinstance(value, str):
+            return ""
+        return re.sub(r"\s+", " ", value.strip().lower())
+
+    @staticmethod
+    def _iter_memory_rows(observation: object) -> list[dict]:
+        """Normalise a lookup_past_query observation to a list of memory rows.
+
+        The tool returns either a bare list of rows or a dict wrapping them
+        under results/rows/matches (mirrors _memory_returned_useful_hit)."""
+        if isinstance(observation, list):
+            return [r for r in observation if isinstance(r, dict)]
+        if isinstance(observation, dict):
+            rows = observation.get("results") or observation.get("rows") or observation.get("matches")
+            if isinstance(rows, list):
+                return [r for r in rows if isinstance(r, dict)]
+        return []
+
+    def _partition_certifications(
+        self,
+        raw: dict,
+        trace: list[dict],
+        raw_query: str,
+        prior_partial: Optional[dict],
+    ) -> tuple[list[str], list[str]]:
+        """Split the LLM's cert list by provenance — the cert-hallucination fix.
+
+        Runs on EVERY parse (not only when the LLM misbehaves). A cert keeps
+        its place in the HARD `certifications` gate only when it has *user*
+        provenance; certs whose only origin is the inference tool become SOFT
+        hints; certs with no provenance at all are dropped with a warning.
+
+        User provenance (→ hard):
+          - named verbatim in the raw query, OR
+          - recalled from memory (lookup_past_query) constraints, OR
+          - carried over from a prior clarification turn (prior_partial), OR
+          - explicitly resolved via canonicalize_certification.
+        Inference provenance (→ soft `industry_typical_certs`):
+          - surfaced by infer_industry_context.common_certs and not user-stated.
+        """
+        query_norm = self._normalise_cert(raw_query)
+
+        # ── Build the user-provenance set ────────────────────────────────
+        user_provenance: set[str] = set()
+        for c in (prior_partial or {}).get("certifications") or []:
+            n = self._normalise_cert(c)
+            if n:
+                user_provenance.add(n)
+        for step in trace:
+            action = step.get("action")
+            if action == "lookup_past_query":
+                for row in self._iter_memory_rows(step.get("observation")):
+                    for c in (row.get("constraints") or {}).get("certifications") or []:
+                        n = self._normalise_cert(c)
+                        if n:
+                            user_provenance.add(n)
+            elif action == "canonicalize_certification":
+                obs = step.get("observation") or {}
+                if isinstance(obs, dict) and obs.get("resolved"):
+                    for key in (obs.get("input"), obs.get("canonical")):
+                        n = self._normalise_cert(key)
+                        if n:
+                            user_provenance.add(n)
+
+        # ── Collect inference-tool certs (ordered, deduped) ──────────────
+        inferred_observed: list[str] = []
+        inferred_norm: set[str] = set()
+        for step in trace:
+            if step.get("action") != "infer_industry_context":
+                continue
+            obs = step.get("observation")
+            if not isinstance(obs, dict):
+                continue
+            for c in obs.get("common_certs") or []:
+                n = self._normalise_cert(c)
+                if n and n not in inferred_norm:
+                    inferred_norm.add(n)
+                    inferred_observed.append(c.strip())
+
+        def _is_user_stated(norm: str) -> bool:
+            # Substring against the query so "ISO 9001" matches "...ISO 9001:2015".
+            return bool(norm) and (norm in query_norm or norm in user_provenance)
+
+        # ── Classify each cert the LLM put in `certifications` ───────────
+        hard: list[str] = []
+        hard_norm: set[str] = set()
+        for c in raw.get("certifications") or []:
+            n = self._normalise_cert(c)
+            if not n:
+                continue
+            if _is_user_stated(n):
+                if n not in hard_norm:
+                    hard_norm.add(n)
+                    hard.append(c.strip() if isinstance(c, str) else c)
+            elif n in inferred_norm:
+                continue  # belongs to the soft list, assembled below
+            else:
+                logger.warning(
+                    "[parser/provenance] Dropping cert %r: absent from user query "
+                    "and not surfaced by infer_industry_context (query=%r)",
+                    c, raw_query,
+                )
+
+        # ── Assemble the soft list: inferred certs + any LLM-routed soft
+        # certs, minus anything already accepted as a hard user cert. ─────
+        soft: list[str] = []
+        soft_norm: set[str] = set()
+        for c in inferred_observed + list(raw.get("industry_typical_certs") or []):
+            n = self._normalise_cert(c)
+            if not n or n in hard_norm or n in soft_norm:
+                continue
+            soft_norm.add(n)
+            soft.append(c.strip() if isinstance(c, str) else c)
+
+        return hard, soft
+
+    def _normalise_constraints(
+        self,
+        raw: dict,
+        trace: list[dict],
+        raw_query: str = "",
+        prior_partial: Optional[dict] = None,
+    ) -> dict:
         """Map the LLM's Finish payload to the ParsedConstraints shape.
 
         Tolerant of missing keys and of legacy "location" nesting. Promotes
@@ -982,6 +1126,13 @@ class ParserAgent(BaseAgent):
         if _is_placeholder_product(product_type):
             product_type = None
 
+        # Cert provenance guard: keep only user-stated certs in the hard
+        # `certifications` gate; route inference-tool certs to the soft
+        # `industry_typical_certs`; drop certs with no provenance at all.
+        hard_certs, inferred_certs = self._partition_certifications(
+            raw, trace, raw_query, prior_partial
+        )
+
         return {
             "product_type": product_type,
             "product_keywords": list(raw.get("product_keywords") or []),
@@ -997,7 +1148,8 @@ class ParserAgent(BaseAgent):
             "location_lng": raw.get("location_lng"),
             "location_radius_km": raw.get("location_radius_km"),
 
-            "certifications": list(raw.get("certifications") or []),
+            "certifications": hard_certs,
+            "industry_typical_certs": inferred_certs,
             "capacity_min": raw.get("capacity_min"),
             "capacity_unit": raw.get("capacity_unit"),
             "lead_time_max_days": raw.get("lead_time_max_days"),

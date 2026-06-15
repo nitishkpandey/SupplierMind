@@ -36,7 +36,8 @@ class ParsedConstraints(TypedDict, total=False):
     location_radius_km: Optional[float]
 
     # Constraints
-    certifications: Optional[list[str]]
+    certifications: Optional[list[str]]            # HARD gate — user-stated certs only
+    industry_typical_certs: Optional[list[str]]    # SOFT hints — inferred, never gating
     capacity_min: Optional[float]
     capacity_unit: Optional[str]
     lead_time_max_days: Optional[int]
