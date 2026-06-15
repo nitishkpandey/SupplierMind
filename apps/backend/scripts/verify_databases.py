@@ -62,7 +62,7 @@ def verify_redis():
     except Exception as e:
         print(f"[ERROR] Redis verification failed:")
         print(f"  Error message: {e}")
-        print("  Tip: Ensure your Redis service is running (e.g., run `docker compose up -d redis`).")
+        print("  Tip: Ensure your Redis service is running (e.g., run `docker compose -f infra/docker/docker-compose.yml up -d redis`).")
     print()
 
 
@@ -123,7 +123,7 @@ def verify_milvus():
     except Exception as e:
         print(f"[ERROR] Milvus verification failed:")
         print(f"  Error message: {e}")
-        print("  Tip: Ensure your Milvus service is running (e.g., run `docker compose up -d milvus`).")
+        print("  Tip: Ensure your Milvus service is running (e.g., run `docker compose -f infra/docker/docker-compose.yml up -d milvus`).")
     print()
 
 

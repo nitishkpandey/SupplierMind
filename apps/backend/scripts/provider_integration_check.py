@@ -11,7 +11,7 @@ Runs the moment OPENAI_API_KEY lands in backend/.env:
 
 Prerequisites:
   - backend/.env: LLM_PROVIDER=openai, OPENAI_API_KEY=sk-...
-  - docker compose up -d  (Postgres, Milvus, Redis)
+  - docker compose -f infra/docker/docker-compose.yml up -d  (Postgres, Milvus, Redis)
 
 Run from backend/:
     uv run python scripts/provider_integration_check.py
@@ -91,7 +91,7 @@ async def recapture_traces() -> None:
 
     # Task 3.1 — ReAct parser trace (direct ParserAgent runs).
     # Task 3.2 / 3.3 demos are also importable mains; they write their JSONs
-    # into Documents/thesis_evidence/week_3_agentic/ — copy results over.
+    # into demo_output/week_3_agentic/ — copy results over.
     logger.info("Re-capture: drive the three demo scripts manually if their "
                 "main() signatures changed; otherwise run them via:")
     logger.info("  uv run python scripts/parser_react_demo.py")

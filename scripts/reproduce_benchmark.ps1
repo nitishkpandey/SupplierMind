@@ -35,7 +35,7 @@ function Invoke-Step([string]$label, [scriptblock]$cmd) {
 
 Write-Host "[1/6] Starting infrastructure (Postgres, Milvus, Redis)..."
 Set-Location $root
-docker compose up -d
+docker compose -f infra/docker/docker-compose.yml up -d
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed (exit $LASTEXITCODE)" }
 Start-Sleep -Seconds 25
 
