@@ -16,5 +16,5 @@ Contents:
   SupplierMind P@5=0.336, CSR=0.686, MRR=0.640 (approved_only, clean run).
 - `week2_supplierbench_10k/`: Week-2 re-run against the 10K synthetic corpus.
 
-Source folders (unchanged): `Documents/thesis_evidence/week_1_speed_and_trust/supplierbench/`
-and `Documents/thesis_evidence/week_2_production/`.
+Source folders (local thesis directory, not tracked): `thesis_evidence/week_1_speed_and_trust/supplierbench/`
+and `thesis_evidence/week_2_production/`.

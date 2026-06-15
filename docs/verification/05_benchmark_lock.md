@@ -65,7 +65,7 @@ git add results/run_20260613 results/groq_contaminated_run_20260613 \
         backend/scripts/build_output_gallery.py backend/scripts/harmonize_csr.py \
         backend/data/evaluation_results.json backend/data/thesis_report.json \
         backend/data/evaluation_checkpoint.json \
-        Documents/SupplierMind_Development_Plan.md
+        Documents/SupplierMind_Development_Plan.md  # local thesis plan, untracked - this line was a no-op at the time of the original run
 git commit -m "benchmark: lock GPT-4o-mini SupplierBench-25 run (run_20260613)"
 git tag -a benchmark-final-v1 -m "Canonical GPT-4o-mini three-paradigm benchmark, 2026-06-13"
 git tag --list | grep benchmark-final-v1   # confirm
