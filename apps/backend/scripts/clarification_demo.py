@@ -15,7 +15,7 @@ hint via state["previous_partial_constraints"].
   Turn 3: User answers "anywhere in EU with ISO 9001" → re-run Parser.
           Now product + cert + region → state == complete.
 
-Output: Documents/thesis_evidence/week_3_agentic/clarification_demo.json
+Output: demo_output/week_3_agentic/clarification_demo.json
 with three turn blocks (raw query, parsed_constraints, react_trace,
 clarification flags) and a verification dict.
 
@@ -44,8 +44,7 @@ logger = logging.getLogger("clarification_demo")
 
 OUT_DIR = (
     Path(__file__).resolve().parents[2]
-    / "Documents"
-    / "thesis_evidence"
+    / "demo_output"
     / "week_3_agentic"
 )
 OUT_PATH = OUT_DIR / "clarification_demo.json"

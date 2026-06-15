@@ -2,7 +2,7 @@
 
 Drives the 4 agentic smoke scenarios via HTTP against the running stack
 (localhost:8000) and saves machine-readable evidence under
-Documents/thesis_evidence/week_3_agentic/smoke_test_3.4/.
+demo_output/week_3_agentic/smoke_test_3.4/.
 
 Scenarios (roadmap Task 3.4):
   1. ReAct trace      — "Find ISO certified packaging in Bavaria" shows
@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 BACKEND = "http://localhost:8000"
 EVIDENCE = (
     Path(__file__).resolve().parents[2]
-    / "Documents" / "thesis_evidence" / "week_3_agentic" / "smoke_test_3.4"
+    / "demo_output" / "week_3_agentic" / "smoke_test_3.4"
 )
 # Free-tier Groq pacing sleeps up to ~60s per LLM call; a full ReAct
 # pipeline run can exceed 7 minutes. 900s is the observed-safe budget.

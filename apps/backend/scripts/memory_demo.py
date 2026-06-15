@@ -18,7 +18,7 @@ Step 3: Q2 runs through the same Parser construction (build_user_registry
         lookup_past_query, see Q1's constraints in the Observation, and
         merge them with the new location.
 
-Output: Documents/thesis_evidence/week_3_agentic/memory_demo.json with both
+Output: demo_output/week_3_agentic/memory_demo.json with both
 react_trace blocks, parsed constraints, and the verification flags Component
 D listed.
 
@@ -45,8 +45,7 @@ logger = logging.getLogger("memory_demo")
 
 OUT_DIR = (
     Path(__file__).resolve().parents[2]
-    / "Documents"
-    / "thesis_evidence"
+    / "demo_output"
     / "week_3_agentic"
 )
 OUT_PATH = OUT_DIR / "memory_demo.json"

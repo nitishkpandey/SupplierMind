@@ -2,7 +2,7 @@
 
 Drives the 4 integration smoke tests via HTTP against the running stack
 (localhost:8000) and saves machine-readable evidence under
-Documents/thesis_evidence/week_2_production/smoke_test/.
+demo_output/week_2_production/smoke_test/.
 
 Run from backend/ with:  uv run python scripts/smoke_test_week2.py
 """
@@ -18,7 +18,7 @@ from pathlib import Path
 import httpx
 
 BACKEND = "http://localhost:8000"
-EVIDENCE = Path(__file__).resolve().parents[2] / "Documents" / "thesis_evidence" / "week_2_production" / "smoke_test"
+EVIDENCE = Path(__file__).resolve().parents[2] / "demo_output" / "week_2_production" / "smoke_test"
 
 
 def utcnow() -> str:

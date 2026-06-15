@@ -8,7 +8,7 @@ Usage:
     uv run python scripts/parser_react_demo.py "<query>"
 
 Writes:
-    Documents/thesis_evidence/week_3_agentic/parser_react_demo.json
+    demo_output/week_3_agentic/parser_react_demo.json
 """
 from __future__ import annotations
 
@@ -25,8 +25,7 @@ from app.agents.parser_agent import ParserAgent  # noqa: E402
 
 OUT_DIR = (
     Path(__file__).resolve().parents[2]
-    / "Documents"
-    / "thesis_evidence"
+    / "demo_output"
     / "week_3_agentic"
 )
 DEFAULT_QUERIES = [

@@ -5,6 +5,9 @@
 # --- THESIS DOCUMENTS (local only) ---
 Documents/
 
+# --- DEMO / SMOKE-TEST OUTPUT (local only, portable path) ---
+demo_output/
+
 # --- SECRETS (NEVER commit these) ---
 .env
 .env.local
