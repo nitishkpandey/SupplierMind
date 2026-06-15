@@ -37,7 +37,7 @@ dist/
 .eslintcache
 
 # --- DOCKER ---
-docker-compose.override.yml
+infra/docker/docker-compose.override.yml
 
 # --- VECTOR DB LOCAL DATA ---
 chroma_db/
@@ -58,8 +58,8 @@ logs/
 # --- TESTING ---
 coverage/
 # --- Task 2.1 bulk-ingest checkpoint (transient, regenerated per run) ---
-backend/data/bulk_ingest_checkpoint.json
-backend/data/bulk_ingest.log
+apps/backend/data/bulk_ingest_checkpoint.json
+apps/backend/data/bulk_ingest.log
 
 # --- INTERNAL PLANNING / PROCESS DOCS (never commit) ---
 docs/audits/
