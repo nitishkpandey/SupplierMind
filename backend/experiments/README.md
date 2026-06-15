@@ -10,8 +10,8 @@ contribution of the thesis.
 | P2 | Minimal RAG: retrieve top-k, one prompt, pick 5 | `paradigm2_rag.py` |
 | P3 | SupplierMind multi-agent system | the application (`app/`) |
 
-All three run on the same provider stack (GPT-4o-mini primary via
-`app/core/llm.py`; Groq fallback) and emit the same output shape
+All three run on OpenAI gpt-4o-mini-2024-07-18 via `app/core/llm.py`
+and emit the same output shape
 (`ParadigmResult`): top-5 supplier names + ids + per-pick reasoning + latency.
 
 ## Design decisions (deliberate, documented for the thesis)
