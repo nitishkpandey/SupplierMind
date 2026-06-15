@@ -8,14 +8,23 @@ Generates the SupplierBench synthetic dataset:
 WHY SYNTHETIC DATA IS SCIENTIFICALLY VALID:
 Following methodology of MS MARCO, BEIR, TREC benchmarks.
 Synthetic benchmarks are standard when no labeled dataset exists.
-Key requirement: reproducibility — random.seed(42) ensures same output every run.
 
-RUN: python data/generate_dataset.py
+CORPUS IS FROZEN (benchmark-final-v2):
+random.seed(42) makes the *content* deterministic, but the row IDs use
+uuid.uuid4(), which is NOT covered by the seed — every run mints fresh IDs.
+The committed suppliers_synthetic.json / queries_benchmark.json are the
+locked artefact; their supplier IDs are referenced by every run under
+results/ and traces/. Regenerating would invalidate all locked results, so
+this script refuses to run without an explicit --force-regenerate override.
+
+RUN (locked — normally a no-op): python data/generate_dataset.py
+RE-BASELINE EVERYTHING (rarely): python data/generate_dataset.py --force-regenerate
 """
 
 import json
 import math
 import random
+import sys
 import uuid
 from pathlib import Path
 
@@ -309,6 +318,19 @@ def generate_queries(suppliers: list[dict]) -> list[dict]:
 
 
 def main() -> None:
+    if "--force-regenerate" not in sys.argv:
+        print(
+            "⛔ Corpus generation is LOCKED (benchmark-final-v2).\n\n"
+            "The SupplierBench-25 corpus is a frozen artefact. The supplier IDs\n"
+            "committed in suppliers_synthetic.json / queries_benchmark.json are\n"
+            "referenced by every locked run under results/ and traces/.\n\n"
+            "Regeneration mints fresh uuid4 IDs (random.seed(42) does NOT seed\n"
+            "uuid4), which would invalidate all locked benchmark results.\n\n"
+            "If you genuinely intend to re-baseline the ENTIRE benchmark, re-run:\n"
+            "    python data/generate_dataset.py --force-regenerate\n"
+        )
+        raise SystemExit(1)
+
     out = Path(__file__).parent
     suppliers_file = out / "suppliers_synthetic.json"
     queries_file = out / "queries_benchmark.json"
