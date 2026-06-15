@@ -1,8 +1,8 @@
 """
-backend/scripts/ingest_suppliers.py — CLI script to ingest SupplierBench data.
+apps/backend/scripts/ingest_suppliers.py — CLI script to ingest SupplierBench data.
 
 RUN THIS ONCE after Phase 1 setup:
-    cd backend
+    cd apps/backend
     python scripts/ingest_suppliers.py
 
 This populates both PostgreSQL and Milvus with all 100 synthetic suppliers.

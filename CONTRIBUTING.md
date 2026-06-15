@@ -7,13 +7,13 @@ Research artefact for a master's thesis; light process, strict hygiene.
 - Python 3.11, type hints throughout, British spelling in prose and comments,
   no em-dashes in text that may be cited.
 - Frontend: TypeScript strict, Tailwind utility classes, components under
-  `frontend/src/features/`.
+  `apps/frontend/src/features/`.
 - Comments explain constraints the code cannot show — not what the next line does.
 
 ## Tests
 
 ```bash
-cd backend
+cd apps/backend
 uv run pytest tests/unit -q        # deterministic; no live LLM/API needed
 ```
 
@@ -21,7 +21,7 @@ uv run pytest tests/unit -q        # deterministic; no live LLM/API needed
 - The LLM is the one external boundary that may be stubbed (`_FakeLLM`
   pattern in the test suite). Milvus-backed tests use disposable
   per-test collections.
-- Frontend type-check: `cd frontend && npx tsc --noEmit`.
+- Frontend type-check: `cd apps/frontend && npx tsc --noEmit`.
 
 ## Commits
 

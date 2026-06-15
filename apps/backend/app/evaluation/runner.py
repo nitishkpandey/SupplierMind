@@ -9,7 +9,7 @@ Runs all 25 benchmark queries through:
 Records all metrics and saves to JSON for the thesis results chapter.
 
 HOW TO RUN:
-    cd backend
+    cd apps/backend
     uv run python scripts/run_evaluation.py
 
     This takes ~15-20 minutes (SupplierMind queries are ~30s each).

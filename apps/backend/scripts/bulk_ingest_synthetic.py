@@ -1,5 +1,5 @@
 """
-backend/scripts/bulk_ingest_synthetic.py
+apps/backend/scripts/bulk_ingest_synthetic.py
 Bulk-load `suppliers_synthetic_10k.json` into Postgres + Milvus.
 
 Two-phase ingestion (separate so embedding failure doesn't lose PG data):
@@ -9,7 +9,7 @@ Two-phase ingestion (separate so embedding failure doesn't lose PG data):
            interruptions resume cleanly.
 
 Usage:
-    cd backend
+    cd apps/backend
     uv run python scripts/bulk_ingest_synthetic.py
     # Optional: --skip-pg if Postgres rows already inserted
     # Optional: --resume to continue from checkpoint

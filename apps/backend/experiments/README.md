@@ -42,12 +42,12 @@ description of its method section.
 ## Running
 
 ```bash
-cd backend
+cd apps/backend
 
 # P1 on a sample query (LLM key required; no databases needed)
 uv run python -m experiments.paradigm1_singleprompt "ISO 9001 packaging supplier in Germany"
 
-# P2 on a sample query (needs Milvus + Postgres up: docker compose up -d)
+# P2 on a sample query (needs Milvus + Postgres up: docker compose -f infra/docker/docker-compose.yml up -d)
 uv run python -m experiments.paradigm2_rag "ISO 9001 packaging supplier in Germany"
 ```
 

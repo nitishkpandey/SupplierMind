@@ -86,10 +86,10 @@ cp .env.example .env
 # Edit .env with your API keys
 
 # 3. Start infrastructure
-docker compose up -d
+docker compose -f infra/docker/docker-compose.yml up -d
 
 # 4. Backend setup
-cd backend
+cd apps/backend
 pip install uv
 uv sync
 uv run alembic upgrade head
@@ -98,7 +98,7 @@ uv run python scripts/ingest_suppliers.py
 uv run uvicorn app.main:app --reload --port 8000
 
 # 5. Frontend (separate terminal)
-cd frontend
+cd apps/frontend
 npm install
 npm run dev
 
@@ -110,7 +110,7 @@ npm run dev
 ### Run Evaluation
 
 ```bash
-cd backend
+cd apps/backend
 # Baselines only (~5 seconds)
 uv run python scripts/run_evaluation.py --baselines-only
 
@@ -143,24 +143,34 @@ Design decisions and the shared output contract are documented in
 
 ```
 SupplierMind/
-|- apps/backend/
-|  |- app/                  FastAPI application (P3: the five-agent system)
-|  |  |- agents/            Parser (ReAct), Discovery, Compliance, Ranking, Evaluator
-|  |  |- agents/tools/      Tool registry + the 5 Parser tools
-|  |  |- api/v1/            REST + SSE endpoints (queries, clarifications, admin)
-|  |  |- core/              LLM providers, embeddings, vector store, rate limiter
-|  |  |- db/                SQLAlchemy models, repositories, Alembic migrations
-|  |  |- evaluation/        SupplierBench-25 harness, metrics, report
-|  |  '- services/          Geocoding, ingestion, query memory (Milvus)
-|  |- experiments/          P1 + P2 baseline paradigms
-|  |- data/                 Synthetic corpus generators (fixed seed 42) + benchmark queries
-|  |- scripts/              Drivers: evaluation, smoke tests, demos, diagnostics
-|  '- tests/unit/           173+ deterministic unit tests (no live LLM needed)
-|- apps/frontend/           React + TypeScript + Tailwind UI
-|- traces/                  Captured agentic traces (groq/, gpt4o_mini/)
+|- apps/
+|  |- backend/              FastAPI app (P3 five-agent system), P1/P2 experiments, data, scripts, tests
+|  |  |- app/                  FastAPI application (P3: the five-agent system)
+|  |  |  |- agents/            Parser (ReAct), Discovery, Compliance, Ranking, Evaluator
+|  |  |  |- agents/tools/      Tool registry + the 5 Parser tools
+|  |  |  |- api/v1/            REST + SSE endpoints (queries, clarifications, admin)
+|  |  |  |- core/              LLM providers, embeddings, vector store, rate limiter
+|  |  |  |- db/                SQLAlchemy models, repositories, Alembic migrations
+|  |  |  |- evaluation/        SupplierBench-25 harness, metrics, report
+|  |  |  '- services/          Geocoding, ingestion, query memory (Milvus)
+|  |  |- experiments/          P1 + P2 baseline paradigms
+|  |  |- data/                 Synthetic corpus generators (fixed seed 42) + benchmark queries
+|  |  |- scripts/              Drivers: evaluation, smoke tests, demos, diagnostics
+|  |  '- tests/unit/           173+ deterministic unit tests (no live LLM needed)
+|  '- frontend/             React + TypeScript + Tailwind UI
+|- infra/
+|  |- docker/               docker-compose.yml (+ prod overlay) and nginx.conf
+|  '- k8s/                  Kubernetes manifests (namespace, deployments, secrets example)
+|- benchmarks/
+|  '- supplierbench25/      SupplierBench-25 pointer (definition lives in apps/backend/data)
+|- docs/
+|  |- adr/                  Architecture decision records
+|  |- supervisor/           Thesis materials for the supervisor
+|  '- verification/         Verification record (provider, traces, benchmark lock)
 |- results/                 Benchmark archives + diagnostics (cert prevalence, samples)
-|- Documents/               Thesis evidence, plans, defence notes
-'- docker-compose.yml       Postgres + Milvus + Redis + MinIO + etcd
+|- traces/                  Captured agentic traces (groq/, gpt4o_mini/)
+|- scripts/                 reproduce_benchmark.ps1 — repo-level benchmark runner
+'- root files               README, ARCHITECTURE, BENCHMARK, CONTRIBUTING, LICENSE, package.json
 ```
 
 ## Thesis
