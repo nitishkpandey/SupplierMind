@@ -93,7 +93,8 @@ cd apps/backend
 pip install uv
 uv sync
 uv run alembic upgrade head
-uv run python data/generate_dataset.py
+# The SupplierBench-25 corpus ships committed (data/suppliers_synthetic.json);
+# no generation step is needed. Just load it into Postgres + Milvus:
 uv run python scripts/ingest_suppliers.py
 uv run uvicorn app.main:app --reload --port 8000
 
