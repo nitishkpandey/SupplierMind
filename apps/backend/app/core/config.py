@@ -9,10 +9,18 @@ USAGE anywhere in the codebase:
 
 import warnings
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve the .env from the repo root regardless of the current working
+# directory. This file lives at apps/backend/app/core/config.py, so the repo
+# root is four parents up (core → app → backend → apps → <root>). Without the
+# absolute path, env_file=".env" resolves to cwd and the root .env is silently
+# ignored when commands run from apps/backend (Phase H finding).
+_REPO_ROOT_ENV = Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(BaseSettings):
@@ -22,7 +30,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_REPO_ROOT_ENV),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # Ignore unknown env vars instead of crashing
