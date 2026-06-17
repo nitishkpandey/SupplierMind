@@ -1,5 +1,7 @@
 # Benchmark run 2026-06-14T21:04:57.065045+00:00
 
+> ⚠️ **Measurement flaw:** The P@5 and MRR columns in this run are NOT valid (corpus supplier IDs did not match ground-truth IDs). CSR values remain valid. See [CORRECTION_NOTE.md](CORRECTION_NOTE.md) before using these numbers; the canonical benchmark is results/run_20260616/.
+
 Corpus: live pool (10,136 suppliers in Postgres / 10,127 in Milvus).
 Provider: openai gpt-4o-mini primary, groq fallback armed.
 
