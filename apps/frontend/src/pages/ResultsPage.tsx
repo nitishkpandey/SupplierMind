@@ -34,11 +34,13 @@ export default function ResultsPage() {
   const queryClient = useQueryClient();
   const [resumeCount, setResumeCount] = useState(0);
   const { events, isComplete, error: sseError, clarification, reset: resetSSE } =
-    useSSE(queryId ?? null);
+    useSSE(queryId ?? null, resumeCount);
 
   // After the user answers a clarification we re-subscribe to the same
   // stream so the resumed pipeline's events flow through this hook. The
-  // `resumeCount` bump forces the SSE useEffect to re-run.
+  // `resumeCount` bump is passed to useSSE as `resumeKey`, so it lands in
+  // that hook's effect dependency array and genuinely re-opens the
+  // EventSource (the old connection was closed at needs_clarification).
   useEffect(() => {
     if (resumeCount > 0) {
       resetSSE();

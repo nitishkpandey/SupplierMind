@@ -486,8 +486,7 @@ async def submit_clarification_answer(
 
     # Re-mount the SSE buffer for this query so progress events from the
     # resumed pipeline reach the existing EventSource client.
-    if query_id not in _sse_events:
-        _sse_events[query_id] = []
+    _sse_events[query_id] = []  # drop stale needs_clarification so the re-subscribed stream reaches complete
     _sse_events[query_id].append({
         "type": "agent_update",
         "agent": "clarification_handler",

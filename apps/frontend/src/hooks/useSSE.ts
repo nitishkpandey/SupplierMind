@@ -18,7 +18,7 @@ export interface ClarificationSignal {
   turn_number: number;
 }
 
-export function useSSE(queryId: string | null) {
+export function useSSE(queryId: string | null, resumeKey = 0) {
   const [events, setEvents] = useState<SSEEvent[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +116,7 @@ export function useSSE(queryId: string | null) {
       sourceRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryId, accessToken]);
+  }, [queryId, accessToken, resumeKey]);
 
   const reset = () => {
     setEvents([]);
