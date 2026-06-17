@@ -33,7 +33,7 @@ import time
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Supplier
+from app.db.models import Supplier, SupplierStatus
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +156,9 @@ async def keyword_baseline_search(
         .where(
             and_(
                 Supplier.is_active == True,  # noqa: E712
+                # Sprint A: pending_review suppliers are HITL-held and must be
+                # excluded from baselines so SupplierBench-25 stays reproducible.
+                Supplier.status != SupplierStatus.pending_review,
                 or_(*conditions),
             )
         )
@@ -263,7 +266,12 @@ async def manual_baseline_search(
     extra_keywords = _extract_keywords_manual(raw_query)
 
     # Step 4: Build query
-    conditions = [Supplier.is_active == True]  # noqa: E712
+    conditions = [
+        Supplier.is_active == True,  # noqa: E712
+        # Sprint A: exclude HITL-held pending_review suppliers from the
+        # benchmark baseline to keep SupplierBench-25 reproducible.
+        Supplier.status != SupplierStatus.pending_review,
+    ]
 
     if category:
         conditions.append(Supplier.category == category)

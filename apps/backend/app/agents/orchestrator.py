@@ -70,6 +70,7 @@ def _create_initial_state(
     *,
     turn_number: int = 1,
     previous_partial_constraints: Optional[dict] = None,
+    exclude_pending: bool = False,
 ) -> AgentState:
     """Create initial AgentState with all defaults.
 
@@ -83,6 +84,9 @@ def _create_initial_state(
         query_id=query_id,
         user_id=user_id,
         search_scope=search_scope,
+        # Sprint A (HITL): eval path sets this True so pending_review suppliers
+        # never enter benchmark scoring, even though the UI flow includes them.
+        exclude_pending=exclude_pending,
 
         # Parser defaults
         parsed_constraints=None,
@@ -447,6 +451,7 @@ async def run_pipeline(
     *,
     turn_number: int = 1,
     previous_partial_constraints: Optional[dict] = None,
+    exclude_pending: bool = False,
 ) -> AgentState:
     """
     Main entry point for running the full agent pipeline.
@@ -474,6 +479,7 @@ async def run_pipeline(
         search_scope,
         turn_number=turn_number,
         previous_partial_constraints=previous_partial_constraints,
+        exclude_pending=exclude_pending,
     )
     pipeline = get_pipeline()
 
