@@ -57,8 +57,8 @@ export interface QueryResult {
   supplier_lead_time_days: number | null;
   supplier_website: string | null;
   supplier_source: string | null;
-  supplier_status: 'approved' | 'saved' | 'discovered' | 'rejected' | null;
-  tier: 'approved' | 'saved' | 'discovered' | null;
+  supplier_status: 'approved' | 'saved' | 'discovered' | 'pending_review' | 'rejected' | null;
+  tier: 'approved' | 'saved' | 'discovered' | 'pending_review' | null;
   // Task 1.6: present only when sanctions screening could not complete.
   sanctions_status?: 'pending_review' | null;
   total_score: number;

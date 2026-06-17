@@ -283,10 +283,15 @@ async def approve_supplier(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Promote a discovered supplier to Approved status (Tier 1).
+    Promote a discovered or pending_review supplier to Approved status (Tier 1).
     Admin only: promotion is an org-wide governance event that affects every
     user's 'approved_only' searches. procurement_managers use Tier 2 (saves)
     for personal shortlists.
+
+    Sprint A (HITL): web-discovered suppliers now enter as 'pending_review',
+    so both 'discovered' and 'pending_review' are valid starting states for
+    promotion. The admin gate, the justification floor (min 20 chars), and the
+    audit-log write are unchanged.
 
     Requires a justification body (min 20 chars). The rationale is persisted
     on the supplier row AND written into audit_logs alongside agent decisions.
@@ -296,11 +301,15 @@ async def approve_supplier(
     ).scalar_one_or_none()
     if supplier is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    if supplier.status != SupplierStatus.discovered:
+    if supplier.status not in (
+        SupplierStatus.discovered,
+        SupplierStatus.pending_review,
+    ):
         raise HTTPException(
             status_code=409,
             detail=f"Cannot approve supplier in '{supplier.status.value}' state; "
-                   "only 'discovered' suppliers are eligible for promotion.",
+                   "only 'discovered' or 'pending_review' suppliers are eligible "
+                   "for promotion.",
         )
 
     await _record_admin_decision(
