@@ -211,6 +211,15 @@ export function SupplierCard({ result }: SupplierCardProps) {
                   New Discovery
                 </Badge>
               )}
+              {/* Sprint A (HITL): web-discovered supplier held for admin approval.
+                  Keyed off `tier` (not the static supplier_status prop) so it
+                  flips correctly when an admin approves optimistically. */}
+              {tier === "pending_review" && (
+                <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700 gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Pending Review
+                </Badge>
+              )}
               {result.sanctions_status === "pending_review" && (
                 <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700 gap-1">
                   <AlertCircle className="w-3 h-3" />

@@ -245,6 +245,60 @@ def test_admin_can_approve_supplier_returns_204():
     assert audit_entry.action == "supplier_approved"
 
 
+def test_admin_can_approve_pending_review_supplier_returns_204():
+    """Sprint A (HITL): web-discovered suppliers now enter as pending_review,
+    so it joins 'discovered' as a valid starting state for promotion. The admin
+    gate, justification floor, and audit-log write are unchanged — only the set
+    of eligible starting states widened."""
+    from app.db.models import SupplierStatus
+
+    admin = _fake_user(UserRole.admin)
+    app.dependency_overrides[get_current_user] = lambda: admin
+
+    pending_supplier = SimpleNamespace(
+        id=uuid4(),
+        status=SupplierStatus.pending_review,
+        approved_by_user_id=None,
+        approved_at=None,
+        approval_justification=None,
+        approval_action=None,
+        approval_decided_at=None,
+    )
+
+    fake_select_result = MagicMock()
+    fake_select_result.scalar_one_or_none.return_value = pending_supplier
+
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(return_value=fake_select_result)
+    fake_session.add = MagicMock()
+    fake_session.commit = AsyncMock()
+
+    async def session_override():
+        yield fake_session
+
+    app.dependency_overrides[get_db] = session_override
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/suppliers/{pending_supplier.id}/approve",
+        json={"justification": "Verified ISO 9001 via cert registry; facility matches query region."},
+    )
+
+    assert response.status_code == 204, (
+        f"admin should approve a pending_review supplier; "
+        f"got {response.status_code} {response.text}"
+    )
+    assert pending_supplier.status == SupplierStatus.approved, (
+        "pending_review must transition to approved on admin approval"
+    )
+    assert pending_supplier.approval_action == "approved"
+    assert pending_supplier.approval_justification.startswith("Verified ISO 9001")
+    fake_session.add.assert_called_once()
+    audit_entry = fake_session.add.call_args[0][0]
+    assert audit_entry.agent_name == "human_admin"
+    assert audit_entry.action == "supplier_approved"
+
+
 def test_approve_without_body_returns_422():
     """Justification is required — missing body must fail validation."""
     admin = _fake_user(UserRole.admin)
@@ -271,7 +325,10 @@ def test_approve_with_short_justification_returns_422():
 
 
 def test_approve_non_discovered_supplier_returns_409():
-    """An already-approved supplier cannot be re-approved (idempotency guard)."""
+    """An already-approved supplier cannot be re-approved (idempotency guard).
+
+    Sprint A widened the eligible set to {discovered, pending_review}; 'approved'
+    is in neither, so the 409 guard still rejects it."""
     from app.db.models import SupplierStatus
 
     admin = _fake_user(UserRole.admin)
