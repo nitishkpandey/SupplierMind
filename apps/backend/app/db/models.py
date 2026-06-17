@@ -61,14 +61,18 @@ class QueryStatus(str, enum.Enum):
 class SupplierStatus(str, enum.Enum):
     """
     Tier-based supplier classification.
-    approved   = Tier 1: company-wide trusted vendors (admin-curated)
-    saved      = Tier 2: personal shortlist (user-saved discoveries)
-    discovered = Tier 3: fresh from web, not yet promoted
-    rejected   = User marked "not relevant" — excluded from future searches
+    approved       = Tier 1: company-wide trusted vendors (admin-curated)
+    saved          = Tier 2: personal shortlist (user-saved discoveries)
+    discovered     = Tier 3: fresh from web, not yet promoted
+    pending_review = Web-discovered, held for admin approval (HITL). Shows in
+                     normal search results with a "Pending Review" badge, but is
+                     excluded from benchmark/baseline evaluation for reproducibility.
+    rejected       = User marked "not relevant" — excluded from future searches
     """
     approved = "approved"
     saved = "saved"
     discovered = "discovered"
+    pending_review = "pending_review"
     rejected = "rejected"
 
 
