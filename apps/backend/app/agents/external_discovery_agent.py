@@ -235,7 +235,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         return result.scalars().first() is not None
 
     def _ingest_suppliers(self, suppliers: list[dict]) -> list[str]:
-        """Add new suppliers to PostgreSQL (as discovered) and Milvus."""
+        """Add new suppliers to PostgreSQL (as pending_review) and Milvus."""
         if not suppliers:
             return []
 
@@ -262,8 +262,11 @@ class ExternalDiscoveryAgent(BaseAgent):
                         website=s.get("website"),
                         contact_email=s.get("contact_email"),
                         source="web_discovery",
-                        # Production v2: new fields
-                        status=SupplierStatus.discovered,
+                        # Production v2 + Sprint A HITL: web-discovered suppliers
+                        # enter a "pending_review" holding state so they no longer
+                        # bypass admin approval. They still get embedded (below,
+                        # after commit) and show in normal search with a badge.
+                        status=SupplierStatus.pending_review,
                         source_url=s.get("source_url"),
                         source_citations=s.get("source_citations") or {},
                         is_active=True,
