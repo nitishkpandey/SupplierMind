@@ -155,6 +155,11 @@ class AgentState(TypedDict):
 
     # ── Production v2 additions ───────────────────────────────────────
     search_scope: str
+    # Sprint A (HITL): pending_review suppliers are in-scope for normal search
+    # (the UI shows them with a badge). The eval/benchmark path sets this True
+    # so evaluation never sees pending suppliers, keeping SupplierBench-25
+    # reproducible — independent of scope.
+    exclude_pending: bool
     tier_assignments: dict[str, str]
     evaluator_retries: int
     evaluator_verdict: Optional[str]

@@ -69,11 +69,18 @@ class DiscoveryAgent(BaseAgent):
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
         user_id = state.get("user_id")
+        # Sprint A (HITL): pending_review suppliers are in-scope for normal
+        # search so the UI can surface them with a badge. The eval path sets
+        # exclude_pending=True so benchmark scoring never sees them.
+        exclude_pending = state.get("exclude_pending", False)
 
-        return self._run_search(state, constraints, retry_count, search_scope, user_id)
+        return self._run_search(
+            state, constraints, retry_count, search_scope, user_id, exclude_pending
+        )
 
     def _run_search(
-        self, state: AgentState, constraints: dict, retry_count: int, search_scope: str, user_id: str
+        self, state: AgentState, constraints: dict, retry_count: int, search_scope: str,
+        user_id: str, exclude_pending: bool = False,
     ) -> AgentState:
         start = time.time()
 
@@ -89,7 +96,7 @@ class DiscoveryAgent(BaseAgent):
 
             # Filter vector results by scope (Milvus doesn't currently index status in this prototype)
             with SyncSessionLocal() as db:
-                valid_ids = self._filter_ids_by_scope(db, [r.supplier_id for r in sem_results], search_scope, user_id)
+                valid_ids = self._filter_ids_by_scope(db, [r.supplier_id for r in sem_results], search_scope, user_id, exclude_pending)
                 filtered_results = [r for r in sem_results if r.supplier_id in valid_ids]
 
                 semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(filtered_results[:10])}
@@ -110,11 +117,17 @@ class DiscoveryAgent(BaseAgent):
                 # Build base condition for scope
                 # approved_only = status=='approved' OR user_supplier_saves matching this user
                 # both = status IN ('approved', 'discovered') OR user_supplier_saves
+                # Sprint A (HITL): pending_review joins the in-scope set so held
+                # suppliers appear in normal results — unless exclude_pending is
+                # set (the eval path), which keeps the benchmark reproducible.
                 base_conds = []
                 if search_scope == "approved_only":
-                    base_conds.append(Supplier.status == SupplierStatus.approved)
+                    in_scope_statuses = [SupplierStatus.approved]
                 else:
-                    base_conds.append(Supplier.status.in_([SupplierStatus.approved, SupplierStatus.discovered]))
+                    in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
+                if not exclude_pending:
+                    in_scope_statuses.append(SupplierStatus.pending_review)
+                base_conds.append(Supplier.status.in_(in_scope_statuses))
 
                 # Add user saved
                 if user_id:
@@ -170,6 +183,10 @@ class DiscoveryAgent(BaseAgent):
                             tier_assignments[sid_str] = "approved"
                         elif sid in saved_ids:
                             tier_assignments[sid_str] = "saved"
+                        elif status == SupplierStatus.pending_review:
+                            # Sprint A: label honestly so the UI badge is correct;
+                            # no tier boost — pending suppliers rank on merit.
+                            tier_assignments[sid_str] = "pending_review"
                         else:
                             tier_assignments[sid_str] = "discovered"
 
@@ -243,7 +260,9 @@ class DiscoveryAgent(BaseAgent):
                 state["retry_count"] = retry_count + 1
                 state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
                 logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
-                return self._run_search(state, relaxed, retry_count + 1, search_scope, user_id)
+                return self._run_search(
+                    state, relaxed, retry_count + 1, search_scope, user_id, exclude_pending
+                )
 
         # ── Final state ───────────────────────────────────────────────
         state["candidate_supplier_ids"] = candidate_ids[:10]
@@ -265,16 +284,26 @@ class DiscoveryAgent(BaseAgent):
 
         return state
 
-    def _filter_ids_by_scope(self, db, sids: list[str], scope: str, user_id: str) -> set[str]:
-        """Returns subset of IDs that are allowed by the current search scope."""
+    def _filter_ids_by_scope(
+        self, db, sids: list[str], scope: str, user_id: str, exclude_pending: bool = False
+    ) -> set[str]:
+        """Returns subset of IDs that are allowed by the current search scope.
+
+        Sprint A (HITL): pending_review is in-scope for normal search so held
+        suppliers surface in the UI; the eval path passes exclude_pending=True
+        to keep them out of benchmark scoring.
+        """
         if not sids:
             return set()
 
         base_conds = []
         if scope == "approved_only":
-            base_conds.append(Supplier.status == SupplierStatus.approved)
+            in_scope_statuses = [SupplierStatus.approved]
         else:
-            base_conds.append(Supplier.status.in_([SupplierStatus.approved, SupplierStatus.discovered]))
+            in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
+        if not exclude_pending:
+            in_scope_statuses.append(SupplierStatus.pending_review)
+        base_conds.append(Supplier.status.in_(in_scope_statuses))
 
         if user_id:
             base_conds.append(

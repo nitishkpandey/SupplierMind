@@ -69,7 +69,12 @@ async def run_suppliermind_query(
     from app.agents.orchestrator import run_pipeline
 
     start = time.time()
-    state = await run_pipeline(raw_query, query_id, user_id=EVAL_USER_ID)
+    # Sprint A (HITL): the UI flow includes pending_review suppliers, but the
+    # benchmark must not — exclude_pending=True keeps SupplierBench-25
+    # reproducible regardless of any pending rows in the DB.
+    state = await run_pipeline(
+        raw_query, query_id, user_id=EVAL_USER_ID, exclude_pending=True
+    )
     exec_ms = int((time.time() - start) * 1000)
 
     ranked = state.get("ranked_suppliers", [])
@@ -130,20 +135,33 @@ async def _load_supplier_name_index(db: AsyncSession) -> dict[str, str]:
     """
     from sqlalchemy import select
 
-    from app.db.models import Supplier
+    from app.db.models import Supplier, SupplierStatus
 
-    result = await db.execute(select(Supplier.id, Supplier.name))
+    # Sprint A: pending_review suppliers are excluded from the P1 name index so
+    # the parametric baseline can never be scored against HITL-held rows.
+    result = await db.execute(
+        select(Supplier.id, Supplier.name).where(
+            Supplier.status != SupplierStatus.pending_review
+        )
+    )
     return {_normalise_name(name): str(sid) for sid, name in result.all() if name}
 
 
 async def _fetch_supplier_dicts(ids: list[str], db: AsyncSession) -> list[dict]:
     from sqlalchemy import select
 
-    from app.db.models import Supplier
+    from app.db.models import Supplier, SupplierStatus
 
     if not ids:
         return []
-    result = await db.execute(select(Supplier).where(Supplier.id.in_(ids)))
+    # Sprint A: never materialise pending_review suppliers into the P2 corpus,
+    # so benchmark scoring stays reproducible even if pending rows exist.
+    result = await db.execute(
+        select(Supplier).where(
+            Supplier.id.in_(ids),
+            Supplier.status != SupplierStatus.pending_review,
+        )
+    )
     rows = {str(s.id): s for s in result.scalars().all()}
     out = []
     for sid in ids:
