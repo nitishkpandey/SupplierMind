@@ -1,0 +1,71 @@
+{
+  "p1_singleprompt": {
+    "precision_at_5": {
+      "mean": 0.0,
+      "lo": 0.0,
+      "hi": 0.0,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "mrr": {
+      "mean": 0.0,
+      "lo": 0.0,
+      "hi": 0.0,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "csr": {
+      "mean": 0.0,
+      "lo": 0.0,
+      "hi": 0.0,
+      "n_queries": 25,
+      "n_resamples": 1000
+    }
+  },
+  "p2_rag": {
+    "precision_at_5": {
+      "mean": 0.35200000000000004,
+      "lo": 0.22400000000000003,
+      "hi": 0.48,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "mrr": {
+      "mean": 0.64,
+      "lo": 0.46,
+      "hi": 0.82,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "csr": {
+      "mean": 0.7933333333333333,
+      "lo": 0.69,
+      "hi": 0.8826666666666667,
+      "n_queries": 25,
+      "n_resamples": 1000
+    }
+  },
+  "suppliermind": {
+    "precision_at_5": {
+      "mean": 0.29600000000000004,
+      "lo": 0.17600000000000002,
+      "hi": 0.424,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "mrr": {
+      "mean": 0.5533333333333333,
+      "lo": 0.37333333333333335,
+      "hi": 0.7333333333333333,
+      "n_queries": 25,
+      "n_resamples": 1000
+    },
+    "csr": {
+      "mean": 0.6063333333333333,
+      "lo": 0.521,
+      "hi": 0.698,
+      "n_queries": 25,
+      "n_resamples": 1000
+    }
+  }
+}
