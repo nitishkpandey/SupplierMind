@@ -31,7 +31,7 @@ Parser (ReAct loop over a tool registry; semantic memory; clarification gate)
    │            └── may PAUSE: pending_clarifications row + SSE event;
    │                user answers via POST /queries/{id}/clarify and the
    │                pipeline resumes with the enriched query
-External Discovery (scope=both only: Tavily, Wikidata, OpenSanctions → auto-ingest)
+External Discovery (scope=both only: Tavily, Geoapify, OpenSanctions -> pending review)
    │
 Internal Discovery (Milvus semantic search + PostgreSQL constraint filtering)
    │
@@ -49,7 +49,7 @@ finalize (write accepted query to per-user semantic memory in Milvus)
 | Agent | Role | LLM use |
 |---|---|---|
 | Parser | ReAct loop: Thought → Action (tool) → Observation, max 6 iterations; emits structured `ParsedConstraints` | yes (loop + tools) |
-| Discovery | Hybrid retrieval: Milvus similarity + SQL constraint filters; three-tier scope (approved / my-list / discovered) | no |
+| Discovery | Hybrid retrieval: Milvus similarity + SQL constraint filters; three-tier scope (approved / my-list / pending review) | no |
 | Compliance | Builds a per-supplier × per-constraint matrix; every claimed fact must quote stored evidence or fail | yes (extraction) |
 | Ranking | Deterministic weighted scoring + human-readable explanations | template only |
 | Evaluator | Judges result quality; can send the pipeline back to discovery with feedback (bounded retries) | yes |
@@ -88,9 +88,18 @@ error message.
 
 1. **Approved** — org-level, admin-curated; default search scope.
 2. **My suppliers** — personal saves, user-scoped.
-3. **Discovered** — auto-ingested from external discovery; quarantined until
-   a human approves with a written justification (HITL; 422 on thin
+3. **Pending review** — web-discovered suppliers with verified city/country
+   and sanctions screening metadata. They remain visible in the query that
+   discovered them when they clear the ranking threshold, but they are
+   quarantined from benchmark/evaluation corpora and company-approved lists
+   until a human approves with a written justification (HITL; 422 on thin
    justifications).
+
+External discovery intentionally keeps the location stack small: Geoapify
+Geocoding validates extracted page locations or company-plus-query context;
+Geoapify Places is the second path when the page has no usable address. Web
+suppliers without a verified city, country, and coordinates are rejected before
+ingestion so the UI does not show `null` locations.
 
 Cross-user access is answered with 404 (not 403) so existence cannot be probed.
 

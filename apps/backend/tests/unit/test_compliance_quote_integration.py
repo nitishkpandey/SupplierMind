@@ -2,7 +2,7 @@
 
 The LLM is the one external boundary, so it is stubbed with canned JSON; the
 real _llm_check_certifications_batch parsing + verification runs unchanged. No
-Groq cost. Proves the fabrication catch (spec Test 2) end-to-end through the
+live LLM cost. Proves the fabrication catch (spec Test 2) end-to-end through the
 agent, not just the pure helper.
 """
 

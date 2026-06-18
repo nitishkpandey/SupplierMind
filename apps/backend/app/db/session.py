@@ -25,7 +25,7 @@ from app.core.config import settings
 # ── Async engine (for FastAPI routes) ────────────────────────────────
 async_engine = create_async_engine(
     settings.DATABASE_URL,              # postgresql+asyncpg://...
-    echo=settings.is_development,
+    echo=settings.SQL_ECHO,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
@@ -48,7 +48,7 @@ _sync_url = settings.DATABASE_URL.replace(
 
 sync_engine = create_engine(
     _sync_url,
-    echo=False,                  # Don't log every agent SQL query
+    echo=settings.SQL_ECHO,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,

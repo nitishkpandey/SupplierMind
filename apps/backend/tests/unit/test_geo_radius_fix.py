@@ -100,3 +100,18 @@ def test_plain_country_mismatch_still_fails():
     statuses = {r["constraint_name"]: r["status"] for r in result["compliance_results"]}
     assert statuses.get("country") == "FAIL"
     assert result["overall_pass"] is False
+
+
+def test_literal_null_country_is_treated_as_missing():
+    agent = _compliance_agent()
+    supplier = {
+        "id": "s3", "name": "Unverified Metals",
+        "country": "null", "certifications": [], "lead_time_days": None,
+    }
+    constraints = {"location_country": "Germany"}
+
+    result = agent._check_supplier(supplier, constraints, geo_distance=None)
+
+    statuses = {r["constraint_name"]: r["status"] for r in result["compliance_results"]}
+    assert "country" not in statuses
+    assert result["overall_pass"] is True

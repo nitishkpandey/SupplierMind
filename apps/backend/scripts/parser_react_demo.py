@@ -1,4 +1,4 @@
-"""Drive the new ReAct ParserAgent against the live Groq LLM and capture a trace.
+"""Drive the ReAct ParserAgent against the configured live LLM and capture a trace.
 
 Used for Task 3.1 evidence: prints a real trace + latency for the consolidated
 writeup. Bypasses the API layer so it does not require the long-running uvicorn

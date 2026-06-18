@@ -11,6 +11,7 @@ Two-phase ingestion (separate so embedding failure doesn't lose PG data):
 Usage:
     cd apps/backend
     uv run python scripts/bulk_ingest_synthetic.py
+    # Optional: --force-pg to re-check/insert missing Postgres rows even if a checkpoint exists
     # Optional: --skip-pg if Postgres rows already inserted
     # Optional: --resume to continue from checkpoint
     # Optional: --input <path> to use a different JSON file
@@ -282,6 +283,11 @@ def main() -> None:
         help="Skip the Postgres phase (use if rows already inserted).",
     )
     parser.add_argument(
+        "--force-pg",
+        action="store_true",
+        help="Run the idempotent Postgres phase even if the checkpoint says it is complete.",
+    )
+    parser.add_argument(
         "--skip-milvus",
         action="store_true",
         help="Skip the Milvus phase (debugging only).",
@@ -307,8 +313,10 @@ def main() -> None:
     checkpoint = _load_checkpoint()
 
     # Phase 1: Postgres
-    if args.skip_pg or checkpoint.get("pg_done"):
-        logger.info("Skipping Postgres phase (already complete or --skip-pg).")
+    if args.skip_pg:
+        logger.info("Skipping Postgres phase (--skip-pg).")
+    elif checkpoint.get("pg_done") and not args.force_pg:
+        logger.info("Skipping Postgres phase (checkpoint says complete; use --force-pg to re-check).")
     else:
         phase_postgres(records)
         checkpoint["pg_done"] = True

@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils";
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "de", label: "Deutsch" },
-  { code: "hi", label: "हिंदी" },
 ];
 
 export function AppLayout() {

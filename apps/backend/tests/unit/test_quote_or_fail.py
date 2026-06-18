@@ -1,6 +1,6 @@
 """Task 1.4 — quote-or-fail rule for LLM equivalence claims.
 
-Pure-function tests, no LLM/Groq cost. Covers the evidence pool builder,
+Pure-function tests, no live LLM cost. Covers the evidence pool builder,
 the verbatim-quote verifier, and the downgrade decision table.
 """
 

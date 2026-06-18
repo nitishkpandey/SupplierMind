@@ -1,12 +1,9 @@
-"""
-app/agents/ranking_agent.py — Multi-factor scoring with LLM explanations.
+"""Multi-factor supplier ranking with deterministic explanations.
 
-PRODUCTION V2 CHANGES:
-- Query-type aware weighting (dynamic weights based on parser classification)
-- Tier-based score boosting (Approved * 1.05, Saved * 1.03)
-- Severe compliance penalties
-- MINIMUM_SCORE raised to 0.40
-- Explainability prompt updated to reference tier
+The ranker combines compliance, semantic relevance, proximity, completeness,
+and supplier tier. Fresh web-discovered suppliers remain visible as
+pending-review results in the originating UI query so managers can approve or
+reject them without leaving the result context.
 """
 
 import json
@@ -16,10 +13,11 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState, RankedSupplier, SupplierComplianceResult
+from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
 
-MINIMUM_SCORE = 0.40        # Raised for production v2
+MINIMUM_SCORE = 0.40        # Suppliers below this score are excluded from visible results
 MAX_RESULTS = 5             # Return top 5 (Precision@5 metric in evaluation)
 HARD_FAIL_CONFIDENCE = 0.8  # Confidence above which a FAIL triggers the score penalty
 HARD_FAIL_PENALTY = 0.60    # Multiply total score by this on confirmed hard fail (40% cut)
@@ -28,7 +26,7 @@ TIER_BOOST_SAVED = 1.03     # User-saved supplier score boost
 PROXIMITY_DECAY_FACTOR = 2  # Linear decay: score = 0 at distance = radius × this factor
 
 
-# ── Template-based explanations (Task 1.5) ────────────────────────────
+# ── Template-based explanations ───────────────────────────────────────
 # Result explanations are assembled deterministically from the validated
 # compliance matrix and supplier data fields — no LLM writes any of it, so no
 # number, cert name, or fact can be hallucinated. Every value traces to a
@@ -39,7 +37,7 @@ PROXIMITY_DECAY_FACTOR = 2  # Linear decay: score = 0 at distance = radius × th
 # which we phrase from scratch so no LLM prose enters the explanation.
 _STRUCTURED_CONSTRAINTS = {"capacity", "lead_time", "location_radius", "country", "category"}
 
-# Quote-or-fail flags (Task 1.4) that mean "claim could not be verified".
+# Quote-or-fail flags that mean "claim could not be verified".
 _UNVERIFIED_FLAGS = {
     "quote_not_in_source", "quote_too_short",
     "equivalence_unverifiable", "quote_unverifiable",
@@ -88,14 +86,17 @@ def build_facts(supplier: dict, tier: str) -> dict:
     """Render the supplier's verifiable facts straight from the DB row."""
     lead = supplier.get("lead_time_days")
     location = ", ".join(
-        p for p in (supplier.get("city"), supplier.get("country")) if p
+        p for p in (
+            clean_optional_text(supplier.get("city")),
+            clean_optional_text(supplier.get("country")),
+        ) if p
     ) or "not specified"
     return {
         "capacity": _format_capacity(
             supplier.get("capacity_value"), supplier.get("capacity_unit") or ""
         ),
         "lead_time": f"{lead} days" if lead is not None else "not specified",
-        "certifications": supplier.get("certifications") or [],
+        "certifications": clean_text_list(supplier.get("certifications")),
         "location": location,
         "tier": tier,
     }
@@ -136,16 +137,54 @@ def build_summary(comp_result: dict) -> str:
 def has_blocking_fail(comp_result: dict) -> bool:
     """True if any compliance verdict for this candidate is FAIL.
 
-    Bug 3 (Phase D): a candidate with any FAIL verdict is hard-excluded from the
-    final result set rather than merely score-penalised, so known-non-compliant
-    suppliers never surface. The check keys on the verdict status itself, so an
-    evaluator downgrade to PARTIAL (with reasoning) lifts the block automatically
-    — a PARTIAL verdict is not a FAIL.
+    A candidate with any FAIL verdict is hard-excluded from the final result
+    set rather than merely score-penalised, so known-non-compliant suppliers
+    never surface. PARTIAL still remains eligible because it means "needs
+    confirmation", not "known failure".
     """
     return any(
         r.get("status") == "FAIL"
         for r in comp_result.get("compliance_results", [])
     )
+
+
+def _supplier_id(scored_result: tuple[float, SupplierComplianceResult]) -> str:
+    return scored_result[1]["supplier_id"]
+
+
+def _select_top_results(
+    scored: list[tuple[float, SupplierComplianceResult]],
+    forced_review_ids: set[str],
+    max_results: int = MAX_RESULTS,
+) -> list[tuple[float, SupplierComplianceResult]]:
+    """Pick top results while keeping fresh pending-review suppliers visible."""
+    scored = sorted(scored, key=lambda x: x[0], reverse=True)
+    top_results = scored[:max_results]
+    top_ids = {_supplier_id(item) for item in top_results}
+
+    missing_review_results = [
+        item for item in scored
+        if _supplier_id(item) in forced_review_ids and _supplier_id(item) not in top_ids
+    ]
+
+    for review_result in missing_review_results:
+        if len(top_results) < max_results:
+            top_results.append(review_result)
+        else:
+            replacement_index = next(
+                (
+                    i for i in range(len(top_results) - 1, -1, -1)
+                    if _supplier_id(top_results[i]) not in forced_review_ids
+                ),
+                None,
+            )
+            if replacement_index is None:
+                break
+            top_results[replacement_index] = review_result
+
+        top_results.sort(key=lambda x: x[0], reverse=True)
+
+    return top_results
 
 
 def build_explanation(
@@ -176,6 +215,8 @@ class RankingAgent(BaseAgent):
         constraints = state.get("parsed_constraints") or {}
         has_radius = bool(constraints.get("location_radius_km"))
         query_type = constraints.get("query_type", "general")
+        exclude_pending = bool(state.get("exclude_pending", False))
+        fresh_review_ids = set(state.get("newly_discovered_supplier_ids") or [])
 
         if not compliance_results:
             state["ranked_suppliers"] = []
@@ -221,16 +262,23 @@ class RankingAgent(BaseAgent):
         scored: list[tuple[float, SupplierComplianceResult]] = []
 
         excluded_fail = 0
+        excluded_pending = 0
+        below_threshold = 0
+        forced_review_ids: set[str] = set()
         for comp_result in compliance_results:
             sid = comp_result["supplier_id"]
+            tier = tier_assignments.get(sid, "discovered")
 
-            # Bug 3 (Phase D): hard-exclude any candidate with a FAIL verdict.
+            if exclude_pending and tier == "pending_review":
+                excluded_pending += 1
+                continue
+
             if has_blocking_fail(comp_result):
                 excluded_fail += 1
                 continue
 
             supplier = supplier_map.get(sid, {})
-            tier = tier_assignments.get(sid, "discovered")
+            is_fresh_review_candidate = tier == "pending_review" and sid in fresh_review_ids
 
             constraint_score = comp_result["pass_rate"]
             semantic_score = semantic_scores.get(sid, 0.5)
@@ -264,12 +312,15 @@ class RankingAgent(BaseAgent):
             elif tier == "saved":
                 total = min(1.0, total * TIER_BOOST_SAVED)
 
-            if total >= MINIMUM_SCORE:
-                scored.append((total, comp_result))
+            if total < MINIMUM_SCORE:
+                below_threshold += 1
+                continue
 
-        # Sort by total score (highest first)
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top_results = scored[:MAX_RESULTS]
+            scored.append((total, comp_result))
+            if is_fresh_review_candidate:
+                forced_review_ids.add(sid)
+
+        top_results = _select_top_results(scored, forced_review_ids)
 
         # ── Generate explanations for top results ─────────────────────
         ranked: list[dict] = []
@@ -286,7 +337,7 @@ class RankingAgent(BaseAgent):
             ) if has_radius else None
             completeness_score = self._calculate_completeness(supplier)
 
-            # Task 1.5: deterministic, template-based explanation — no LLM.
+            # Deterministic, template-based explanation; no LLM text.
             # Stored as a JSON string in the Text column; the API parses it back
             # into a structured object for the frontend.
             explanation = json.dumps(
@@ -320,8 +371,11 @@ class RankingAgent(BaseAgent):
             output_summary=(
                 f"Top {len(ranked)} results. "
                 f"Scores: {[round(r['total_score'], 2) for r in ranked]}. "
-                f"{len(scored) - len(ranked)} below threshold ({MINIMUM_SCORE}). "
-                f"{excluded_fail} excluded for FAIL verdict."
+                f"{max(0, len(scored) - len(ranked))} eligible not selected. "
+                f"{below_threshold} candidates excluded below score threshold ({MINIMUM_SCORE}). "
+                f"{excluded_fail} excluded for FAIL verdict. "
+                f"{excluded_pending} pending excluded for eval. "
+                f"{len(forced_review_ids)} fresh review candidate(s) kept visible."
             ),
             duration_ms=duration_ms,
             reasoning=f"Dynamic weights: constraint={w_constraint}, "
@@ -358,4 +412,3 @@ class RankingAgent(BaseAgent):
             if supplier.get(f) not in (None, [], "", 0)
         )
         return filled / len(fields)
-

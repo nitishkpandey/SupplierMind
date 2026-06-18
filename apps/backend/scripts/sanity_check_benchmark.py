@@ -68,13 +68,12 @@ def main() -> None:
     if log_path.exists():
         log_text = log_path.read_text(encoding="utf-8", errors="replace")
         openai_retries = len(re.findall(r"Retrying app\.core\.llm\.OpenAIProvider", log_text))
-        groq_retries = len(re.findall(r"Retrying app\.core\.llm\.GroqProvider", log_text))
         voyage_retries = len(re.findall(r"Retrying app\.core\.embeddings", log_text))
-        fallbacks = len(re.findall(r"\[llm-fallback\]", log_text))
+        fallback_events = len(re.findall(r"\[llm-fallback\]|FallbackLLMClient", log_text))
         findings.append((
-            "retry counts", fallbacks == 0,
-            f"openai={openai_retries}, groq={groq_retries}, voyage={voyage_retries}, "
-            f"llm-fallback events={fallbacks} (fallbacks would mix models across paradigms)",
+            "retry counts", fallback_events == 0,
+            f"openai={openai_retries}, voyage={voyage_retries}, "
+            f"llm-fallback events={fallback_events} (fallbacks would mix models across paradigms)",
         ))
     else:
         findings.append(("retry counts", False, f"log not found: {log_path}"))

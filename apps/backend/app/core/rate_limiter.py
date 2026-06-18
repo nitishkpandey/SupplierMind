@@ -28,9 +28,8 @@ WINDOW_SECONDS = 60.0
 SAFETY_MARGIN = 0.85
 
 # Per-model API limits. OpenAI paid tier 1 (conservative vs the published
-# 500 RPM / 200K TPM so bursts never 429). The Groq/llama entries were removed
-# in Phase C (ADR-002); the prefix fallback in _caps resolves dated snapshots
-# to their family.
+# 500 RPM / 200K TPM so bursts never 429). Prefix matching resolves dated
+# snapshots to their family.
 MODEL_RATE_LIMITS: dict[str, dict[str, int]] = {
     "gpt-4o-mini": {"rpm": 400, "tpm": 180_000},
 }
@@ -40,12 +39,8 @@ MODEL_RATE_LIMITS: dict[str, dict[str, int]] = {
 DEFAULT_LIMIT: dict[str, int] = {"rpm": 30, "tpm": 6_000}
 
 
-class GroqRateLimiter:
+class ModelRateLimiter:
     """Per-model sliding-window limiter. Call acquire() before each API call.
-
-    Name retained for git-blame continuity; post-Phase-C this is a generic
-    rate limiter (it throttles OpenAI). Proper rename deferred to post-thesis
-    cleanup.
     """
 
     def __init__(
@@ -196,15 +191,15 @@ def _default_audit_writer(event: dict[str, Any]) -> None:
         session.commit()
 
 
-_limiter: GroqRateLimiter | None = None
+_limiter: ModelRateLimiter | None = None
 _limiter_lock = threading.Lock()
 
 
-def get_rate_limiter() -> GroqRateLimiter:
+def get_rate_limiter() -> ModelRateLimiter:
     """Process-wide singleton limiter shared across all agents/threads."""
     global _limiter
     if _limiter is None:
         with _limiter_lock:
             if _limiter is None:
-                _limiter = GroqRateLimiter(audit_writer=_default_audit_writer)
+                _limiter = ModelRateLimiter(audit_writer=_default_audit_writer)
     return _limiter

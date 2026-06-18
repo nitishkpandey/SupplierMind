@@ -29,6 +29,7 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState, ComplianceResult, SupplierComplianceResult
+from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
 
@@ -421,15 +422,17 @@ class ComplianceAgent(BaseAgent):
         sc_count = 0   # short-circuited (deterministic, no-LLM) verdicts for this supplier
 
         # ── Hard check: Category ──────────────────────────────────────
-        if constraints.get("category") and supplier.get("category"):
-            status = "PASS" if supplier["category"] == constraints["category"] else "FAIL"
+        req_category = clean_optional_text(constraints.get("category"))
+        sup_category = clean_optional_text(supplier.get("category"))
+        if req_category and sup_category:
+            status = "PASS" if sup_category == req_category else "FAIL"
             results.append({
                 "constraint_name": "category",
                 "status": status,
                 "reason": (
-                    f"Supplier category '{supplier['category']}' "
+                    f"Supplier category '{sup_category}' "
                     f"{'matches' if status == 'PASS' else 'does not match'} "
-                    f"required '{constraints['category']}'"
+                    f"required '{req_category}'"
                 ),
                 "confidence": CATEGORY_CONFIDENCE,
             })
@@ -445,8 +448,10 @@ class ComplianceAgent(BaseAgent):
         # The geocoded centre of a "within Nkm of <city>" query is a city, not a
         # country, so equality would FAIL every supplier spuriously.
         has_radius_constraint = bool(constraints.get("location_radius_km"))
-        req_country = (constraints.get("location_country") or "").strip().casefold()
-        sup_country = (supplier.get("country") or "").strip().casefold()
+        req_country_text = clean_optional_text(constraints.get("location_country"))
+        sup_country_text = clean_optional_text(supplier.get("country"))
+        req_country = (req_country_text or "").casefold()
+        sup_country = (sup_country_text or "").casefold()
         if not has_radius_constraint \
                 and req_country and sup_country and req_country != sup_country \
                 and req_country not in sup_country and sup_country not in req_country:
@@ -454,15 +459,15 @@ class ComplianceAgent(BaseAgent):
                 "constraint_name": "country",
                 "status": "FAIL",
                 "reason": (
-                    f"Supplier is in {supplier.get('country')}, "
-                    f"required country is {constraints.get('location_country')}"
+                    f"Supplier is in {sup_country_text}, "
+                    f"required country is {req_country_text}"
                 ),
                 "confidence": 1.0,
             })
             sc_count += 1
 
         # ── Hard check: Certifications ────────────────────────────────
-        supplier_certs_raw = supplier.get("certifications") or []
+        supplier_certs_raw = clean_text_list(supplier.get("certifications"))
         supplier_certs = [c.upper() for c in supplier_certs_raw]
         required_certs = constraints.get("certifications") or []
         certs_needing_llm: list[str] = []
@@ -778,4 +783,3 @@ Return JSON object:
                 "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} is below minimum {min_cap:,.0f}",
                 "confidence": 1.0,
             }
-

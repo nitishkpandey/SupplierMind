@@ -1,12 +1,4 @@
-"""
-app/agents/external_discovery_agent.py — Discovers NEW suppliers from external sources.
-
-PRODUCTION V2 CHANGES:
-- Two-stage extraction (stage1_classify → stage2_extract)
-- Source URL and citations stored per supplier
-- Suppliers ingested as SupplierStatus.discovered (Tier 3)
-- Richer description generation for better semantic search matching
-"""
+"""Discover new suppliers from external sources and hold them for review."""
 
 import logging
 import time
@@ -19,11 +11,10 @@ from app.core.config import settings
 from app.db.session import SyncSessionLocal
 from app.db.models import Supplier, SupplierStatus
 from app.services.web_search import get_web_search_service
-from app.services.wikidata import get_wikidata_service
 from app.services.sanctions import get_sanctions_service
 from app.services.supplier_extraction import SupplierExtractionService
+from app.services.location_enrichment import get_location_enrichment_service, VerifiedLocation
 from app.core.vector_store import get_vector_store
-from app.core.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +31,9 @@ class ExternalDiscoveryAgent(BaseAgent):
     def __init__(self) -> None:
         super().__init__()
         self.web_search = get_web_search_service()
-        self.wikidata = get_wikidata_service()
         self.sanctions = get_sanctions_service()
         self.extractor = SupplierExtractionService()
+        self.location_enricher = get_location_enrichment_service()
 
     def execute(self, state: AgentState) -> AgentState:
         start = time.time()
@@ -135,10 +126,21 @@ class ExternalDiscoveryAgent(BaseAgent):
         validated: list[dict] = []
         rejected_sanctions = 0
         rejected_duplicate = 0
+        rejected_missing_location = 0
         pending_sanctions = 0
 
         with SyncSessionLocal() as db:
             for s in extracted:
+                location = self.location_enricher.enrich(s, constraints)
+                if location is None:
+                    logger.info(
+                        "[external_discovery] Missing verified location: %r",
+                        s["name"],
+                    )
+                    rejected_missing_location += 1
+                    continue
+                self._apply_verified_location(s, location)
+
                 screening = self.sanctions.screen_company(s["name"])
                 if screening.status == "flagged":
                     logger.warning(
@@ -165,12 +167,6 @@ class ExternalDiscoveryAgent(BaseAgent):
                     rejected_duplicate += 1
                     continue
 
-                wd_data = self.wikidata.lookup_company(s["name"])
-                if wd_data:
-                    s["wikidata_id"] = wd_data.get("wikidata_id")
-                    if not s.get("country") and wd_data.get("country"):
-                        s["country"] = wd_data["country"]
-
                 validated.append(s)
 
         logger.debug(
@@ -194,6 +190,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             "rejected_sanctions": rejected_sanctions,
             "pending_sanctions": pending_sanctions,
             "rejected_duplicates": rejected_duplicate,
+            "rejected_missing_location": rejected_missing_location,
             "ingested": len(newly_added_ids),
         }
 
@@ -210,16 +207,31 @@ class ExternalDiscoveryAgent(BaseAgent):
                 f"extracted={len(extracted)}, validated={len(validated)}, "
                 f"ingested={len(newly_added_ids)}, "
                 f"rejected_sanctions={rejected_sanctions}, pending_sanctions={pending_sanctions}, "
-                f"duplicates={rejected_duplicate}"
+                f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}"
             ),
             duration_ms=duration_ms,
             reasoning=(
-                f"Two-stage web extraction. "
-                f"{len(newly_added_ids)} new suppliers added as discovered (Tier 3)."
+                "Two-stage web extraction plus Geoapify location validation. "
+                f"{len(newly_added_ids)} new suppliers added as pending review."
             ),
         )
 
         return state
+
+    @staticmethod
+    def _apply_verified_location(supplier: dict, location: VerifiedLocation) -> None:
+        supplier["city"] = location.city
+        supplier["country"] = location.country
+        supplier["address"] = location.formatted_address or supplier.get("address")
+        supplier["latitude"] = location.latitude
+        supplier["longitude"] = location.longitude
+        citations = supplier.setdefault("source_citations", {}) or {}
+        citations["location"] = {
+            "source": location.source,
+            "confidence": location.confidence,
+            "formatted_address": location.formatted_address,
+        }
+        supplier["source_citations"] = citations
 
     def _is_duplicate(self, db, name: str, country: Optional[str]) -> bool:
         """Check if a supplier already exists by name + country (case-insensitive)."""
@@ -252,6 +264,7 @@ class ExternalDiscoveryAgent(BaseAgent):
                         category=s.get("category"),
                         country=s.get("country"),
                         city=s.get("city"),
+                        address=s.get("address"),
                         latitude=s.get("latitude"),
                         longitude=s.get("longitude"),
                         certifications=s.get("certifications") or [],
@@ -262,10 +275,9 @@ class ExternalDiscoveryAgent(BaseAgent):
                         website=s.get("website"),
                         contact_email=s.get("contact_email"),
                         source="web_discovery",
-                        # Production v2 + Sprint A HITL: web-discovered suppliers
-                        # enter a "pending_review" holding state so they no longer
-                        # bypass admin approval. They still get embedded (below,
-                        # after commit) and show in normal search with a badge.
+                        # Web-discovered suppliers enter a pending-review state
+                        # so they never bypass manager approval. They are still
+                        # embedded after commit and shown with a badge in search.
                         status=SupplierStatus.pending_review,
                         source_url=s.get("source_url"),
                         source_citations=s.get("source_citations") or {},
@@ -290,4 +302,3 @@ class ExternalDiscoveryAgent(BaseAgent):
             logger.error("[external_discovery] Ingestion failed: %s", e)
 
         return new_ids
-

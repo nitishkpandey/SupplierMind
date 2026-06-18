@@ -69,9 +69,9 @@ class DiscoveryAgent(BaseAgent):
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
         user_id = state.get("user_id")
-        # Sprint A (HITL): pending_review suppliers are in-scope for normal
-        # search so the UI can surface them with a badge. The eval path sets
-        # exclude_pending=True so benchmark scoring never sees them.
+        # HITL: pending_review suppliers are in-scope only for "both"
+        # (Discover New Suppliers). Approved-only stays approved/saved DB rows.
+        # The eval path also sets exclude_pending=True for reproducibility.
         exclude_pending = state.get("exclude_pending", False)
 
         return self._run_search(
@@ -108,6 +108,7 @@ class DiscoveryAgent(BaseAgent):
 
         # ── Step 2 & 3: Structured + Geospatial (sync DB) ────────
         structured_ranked: dict[str, int] = {}
+        fresh_ranked: dict[str, int] = {}
         geo_ranked: dict[str, int] = {}
         geo_distances: dict[str, float] = {}
         tier_assignments: dict[str, str] = {}
@@ -116,16 +117,14 @@ class DiscoveryAgent(BaseAgent):
             with SyncSessionLocal() as db:
                 # Build base condition for scope
                 # approved_only = status=='approved' OR user_supplier_saves matching this user
-                # both = status IN ('approved', 'discovered') OR user_supplier_saves
-                # Sprint A (HITL): pending_review joins the in-scope set so held
-                # suppliers appear in normal results — unless exclude_pending is
-                # set (the eval path), which keeps the benchmark reproducible.
+                # both = status IN ('approved', 'discovered', 'pending_review')
+                # unless exclude_pending is set for evaluation.
                 base_conds = []
                 if search_scope == "approved_only":
                     in_scope_statuses = [SupplierStatus.approved]
                 else:
                     in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
-                if not exclude_pending:
+                if search_scope != "approved_only" and not exclude_pending:
                     in_scope_statuses.append(SupplierStatus.pending_review)
                 base_conds.append(Supplier.status.in_(in_scope_statuses))
 
@@ -144,23 +143,51 @@ class DiscoveryAgent(BaseAgent):
                 category = constraints.get("category_hint")
                 country = self._extract_country_from_constraints(constraints)
                 certs = constraints.get("certifications")
+                product_terms = self._product_keyword_terms(constraints)
 
-                query = select(Supplier).where(Supplier.is_active == True).where(scope_filter)
+                has_structured_filters = bool(category or country or certs or product_terms)
+                structured = []
+                if has_structured_filters:
+                    query = select(Supplier).where(Supplier.is_active == True).where(scope_filter)
 
-                if category:
-                    query = query.where(Supplier.category == category)
-                if country:
-                    query = query.where(Supplier.country == country)
-                if certs:
-                    for c in certs:
-                        query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
+                    if category:
+                        query = query.where(Supplier.category == category)
+                    if country:
+                        query = query.where(Supplier.country == country)
+                    if certs:
+                        for c in certs:
+                            query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
+                    if product_terms:
+                        term_filters = []
+                        for term in product_terms:
+                            pattern = f"%{term}%"
+                            term_filters.extend([
+                                Supplier.name.ilike(pattern),
+                                Supplier.description.ilike(pattern),
+                                Supplier.category.ilike(pattern),
+                            ])
+                        query = query.where(or_(*term_filters))
 
-                structured = db.execute(query.limit(20)).scalars().all()
+                    structured = db.execute(query.limit(20)).scalars().all()
                 structured_ranked = {str(s.id): i + 1 for i, s in enumerate(structured)}
                 logger.debug("[discovery] Structured filter: %d results", len(structured))
 
+                fresh_ids = self._valid_newly_discovered_ids(
+                    db=db,
+                    ids=state.get("newly_discovered_supplier_ids", []),
+                    scope=search_scope,
+                    user_id=user_id,
+                    exclude_pending=exclude_pending,
+                )
+                fresh_ranked = {sid: i + 1 for i, sid in enumerate(fresh_ids)}
+                if fresh_ranked:
+                    logger.debug(
+                        "[discovery] Fresh external candidates carried forward: %d",
+                        len(fresh_ranked),
+                    )
+
                 # Build tier assignments for ALL found suppliers
-                all_found_ids = set(semantic_ranked) | set(structured_ranked)
+                all_found_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked)
                 if all_found_ids:
                     # Determine tiers
                     suppliers_info = db.execute(
@@ -210,7 +237,7 @@ class DiscoveryAgent(BaseAgent):
             logger.error("[discovery] DB search failed: %s", e)
 
         # ── Step 4: Merge with Reciprocal Rank Fusion ─────────────────
-        all_ids = set(semantic_ranked) | set(structured_ranked) | set(geo_ranked)
+        all_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked) | set(geo_ranked)
         rrf_scores: dict[str, float] = {}
         for sid in all_ids:
             score = 0.0
@@ -218,6 +245,8 @@ class DiscoveryAgent(BaseAgent):
                 score += 1.0 / (RRF_K + semantic_ranked[sid])
             if sid in structured_ranked:
                 score += 1.0 / (RRF_K + structured_ranked[sid])
+            if sid in fresh_ranked:
+                score += 1.0 / (RRF_K + fresh_ranked[sid])
             if sid in geo_ranked:
                 score += 1.0 / (RRF_K + geo_ranked[sid])
             rrf_scores[sid] = score
@@ -238,6 +267,7 @@ class DiscoveryAgent(BaseAgent):
             output_summary=(
                 f"semantic={len(semantic_ranked)}, "
                 f"structured={len(structured_ranked)}, "
+                f"fresh={len(fresh_ranked)}, "
                 f"merged={len(candidate_ids)}"
             ),
             duration_ms=duration_ms,
@@ -284,14 +314,36 @@ class DiscoveryAgent(BaseAgent):
 
         return state
 
+    def _valid_newly_discovered_ids(
+        self,
+        db,
+        ids: list[str],
+        scope: str,
+        user_id: str,
+        exclude_pending: bool = False,
+    ) -> list[str]:
+        """Return freshly ingested web supplier IDs that belong in this run.
+
+        External discovery already decided these rows are relevant enough to
+        create for the current query. Carry them forward as their own retrieval
+        signal so the immediate shortlist does not depend on the vector index
+        rediscovering newly inserted rows in the same pipeline pass.
+        """
+        ordered = [str(sid) for sid in ids if sid]
+        if not ordered or scope == "approved_only":
+            return []
+
+        valid = self._filter_ids_by_scope(db, ordered, scope, user_id, exclude_pending)
+        return [sid for sid in ordered if sid in valid]
+
     def _filter_ids_by_scope(
         self, db, sids: list[str], scope: str, user_id: str, exclude_pending: bool = False
     ) -> set[str]:
         """Returns subset of IDs that are allowed by the current search scope.
 
-        Sprint A (HITL): pending_review is in-scope for normal search so held
-        suppliers surface in the UI; the eval path passes exclude_pending=True
-        to keep them out of benchmark scoring.
+        pending_review is in-scope only for Discover New Suppliers (`both`);
+        the eval path passes exclude_pending=True to keep held suppliers out
+        of benchmark scoring.
         """
         if not sids:
             return set()
@@ -301,7 +353,7 @@ class DiscoveryAgent(BaseAgent):
             in_scope_statuses = [SupplierStatus.approved]
         else:
             in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
-        if not exclude_pending:
+        if scope != "approved_only" and not exclude_pending:
             in_scope_statuses.append(SupplierStatus.pending_review)
         base_conds.append(Supplier.status.in_(in_scope_statuses))
 
@@ -329,6 +381,25 @@ class DiscoveryAgent(BaseAgent):
         if constraints.get("location_name"):
             parts.append(f"location: {constraints['location_name']}")
         return " | ".join(parts)
+
+    @staticmethod
+    def _product_keyword_terms(constraints: dict) -> list[str]:
+        """Terms for DB keyword retrieval when embeddings are incomplete."""
+        raw_terms = []
+        if constraints.get("product_type"):
+            raw_terms.append(str(constraints["product_type"]))
+        raw_terms.extend(str(term) for term in constraints.get("product_keywords") or [])
+
+        seen = set()
+        terms = []
+        for term in raw_terms:
+            cleaned = " ".join(term.strip().split())
+            key = cleaned.casefold()
+            if len(cleaned) < 3 or key in seen:
+                continue
+            seen.add(key)
+            terms.append(cleaned)
+        return terms[:8]
 
     def _decide_relaxation(
         self,

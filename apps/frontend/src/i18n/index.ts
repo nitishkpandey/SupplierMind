@@ -4,7 +4,6 @@ import LanguageDetector from "i18next-browser-languagedetector";
 
 import en from "./locales/en.json";
 import de from "./locales/de.json";
-import hi from "./locales/hi.json";
 
 i18n
   .use(LanguageDetector)
@@ -13,7 +12,6 @@ i18n
     resources: {
       en: { translation: en },
       de: { translation: de },
-      hi: { translation: hi },
     },
     fallbackLng: "en",
     debug: false,

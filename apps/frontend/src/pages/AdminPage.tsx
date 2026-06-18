@@ -182,7 +182,7 @@ export default function AdminPage() {
           <Card>
             <CardHeader>
               <CardTitle>Supplier Database</CardTitle>
-              <CardDescription>100 suppliers in SupplierBench dataset</CardDescription>
+              <CardDescription>Active supplier count is read from the database</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">

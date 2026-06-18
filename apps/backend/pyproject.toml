@@ -23,7 +23,7 @@ dependencies = [
     # Embeddings
     "voyageai==0.2.3",
     # Vector Database
-    "pymilvus==2.4.9",
+    "pymilvus==2.3.7",
     "chromadb==0.5.3",
     # Cache
     "redis==5.0.6",

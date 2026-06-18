@@ -12,12 +12,13 @@ from typing import Annotated, AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import resume_pipeline, run_pipeline
 from app.api.deps import assert_owner_or_admin, get_current_user, require_manager
 from app.core.config import settings
-from app.db.models import Query, QueryResult, AuditLog, QueryStatus, User
+from app.db.models import AuditLog, PendingClarification, Query, QueryResult, QueryStatus, User
 from app.db.repositories.clarification_repo import (
     ClarificationAlreadyResolved,
     ClarificationRepository,
@@ -191,9 +192,9 @@ async def stream_query_progress(
                 event_type = event.get("type", "agent_update")
                 yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
                 sent_count += 1
-                # Task 3.3 — `needs_clarification` also terminates the stream:
-                # the frontend renders the question, the user answers, the
-                # /clarify endpoint resumes and the client re-subscribes.
+                # A clarification question terminates this stream. The frontend
+                # renders the question, submits the answer, and re-subscribes
+                # while the resumed pipeline continues.
                 if event_type in ("complete", "error", "needs_clarification"):
                     return
 
@@ -251,6 +252,33 @@ async def list_queries(
     }
 
 
+@router.delete(
+    "/history",
+    summary="Clear query history for current user",
+)
+async def clear_query_history(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete the current user's query history and query-scoped artifacts."""
+    user_query_ids = select(Query.id).where(Query.user_id == current_user.id)
+
+    await db.execute(
+        delete(QueryResult).where(QueryResult.query_id.in_(user_query_ids))
+    )
+    await db.execute(
+        delete(AuditLog).where(AuditLog.query_id.in_(user_query_ids))
+    )
+    await db.execute(
+        delete(PendingClarification).where(PendingClarification.query_id.in_(user_query_ids))
+    )
+    result = await db.execute(
+        delete(Query).where(Query.user_id == current_user.id)
+    )
+    await db.commit()
+    return {"deleted": max(0, int(result.rowcount or 0))}
+
+
 @router.get(
     "/{query_id}",
     summary="Get query status and results",
@@ -286,9 +314,8 @@ async def get_query(
 
     def _result_dict(r: QueryResult) -> dict:
         supplier = supplier_map.get(str(r.supplier_id))
-        # Task 1.5: explanation is stored as a JSON structured object. Parse it
-        # into explanation_detail; keep explanation as the plain summary string
-        # (legacy rows hold plain text and pass through unchanged).
+        # Explanation is stored as structured JSON when available. Keep the
+        # legacy string path for older rows that still hold plain text.
         explanation_text = r.explanation or ""
         explanation_detail = None
         if explanation_text:
@@ -315,8 +342,8 @@ async def get_query(
             "supplier_source": supplier.source if supplier else None,
             "supplier_status": supplier.status.value if supplier else None,
             "tier": supplier.status.value if supplier else None,
-            # Task 1.6: only present when screening couldn't complete; absence
-            # means no pending state (we never assert "clear" in the UI).
+            # Only present when screening couldn't complete; absence means no
+            # pending state, not an explicit "clear" assertion.
             "sanctions_status": (
                 (supplier.source_citations or {}).get("sanctions", {}).get("status")
                 if supplier else None
@@ -330,7 +357,7 @@ async def get_query(
             "explanation": explanation_text,
             "explanation_detail": explanation_detail,
             "distance_km": r.distance_km,
-            # Task 2.4: HITL approval rationale — only present after an admin decision.
+            # Manager approval rationale, only present after a decision.
             "approval_justification": supplier.approval_justification if supplier else None,
             "approval_action": supplier.approval_action if supplier else None,
             "approval_decided_at": (
@@ -401,7 +428,7 @@ async def get_audit_trail(
     }
 
 
-# ── Task 3.3 — Multi-turn clarification endpoints ────────────────────
+# ── Multi-turn clarification endpoints ────────────────────────────────
 
 
 @router.get(
@@ -701,9 +728,9 @@ async def _run_pipeline_background(
                 "duration_ms": entry.get("duration_ms", 0),
             })
 
-        # Task 3.3 — pause for clarification. Don't write QueryResult rows,
-        # don't mark the query completed; instead leave status=pending and
-        # surface the question via SSE + audit log persistence.
+        # Pause for clarification. Don't write QueryResult rows or mark the
+        # query completed; leave status=pending and surface the question via
+        # SSE plus audit-log persistence.
         #
         # Pause ONLY when a pending_clarifications row exists
         # (clarification_id set). The degraded Parser paths
@@ -799,8 +826,8 @@ async def _run_pipeline_background(
                 db.add(result)
 
             for entry in final_state.get("audit_log", []):
-                # Task 3.1: prefer structured snapshots (ReAct trace) when
-                # provided; otherwise fall back to wrapping the plain summary.
+                # Prefer structured snapshots when present; otherwise fall
+                # back to wrapping the plain summary.
                 input_snap = entry.get("input_snapshot") or {
                     "summary": entry.get("input_summary", "")
                 }

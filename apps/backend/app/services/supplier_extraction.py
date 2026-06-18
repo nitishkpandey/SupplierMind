@@ -18,14 +18,14 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from app.core.llm import get_llm_client
-from app.services.geocoding import GeocodingService
 from app.services.page_fetcher import fetch_page_content
+from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
 
 # Hosts that are aggregators/directories/news/social, never a supplier's own
-# site. Used as a fallback classifier when the stage-1 LLM call fails (e.g.
-# Groq rate-limit), so throttling doesn't silently drop real candidates.
+# site. Used as a fallback classifier when the stage-1 LLM call fails, so
+# throttling or transient provider errors do not silently drop real candidates.
 _DIRECTORY_HOST_MARKERS = (
     "wikipedia.org", "linkedin.com", "facebook.com", "twitter.com", "x.com",
     "youtube.com", "instagram.com", "reddit.com", "quora.com", "medium.com",
@@ -66,7 +66,7 @@ Return JSON only:
 STAGE_2_PROMPT = """You are extracting structured supplier data from a company's webpage.
 
 CRITICAL RULES:
-1. Only extract facts EXPLICITLY stated in the source text. If you can't find it, use null.
+1. Only extract facts EXPLICITLY stated in the source text. If you can't find it, use JSON null, never the string "null".
 2. Quote source text for each non-trivial field in the "citations" object.
 3. Numeric values MUST appear verbatim in source text — do not infer or estimate.
 4. The "description" field is critical for semantic search — write 2-4 rich sentences.
@@ -123,7 +123,6 @@ class SupplierExtractionService:
 
     def __init__(self) -> None:
         self.llm = get_llm_client()
-        self.geocoder = GeocodingService()
 
     def stage1_classify(
         self, title: str, url: str, snippet: str
@@ -145,7 +144,7 @@ class SupplierExtractionService:
             )
             return json.loads(raw)
         except Exception as e:
-            # LLM unavailable (commonly Groq rate-limit). Do NOT auto-reject —
+            # LLM unavailable. Do NOT auto-reject —
             # that silently discards real suppliers when the API is throttled.
             # Fall back to a URL heuristic so only obvious directories drop.
             logger.warning("[extraction] Stage 1 LLM failed, using URL heuristic: %s", e)
@@ -204,33 +203,27 @@ class SupplierExtractionService:
             return None
 
         # Verification: hallucination guards
-        verified = self._verify_facts(parsed, full_content)
+        verified = self._normalise_extracted_fields(
+            self._verify_facts(parsed, full_content)
+        )
 
         # Validate name
-        if not verified.get("name") or not isinstance(verified["name"], str):
+        if not verified.get("name"):
             return None
-
-        # Geocode if location available
-        lat, lng = None, None
-        if verified.get("city") and verified.get("country"):
-            coords = self.geocoder.geocode(
-                f"{verified['city']}, {verified['country']}"
-            )
-            if coords:
-                lat, lng = coords
 
         # Build source_citations dict
         citations_dict = {}
         raw_citations = verified.get("citations") or {}
         for field in ("name", "description", "certifications", "capacity", "lead_time_days"):
-            if raw_citations.get(field):
+            source_phrase = clean_optional_text(raw_citations.get(field))
+            if source_phrase:
                 citations_dict[field] = {
                     "url": url,
-                    "source_phrase": str(raw_citations[field])[:300],
+                    "source_phrase": source_phrase[:300],
                 }
 
         return {
-            "name": verified["name"].strip(),
+            "name": verified["name"],
             "description": verified.get("description") or "",
             "primary_products": verified.get("primary_products") or [],
             "industries_served": verified.get("industries_served") or [],
@@ -238,8 +231,8 @@ class SupplierExtractionService:
             "country": verified.get("country"),
             "city": verified.get("city"),
             "address": verified.get("address"),
-            "latitude": lat,
-            "longitude": lng,
+            "latitude": None,
+            "longitude": None,
             "certifications": verified.get("certifications") or [],
             "capacity_value": verified.get("capacity_value"),
             "capacity_unit": verified.get("capacity_unit"),
@@ -311,6 +304,31 @@ class SupplierExtractionService:
             verified["certifications"] = verified_certs
 
         return verified
+
+    @classmethod
+    def _normalise_extracted_fields(cls, parsed: dict) -> dict:
+        cleaned = dict(parsed)
+
+        for field in (
+            "name",
+            "description",
+            "country",
+            "city",
+            "address",
+            "capacity_unit",
+            "website",
+            "contact_email",
+        ):
+            cleaned[field] = clean_optional_text(cleaned.get(field))
+
+        cleaned["primary_products"] = clean_text_list(cleaned.get("primary_products"))
+        cleaned["industries_served"] = clean_text_list(cleaned.get("industries_served"))
+        cleaned["certifications"] = clean_text_list(cleaned.get("certifications"))
+
+        if cleaned.get("capacity_value") is None:
+            cleaned["capacity_unit"] = None
+
+        return cleaned
 
     def _infer_category(self, parsed: dict) -> Optional[str]:
         """Heuristic category from product/industry keywords."""

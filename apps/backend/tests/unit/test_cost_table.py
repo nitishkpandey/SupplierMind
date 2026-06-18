@@ -42,11 +42,11 @@ def test_startup_guard_predicate():
     assert model_cost_is_known("gpt-4o") is False  # not a known family prefix
 
 
-def test_groq_models_removed_from_cost_table():
-    # Post-Phase-C (ADR-002): Groq/llama models are gone from the table, so they
-    # now raise rather than resolve. The OpenAI snapshot is the only priced entry.
+def test_unsupported_models_raise_from_cost_table():
+    # Single-provider deployment: unsupported model families raise rather than
+    # resolve silently. The OpenAI snapshot is the only priced entry.
     with pytest.raises(UnknownModelCostError):
-        resolve_cost_rates("llama-3.1-8b-instant")
+        resolve_cost_rates("unsupported-chat-model")
     assert resolve_cost_rates("gpt-4o-mini-2024-07-18") == (0.15, 0.60)
 
 
@@ -63,9 +63,9 @@ def test_is_pinned_snapshot_accepts_dated_and_rejects_alias():
 def test_rate_limiter_dated_snapshot_inherits_family_caps():
     # a pinned snapshot must resolve to gpt-4o-mini's generous caps, not the
     # conservative default (Audit H rate-limiter coupling).
-    from app.core.rate_limiter import GroqRateLimiter
+    from app.core.rate_limiter import ModelRateLimiter
 
-    limiter = GroqRateLimiter()
+    limiter = ModelRateLimiter()
     family = limiter._caps("gpt-4o-mini")
     snapshot = limiter._caps("gpt-4o-mini-2024-07-18")
     default = limiter._caps("some-unknown-model")

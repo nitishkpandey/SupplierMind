@@ -1,6 +1,6 @@
 """Drive the Task 3.2 killer demo: cross-query memory hop in the Parser.
 
-Two queries against the live Groq LLM, real Voyage embeddings, real Milvus.
+Two queries against the configured live LLM, real Voyage embeddings, real Milvus.
 
   Q1: ISO 9001 certified packaging supplier in Germany with 10000 units per
       month capacity.

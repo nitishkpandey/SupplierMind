@@ -1,16 +1,18 @@
 import { useTranslation } from "react-i18next";
 import type { QueryWithResults } from "@/types";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryService } from "@/services/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Clock, Search, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Search, ExternalLink, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function HistoryPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["queryHistory"],
@@ -18,6 +20,20 @@ export default function HistoryPage() {
   });
 
   const queries = data?.items ?? [];
+  const clearHistory = useMutation({
+    mutationFn: () => queryService.clearHistory(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queryHistory"] });
+    },
+  });
+
+  const handleClearHistory = () => {
+    if (queries.length === 0 || clearHistory.isPending) return;
+    const confirmed = window.confirm("Clear all query history?");
+    if (confirmed) {
+      clearHistory.mutate();
+    }
+  };
 
   const statusConfig = {
     completed: { icon: CheckCircle, color: "text-green-500", label: t("history.status_completed") },
@@ -28,11 +44,23 @@ export default function HistoryPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t("history.title")}</h1>
-        <p className="text-muted-foreground mt-1">
-          {data?.total ?? 0} total discoveries
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">{t("history.title")}</h1>
+          <p className="text-muted-foreground mt-1">
+            {data?.total ?? 0} total discoveries
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={handleClearHistory}
+          disabled={queries.length === 0 || clearHistory.isPending}
+        >
+          <Trash2 className="w-4 h-4" />
+          Clear History
+        </Button>
       </div>
 
       {isLoading ? (

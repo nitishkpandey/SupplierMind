@@ -51,8 +51,8 @@ Concretely (Phase C):
   loud failure is preferable to silent degradation to a weaker model, and the
   retained abstraction makes adding a *same-class* backup (Azure OpenAI) a small
   future change if ever needed.
-- The `GroqRateLimiter` class name is retained for git-blame continuity (it is
-  now a generic limiter); a rename is deferred to post-thesis cleanup.
+- The provider-neutral `ModelRateLimiter` throttles OpenAI calls by model
+  family and dated snapshot.
 
 ## Alternatives considered
 

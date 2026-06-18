@@ -86,11 +86,13 @@ export const queryService = {
 
   getHistory: (page = 1) =>
     api.get(`/queries?offset=${(page - 1) * 20}&limit=20`),
+  clearHistory: () =>
+    api.delete<{ deleted: number }>("/queries/history"),
 
   getAuditTrail: (queryId: string) =>
     api.get(`/queries/${queryId}/audit`),
 
-  // Task 3.3 — multi-turn clarification dialogue
+  // Multi-turn clarification dialogue
   getClarification: (queryId: string) =>
     api.get<{
       id: string;
@@ -113,11 +115,21 @@ export const queryService = {
 export const supplierService = {
   getById: (id: string) => api.get<{ id: string }>(`/suppliers/${id}`),
   list: (page = 1) => api.get(`/suppliers?offset=${(page - 1) * 20}&limit=20`),
+  stats: () =>
+    api.get<{
+      total_active: number;
+      indexed_suppliers: number | null;
+      index_status: "synced" | "out_of_sync" | "unavailable";
+    }>("/suppliers/stats"),
 };
 
 // Production v2: Tier workflow service
 export const supplierWorkflowService = {
   getMyList: (page = 1) => api.get(`/suppliers/my-list?offset=${(page - 1) * 20}&limit=20`),
+  // Pending Review tab: my-list does not return pending_review suppliers, so we
+  // fetch them separately. Readable by any authenticated user.
+  getPending: (page = 1) =>
+    api.get(`/suppliers?status_filter=pending_review&offset=${(page - 1) * 20}&limit=20`),
   save: (id: string) => api.post(`/suppliers/${id}/save`),
   unsave: (id: string) => api.delete(`/suppliers/${id}/save`),
   approve: (id: string, justification: string) =>
@@ -143,7 +155,7 @@ export const evalService = {
     api.post("/eval/run", null, { params: { baselines_only: baselinesOnly } }),
 };
 
-// Task 2.5 — admin operational metrics
+// Admin operational metrics
 export interface AgentLatency {
   agent_name: string;
   p50_ms: number;
