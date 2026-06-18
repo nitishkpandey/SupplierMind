@@ -318,6 +318,61 @@ def test_memory_hit_suppresses_clarification_when_product_missing():
     assert out["pipeline_status"] == "running"
 
 
+def test_generic_location_query_with_memory_hit_still_asks_for_product():
+    """A broad location-only query should not borrow a product/category from
+    memory unless the user explicitly refers back to prior context."""
+    geocoder = _FakeGeocoder((50.1109, 8.6821))
+
+    def _lookup_fn(query_text: str, top_k: int = 3) -> list[dict[str, Any]]:
+        return [
+            {
+                "memory_id": "m-frankfurt",
+                "score": 0.82,
+                "query_text": "Find textile suppliers near Frankfurt",
+                "constraints": {
+                    "product_type": "textiles",
+                    "location_city": "Frankfurt",
+                },
+            }
+        ]
+
+    registry = _build_registry(geocoder=geocoder, lookup_fn=_lookup_fn)
+
+    finish_payload = {
+        "product_type": None,
+        "product_keywords": [],
+        "industry_context": None,
+        "buyer_intent": "any",
+        "category_hint": None,
+        "location_city": "Frankfurt",
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "geographic_priority",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.8,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: Check memory.\nAction: lookup_past_query\nAction Input: {"query_text": "Find suppliers near Frankfurt", "top_k": 3}',
+        f'Thought: Finish with location only.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+        "What product or service do you need near Frankfurt, such as metals, packaging, or logistics?",
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("Find suppliers near Frankfurt."))
+
+    assert out["needs_clarification"] is True
+    assert out["pipeline_status"] == "needs_clarification"
+    assert "product" in (out["clarification_question"] or "").lower()
+
+
 # ── 5. Fallback path (max_iterations) is not double-clarified ────────
 
 

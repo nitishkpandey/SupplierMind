@@ -127,6 +127,25 @@ _PLACEHOLDER_PATTERNS = (
     "our usual vendors",
 )
 
+_MEMORY_REFERENCE_RE = re.compile(
+    r"\b(?:"
+    r"same\s+as\s+(?:last\s+time|before|previously)|"
+    r"last\s+time|previous\s+(?:query|search|one)|earlier\s+(?:query|search)|"
+    r"again|as\s+before|like\s+before|similar\s+to\s+(?:last|before|the\s+previous)|"
+    r"those|them|that\s+one"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_NON_PRODUCT_QUERY_TOKENS = frozenset({
+    "near", "nearby", "around", "within", "inside", "outside", "from", "in",
+    "at", "by", "close", "closest", "local", "located", "based",
+    "km", "kms", "kilometer", "kilometers", "mile", "miles",
+    "certified", "certification", "certifications", "compliant",
+    "lead", "time", "capacity", "deliver", "delivery", "month", "monthly",
+    "days", "day", "under", "over", "above", "below", "more", "less",
+})
+
 # ── Final constraint schema — what Finish must emit ──────────────────
 FINISH_SCHEMA = {
     "product_type": "specific product or service name (string)",
@@ -651,6 +670,9 @@ class ParserAgent(BaseAgent):
             constraints.get("product_type")
         )
         memory_was_helpful = self._memory_returned_useful_hit(trace)
+        memory_context_requested = self._raw_query_requests_memory_context(raw_query)
+        memory_can_supply_product = memory_was_helpful and memory_context_requested
+        raw_has_product_signal = self._raw_query_has_product_signal(raw_query, constraints)
         constraint_count = sum(
             1 for k in (
                 "product_type",
@@ -661,8 +683,16 @@ class ParserAgent(BaseAgent):
             if constraints.get(k)
         )
 
-        # Rule 1 — missing product, no memory help.
-        if not has_product and not memory_was_helpful:
+        # Rule 1 — missing product, no explicit memory reference.
+        if not has_product and not memory_can_supply_product:
+            return self._compose_clarification_question(
+                raw_query, constraints, missing="product"
+            )
+
+        # Rule 1b — the model inferred/borrowed a product for a location-only
+        # query. Do not let semantic memory or industry inference decide what
+        # the user wants unless the user explicitly asked to reuse context.
+        if not raw_has_product_signal and not memory_can_supply_product:
             return self._compose_clarification_question(
                 raw_query, constraints, missing="product"
             )
@@ -682,6 +712,32 @@ class ParserAgent(BaseAgent):
             )
 
         return None
+
+    @staticmethod
+    def _raw_query_requests_memory_context(raw_query: str) -> bool:
+        """True when the user explicitly refers back to prior context."""
+        return bool(_MEMORY_REFERENCE_RE.search(raw_query or ""))
+
+    @staticmethod
+    def _raw_query_has_product_signal(raw_query: str, constraints: dict) -> bool:
+        """True when the raw query names a product/service beyond location,
+        certification, capacity, or generic supplier-search words."""
+        tokens = re.findall(r"[a-zA-Z0-9]+", (raw_query or "").lower())
+        if not tokens:
+            return False
+
+        ignored = set(_QUERY_STOPWORDS) | set(_NON_PRODUCT_QUERY_TOKENS)
+        for key in (
+            "location_name", "location_city", "location_country", "location_region",
+        ):
+            value = constraints.get(key)
+            if isinstance(value, str):
+                ignored.update(re.findall(r"[a-zA-Z0-9]+", value.lower()))
+        for cert in constraints.get("certifications") or []:
+            if isinstance(cert, str):
+                ignored.update(re.findall(r"[a-zA-Z0-9]+", cert.lower()))
+
+        return any(token not in ignored and not token.isdigit() for token in tokens)
 
     @staticmethod
     def _memory_returned_useful_hit(trace: list[dict]) -> bool:
