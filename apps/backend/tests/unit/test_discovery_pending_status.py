@@ -181,9 +181,8 @@ _KW = "zzqforgetoken"  # nonsense token guaranteed absent from the corpus
 
 
 def test_pending_in_search_scope_but_excluded_on_eval_path():
-    """Discovery scope: pending_review is retrieved in the normal (UI) flow,
-    but the eval path (exclude_pending=True) filters it out — proving the UI
-    and benchmark diverge by design, not by scope alone."""
+    """Discovery scope can retrieve pending_review in the normal UI flow,
+    while approved_only and eval paths filter it out."""
     agent = DiscoveryAgent.__new__(DiscoveryAgent)  # _filter_ids_by_scope is stateless
     with SyncSessionLocal() as db:
         pending = Supplier(
@@ -196,16 +195,21 @@ def test_pending_in_search_scope_but_excluded_on_eval_path():
         db.flush()
         pid = str(pending.id)
 
-        included = agent._filter_ids_by_scope(
+        approved_only = agent._filter_ids_by_scope(
             db, [pid], "approved_only", "", exclude_pending=False
         )
-        assert pid in included, "pending must show in the normal (UI) search scope"
+        assert pid not in approved_only, "approved_only must not include pending suppliers"
+
+        included = agent._filter_ids_by_scope(
+            db, [pid], "both", "", exclude_pending=False
+        )
+        assert pid in included, "pending must show in discover-new-suppliers scope"
 
         excluded = agent._filter_ids_by_scope(
-            db, [pid], "approved_only", "", exclude_pending=True
+            db, [pid], "both", "", exclude_pending=True
         )
         assert pid not in excluded, (
-            "eval path must exclude pending even in approved_only scope"
+            "eval path must exclude pending even in discovery scope"
         )
 
         db.rollback()

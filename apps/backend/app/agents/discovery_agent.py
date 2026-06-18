@@ -69,9 +69,9 @@ class DiscoveryAgent(BaseAgent):
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
         user_id = state.get("user_id")
-        # Sprint A (HITL): pending_review suppliers are in-scope for normal
-        # search so the UI can surface them with a badge. The eval path sets
-        # exclude_pending=True so benchmark scoring never sees them.
+        # HITL: pending_review suppliers are in-scope only for "both"
+        # (Discover New Suppliers). Approved-only stays approved/saved DB rows.
+        # The eval path also sets exclude_pending=True for reproducibility.
         exclude_pending = state.get("exclude_pending", False)
 
         return self._run_search(
@@ -117,16 +117,14 @@ class DiscoveryAgent(BaseAgent):
             with SyncSessionLocal() as db:
                 # Build base condition for scope
                 # approved_only = status=='approved' OR user_supplier_saves matching this user
-                # both = status IN ('approved', 'discovered') OR user_supplier_saves
-                # Sprint A (HITL): pending_review joins the in-scope set so held
-                # suppliers appear in normal results — unless exclude_pending is
-                # set (the eval path), which keeps the benchmark reproducible.
+                # both = status IN ('approved', 'discovered', 'pending_review')
+                # unless exclude_pending is set for evaluation.
                 base_conds = []
                 if search_scope == "approved_only":
                     in_scope_statuses = [SupplierStatus.approved]
                 else:
                     in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
-                if not exclude_pending:
+                if search_scope != "approved_only" and not exclude_pending:
                     in_scope_statuses.append(SupplierStatus.pending_review)
                 base_conds.append(Supplier.status.in_(in_scope_statuses))
 
@@ -343,9 +341,9 @@ class DiscoveryAgent(BaseAgent):
     ) -> set[str]:
         """Returns subset of IDs that are allowed by the current search scope.
 
-        Sprint A (HITL): pending_review is in-scope for normal search so held
-        suppliers surface in the UI; the eval path passes exclude_pending=True
-        to keep them out of benchmark scoring.
+        pending_review is in-scope only for Discover New Suppliers (`both`);
+        the eval path passes exclude_pending=True to keep held suppliers out
+        of benchmark scoring.
         """
         if not sids:
             return set()
@@ -355,7 +353,7 @@ class DiscoveryAgent(BaseAgent):
             in_scope_statuses = [SupplierStatus.approved]
         else:
             in_scope_statuses = [SupplierStatus.approved, SupplierStatus.discovered]
-        if not exclude_pending:
+        if scope != "approved_only" and not exclude_pending:
             in_scope_statuses.append(SupplierStatus.pending_review)
         base_conds.append(Supplier.status.in_(in_scope_statuses))
 
