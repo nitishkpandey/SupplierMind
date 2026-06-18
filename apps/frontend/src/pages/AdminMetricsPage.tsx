@@ -27,6 +27,11 @@ function formatMs(ms: number): string {
   return `${ms} ms`;
 }
 
+function formatTooltipMs(value: unknown): string {
+  const ms = typeof value === "number" ? value : Number(value ?? 0);
+  return Number.isFinite(ms) ? formatMs(ms) : "0 ms";
+}
+
 function p95ClassName(ms: number): string {
   if (ms > 30_000) return "text-destructive font-semibold";
   if (ms > 10_000) return "text-amber-600 font-semibold";
@@ -233,7 +238,7 @@ export default function AdminMetricsPage() {
                         tickFormatter={(v) => formatMs(v)}
                         tick={{ fontSize: 11 }}
                       />
-                      <Tooltip formatter={(v: number) => formatMs(v)} />
+                      <Tooltip formatter={(v) => formatTooltipMs(v)} />
                       <Bar dataKey="mean" fill="#3b82f6" name="Mean latency" />
                     </BarChart>
                   </ResponsiveContainer>

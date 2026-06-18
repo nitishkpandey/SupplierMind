@@ -8,8 +8,8 @@ PROVIDER (single-provider deployment, see docs/adr/ADR-002):
   - OpenAIProvider  gpt-4o-mini-2024-07-18 via OpenAI — the only provider.
     The LLMProvider Protocol is retained so a future OpenAI-compatible
     provider (Azure OpenAI, etc.) can be swapped in without touching agents.
-    Groq was removed in Phase C; there is no fallback. An OpenAI failure that
-    survives the per-provider tenacity retries propagates as a clear error.
+    There is no runtime fallback. An OpenAI failure that survives the
+    per-provider tenacity retries propagates as a clear error.
 
 TENACITY: Automatic retry on rate limits and transient 5xx inside the provider;
 auth/config errors propagate immediately (a fallback would mask them).
@@ -287,7 +287,7 @@ def build_llm_client() -> Any:
     if settings.LLM_PROVIDER != "openai":
         raise ValueError(
             f"Unsupported LLM_PROVIDER={settings.LLM_PROVIDER!r}. "
-            "Only 'openai' is supported (Groq was removed in Phase C, ADR-002)."
+            "Only 'openai' is supported in the single-provider deployment."
         )
     return OpenAIProvider()
 

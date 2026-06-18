@@ -1,6 +1,6 @@
-"""Unit tests for the LLM provider abstraction (single-provider, post-Phase-C).
+"""Unit tests for the LLM provider abstraction (single-provider deployment).
 
-Pins the contracts after Groq removal (ADR-002):
+Pins the contracts after ADR-002:
   1. build_llm_client returns a bare OpenAIProvider — no fallback wrapper.
   2. An unsupported LLM_PROVIDER raises.
   3. Missing OPENAI_API_KEY raises.
@@ -50,8 +50,8 @@ def test_build_llm_client_returns_openai_provider():
 
 
 def test_build_llm_client_unsupported_provider_raises():
-    # Groq removed (ADR-002): anything but "openai" is rejected.
-    with patch.object(llm_mod.settings, "LLM_PROVIDER", "groq"):
+    # Anything but "openai" is rejected in the single-provider deployment.
+    with patch.object(llm_mod.settings, "LLM_PROVIDER", "anthropic"):
         with pytest.raises(ValueError, match="Only 'openai' is supported"):
             build_llm_client()
 

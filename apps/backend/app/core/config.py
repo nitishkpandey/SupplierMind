@@ -18,8 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Resolve the .env from the repo root regardless of the current working
 # directory. This file lives at apps/backend/app/core/config.py, so the repo
 # root is four parents up (core → app → backend → apps → <root>). Without the
-# absolute path, env_file=".env" resolves to cwd and the root .env is silently
-# ignored when commands run from apps/backend (Phase H finding).
+# absolute path, env_file=".env" resolves to cwd and the root .env can be
+# silently ignored when commands run from apps/backend.
 _REPO_ROOT_ENV = Path(__file__).resolve().parents[4] / ".env"
 
 
@@ -51,11 +51,12 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "suppliermind"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5433
+    SQL_ECHO: bool = False
 
     # ── LLM ──────────────────────────────────────────────────────────
-    # Single-provider deployment (ADR-002): OpenAI only. Groq was removed in
-    # Phase C. LLM_PROVIDER is kept (one valid value) so the selection seam
-    # stays for a future OpenAI-compatible provider.
+    # Single-provider deployment (ADR-002): OpenAI only. LLM_PROVIDER is kept
+    # with one valid value so a future OpenAI-compatible provider can reuse the
+    # same configuration boundary.
     LLM_PROVIDER: Literal["openai"] = "openai"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL_NAME: str = "gpt-4o-mini-2024-07-18"
@@ -86,11 +87,14 @@ class Settings(BaseSettings):
 
     # ── Geocoding ─────────────────────────────────────────────────────
     NOMINATIM_USER_AGENT: str = "suppliermind-thesis/1.0"
+    GEOAPIFY_GEOCODING_API_KEY: str = ""
+    GEOAPIFY_PLACES_API_KEY: str = ""
+    GEOAPIFY_TIMEOUT_SECONDS: float = 10.0
+    GEOAPIFY_MIN_CONFIDENCE: float = 0.6
 
     # ── External APIs ─────────────────────────────────────────────────
     OPENSANCTIONS_API_KEY: str = ""
     SANCTIONS_API_BASE_URL: str = "https://api.opensanctions.org"
-    WIKIDATA_SPARQL_ENDPOINT: str = "https://query.wikidata.org/sparql"
 
     # ── External Discovery ─────────────────────────────────────────────
     TAVILY_API_KEY: str = ""

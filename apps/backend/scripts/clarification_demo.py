@@ -1,8 +1,8 @@
 """Drive the Task 3.3 killer demo: multi-turn clarification dialogue.
 
-Three turns against the live Groq LLM. No database, no Milvus, no API —
-the Parser is exercised directly so the demo runs even when the rest of
-the stack is offline. Each turn appends the user's prior answers to the
+Three turns against the configured live LLM. No database, no Milvus, no API
+are required; the Parser is exercised directly so the demo runs even when the
+rest of the stack is offline. Each turn appends the user's prior answers to the
 raw query (mirroring `resume_pipeline`'s augmentation) and re-runs the
 Parser; the previous turn's parsed_constraints are threaded through as a
 hint via state["previous_partial_constraints"].

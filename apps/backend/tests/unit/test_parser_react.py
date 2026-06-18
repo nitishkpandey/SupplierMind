@@ -387,12 +387,12 @@ def test_react_trace_lands_in_audit_log_output_snapshot():
 
 # -- Hallucinated-Observation hardening (Task 3.4 smoke regression) ----------
 #
-# llama-3.1 frequently emits the Observation (and follow-up commentary) inside
-# its own completion. The Task 3.4 smoke run burned 4 of 6 iterations on
-# "Action Input is not valid JSON: Extra data" because the old regex captured
-# everything from the first { to the last } in the response. These tests pin
-# the two defense layers: truncation at a hallucinated "Observation:" and
-# first-JSON-value parsing that ignores trailing junk.
+# Some models emit the Observation (and follow-up commentary) inside their own
+# completion. The Task 3.4 smoke run burned 4 of 6 iterations on "Action Input
+# is not valid JSON: Extra data" because the old regex captured everything
+# from the first { to the last } in the response. These tests pin the two
+# defense layers: truncation at a hallucinated "Observation:" and first-JSON-
+# value parsing that ignores trailing junk.
 
 
 def test_parse_react_response_ignores_hallucinated_observation():

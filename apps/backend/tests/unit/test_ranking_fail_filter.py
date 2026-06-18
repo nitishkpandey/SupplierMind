@@ -6,7 +6,7 @@ downgrades a FAIL to PARTIAL (with reasoning) the candidate is no longer blocked
 — a PARTIAL verdict is not a FAIL.
 """
 
-from app.agents.ranking_agent import has_blocking_fail
+from app.agents.ranking_agent import RankingAgent, has_blocking_fail
 
 
 def test_any_fail_blocks_candidate():
@@ -35,3 +35,110 @@ def test_partial_does_not_block():
 
 def test_empty_results_is_eligible():
     assert has_blocking_fail({"supplier_id": "s4", "compliance_results": []}) is False
+
+
+def test_low_score_eligible_suppliers_are_not_padded_into_results(monkeypatch):
+    agent = RankingAgent.__new__(RankingAgent)
+    supplier_ids = [f"s{i}" for i in range(1, 8)]
+
+    monkeypatch.setattr(
+        agent,
+        "_fetch_suppliers",
+        lambda ids: [
+            {
+                "id": sid,
+                "name": f"Supplier {sid}",
+                "description": "Relevant but sparse supplier.",
+                "category": "metals",
+                "country": "Germany",
+                "city": "Munich",
+                "certifications": ["AS9100"],
+            }
+            for sid in ids
+        ],
+    )
+
+    state = {
+        "parsed_constraints": {"query_type": "general"},
+        "compliance_results": [
+            {
+                "supplier_id": sid,
+                "pass_rate": 0.0,
+                "overall_pass": False,
+                "compliance_results": [
+                    {
+                        "constraint_name": "AS9100",
+                        "status": "PARTIAL",
+                        "reason": "Needs confirmation",
+                    }
+                ],
+            }
+            for sid in supplier_ids
+        ],
+        "semantic_scores": {sid: 0.1 for sid in supplier_ids},
+        "geo_distances": {},
+        "tier_assignments": {sid: "approved" for sid in supplier_ids},
+        "audit_log": [],
+    }
+
+    result = agent.execute(state)
+
+    assert result["ranked_suppliers"] == []
+
+
+def test_high_score_eligible_suppliers_still_rank(monkeypatch):
+    agent = RankingAgent.__new__(RankingAgent)
+    supplier_ids = [f"s{i}" for i in range(1, 4)]
+
+    monkeypatch.setattr(
+        agent,
+        "_fetch_suppliers",
+        lambda ids: [
+            {
+                "id": sid,
+                "name": f"Supplier {sid}",
+                "description": "Bronze supplier with verified monthly tonnage and lead time.",
+                "category": "metals",
+                "country": "Germany",
+                "city": "Bremen",
+                "certifications": ["ISO 9001"],
+                "capacity_value": 5,
+                "capacity_unit": "metric_tons/month",
+                "lead_time_days": 14,
+                "website": "https://example.test",
+            }
+            for sid in ids
+        ],
+    )
+
+    state = {
+        "parsed_constraints": {"query_type": "general"},
+        "compliance_results": [
+            {
+                "supplier_id": sid,
+                "pass_rate": 1.0,
+                "overall_pass": True,
+                "compliance_results": [
+                    {
+                        "constraint_name": "capacity",
+                        "status": "PASS",
+                        "reason": "Capacity meets minimum",
+                    },
+                    {
+                        "constraint_name": "lead_time",
+                        "status": "PASS",
+                        "reason": "Lead time meets limit",
+                    },
+                ],
+            }
+            for sid in supplier_ids
+        ],
+        "semantic_scores": {sid: 0.8 for sid in supplier_ids},
+        "geo_distances": {},
+        "tier_assignments": {sid: "approved" for sid in supplier_ids},
+        "audit_log": [],
+    }
+
+    result = agent.execute(state)
+
+    assert [r["supplier_id"] for r in result["ranked_suppliers"]] == supplier_ids

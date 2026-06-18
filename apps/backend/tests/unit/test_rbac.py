@@ -180,21 +180,67 @@ def test_list_queries_filters_by_current_user_id():
     )
 
 
-# ── 3. Admin-only mutations reject non-admins with 403 ────────────────
-def test_procurement_manager_cannot_approve_supplier_returns_403():
+# ── 3. Manager-gated mutations: managers act, analysts are denied ─────
+def test_procurement_manager_can_approve_pending_review_returns_204():
     """
-    approve is admin-only because Tier-1 promotion is an org-wide event.
-    A procurement_manager has Tier-2 (personal saves), not Tier-1 promotion.
+    Pending Review feature: approve/reject widened from admin-only to
+    manager-gated (admin OR procurement_manager) so procurement managers can
+    action the Pending Review tab. A manager approving a pending_review
+    supplier with a valid justification now succeeds (204).
     """
-    manager = _fake_user(UserRole.procurement_manager)
+    from app.db.models import SupplierStatus
 
+    manager = _fake_user(UserRole.procurement_manager)
     app.dependency_overrides[get_current_user] = lambda: manager
+
+    pending_supplier = SimpleNamespace(
+        id=uuid4(),
+        status=SupplierStatus.pending_review,
+        approved_by_user_id=None,
+        approved_at=None,
+        approval_justification=None,
+        approval_action=None,
+        approval_decided_at=None,
+    )
+
+    fake_select_result = MagicMock()
+    fake_select_result.scalar_one_or_none.return_value = pending_supplier
+
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(return_value=fake_select_result)
+    fake_session.add = MagicMock()
+    fake_session.commit = AsyncMock()
+
+    async def session_override():
+        yield fake_session
+
+    app.dependency_overrides[get_db] = session_override
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/v1/suppliers/{pending_supplier.id}/approve",
+        json={"justification": "Verified ISO 9001 via registry; facility matches query region."},
+    )
+
+    assert response.status_code == 204, (
+        f"procurement_manager should approve a pending_review supplier; "
+        f"got {response.status_code} {response.text}"
+    )
+    assert pending_supplier.status == SupplierStatus.approved
+    assert pending_supplier.approval_action == "approved"
+
+
+def test_analyst_cannot_approve_supplier_returns_403():
+    """The role gate still excludes analysts: approve/reject are manager-gated,
+    so an analyst is denied before any body/state checks."""
+    analyst = _fake_user(UserRole.analyst)
+    app.dependency_overrides[get_current_user] = lambda: analyst
 
     client = TestClient(app)
     response = client.post(f"/api/v1/suppliers/{uuid4()}/approve")
 
     assert response.status_code == 403, (
-        f"procurement_manager must be denied approve; got {response.status_code}"
+        f"analyst must be denied approve; got {response.status_code}"
     )
 
 
@@ -358,15 +404,15 @@ def test_approve_non_discovered_supplier_returns_409():
     assert response.status_code == 409
 
 
-def test_procurement_manager_cannot_reject_supplier_returns_403():
-    """Symmetry: reject has the same admin-only governance rationale."""
-    manager = _fake_user(UserRole.procurement_manager)
-    app.dependency_overrides[get_current_user] = lambda: manager
+def test_analyst_cannot_reject_supplier_returns_403():
+    """Symmetry: reject is manager-gated too, so analysts are denied."""
+    analyst = _fake_user(UserRole.analyst)
+    app.dependency_overrides[get_current_user] = lambda: analyst
 
     client = TestClient(app)
     response = client.post(
         f"/api/v1/suppliers/{uuid4()}/reject",
-        json={"justification": "Manager attempting reject — expected 403."},
+        json={"justification": "Analyst attempting reject — expected 403."},
     )
 
     assert response.status_code == 403

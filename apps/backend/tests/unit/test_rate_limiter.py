@@ -1,4 +1,4 @@
-"""Task 1.6 Component B — Groq sliding-window throttle.
+"""Task 1.6 Component B — per-model sliding-window throttle.
 
 Deterministic tests with an injected fake clock — no real sleeping, no network.
 The limiter paces requests to stay under per-model RPM/TPM so the pipeline
@@ -8,7 +8,7 @@ stops fighting 429s with reactive backoff.
 import logging
 
 from app.core.llm import estimate_message_tokens
-from app.core.rate_limiter import GroqRateLimiter
+from app.core.rate_limiter import ModelRateLimiter
 
 
 class FakeClock:
@@ -25,8 +25,8 @@ class FakeClock:
             self.t += dt
 
 
-def make_limiter(rpm: int, tpm: int, clock: FakeClock, margin: float = 1.0) -> GroqRateLimiter:
-    return GroqRateLimiter(
+def make_limiter(rpm: int, tpm: int, clock: FakeClock, margin: float = 1.0) -> ModelRateLimiter:
+    return ModelRateLimiter(
         limits={"m": {"rpm": rpm, "tpm": tpm}},
         default_limit={"rpm": rpm, "tpm": tpm},
         margin=margin,

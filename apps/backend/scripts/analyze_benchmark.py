@@ -247,7 +247,7 @@ def main() -> None:
         f"# Benchmark run {datetime.now(timezone.utc).isoformat()}",
         "",
         "Corpus: live pool (10,136 suppliers in Postgres / 10,127 in Milvus).",
-        "Provider: openai gpt-4o-mini primary, groq fallback armed.",
+        "Provider: OpenAI gpt-4o-mini only; no runtime fallback.",
         "",
         "| Paradigm | Tier | n | P@5 | MRR | CSR | Latency ms | Cost USD |",
         "|----------|------|---|-----|-----|-----|-----------|----------|",

@@ -58,8 +58,8 @@ def _connect_milvus_if_needed() -> None:
     """
     from pymilvus import connections
 
-    # pymilvus 2.4 has `has_connection(alias)` returning bool. Older versions
-    # only expose `list_connections()` returning [(alias, addr), ...].
+    # Pymilvus has changed connection helpers across releases; support both
+    # `has_connection(alias)` and `list_connections()` shapes.
     have_connection = False
     if hasattr(connections, "has_connection"):
         try:

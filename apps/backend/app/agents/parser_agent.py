@@ -157,7 +157,7 @@ FINISH_SCHEMA = {
     "lead_time_max_days": "lead-time ceiling in days (number) or null",
     "query_type": "geographic_priority | compliance_critical | capability_match | general",
     "complexity": "simple | medium | complex",
-    "original_language": "en | de | hi | other",
+    "original_language": "en | de | other",
     "confidence": "0.0-1.0 (number)",
     "clarification_needed": "boolean",
     "clarification_question": "string or null",
@@ -179,9 +179,8 @@ _ACTION_RE = re.compile(r"Action:\s*([A-Za-z_][A-Za-z0-9_]*)", re.DOTALL)
 def _parse_react_response(text: str) -> _ReActStep:
     """Parse one Thought/Action/Action Input block. Raises ValueError on bad shape.
 
-    llama-3.1 sometimes hallucinates the Observation (and further commentary)
-    inside its own completion even with a stop sequence in place (e.g. when
-    the response arrives via a provider that ignores `stop`). Defend in two
+    Some models hallucinate the Observation (and further commentary) inside
+    their own completion even with a stop sequence in place. Defend in two
     layers: truncate everything from a hallucinated "Observation:" onwards,
     then parse only the FIRST JSON value after "Action Input:" and ignore any
     trailing junk (json.JSONDecoder.raw_decode instead of json.loads).
@@ -326,8 +325,8 @@ class ParserAgent(BaseAgent):
         for iteration in range(MAX_REACT_ITERATIONS):
             # Force-finish nudge (Task 3.4): on the last allowed iteration,
             # tell the model explicitly that only Finish is acceptable.
-            # llama-3.1 otherwise keeps "validating" with more tool calls
-            # until the budget dies (observed: 4x infer_industry_context).
+            # Some models otherwise keep "validating" with more tool calls
+            # until the budget dies.
             if iteration == MAX_REACT_ITERATIONS - 1:
                 messages.append({
                     "role": "user",
@@ -343,8 +342,8 @@ class ParserAgent(BaseAgent):
                     messages,
                     max_tokens=LLM_MAX_TOKENS_PER_STEP,
                     temperature=0.0,
-                    # llama-3.1 tends to hallucinate the Observation inside its
-                    # own completion; cut generation before it gets the chance.
+                    # Some models hallucinate Observation inside their own
+                    # completion; cut generation before it gets the chance.
                     stop=["\nObservation:", "Observation:"],
                 )
             except Exception as e:
@@ -1045,8 +1044,8 @@ class ParserAgent(BaseAgent):
         # Same trick for canonicalize_certification: if the LLM kept the raw
         # cert name but the canonical key is known, swap to canonical.
         # If certifications is empty entirely, promote every resolved cert
-        # observation directly — llama-3.1 occasionally emits an empty Finish
-        # payload after a dedup-then-finish step, so we let the trace win.
+        # observation directly. Some models emit an empty Finish payload after
+        # a dedup-then-finish step, so we let the trace win.
         certs_in = list(raw.get("certifications") or [])
         canonical_map: dict[str, str] = {}
         canonical_seen: list[str] = []

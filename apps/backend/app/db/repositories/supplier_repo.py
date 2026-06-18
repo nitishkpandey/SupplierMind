@@ -129,7 +129,8 @@ class SupplierRepository(BaseRepository[Supplier]):
         """
         # First, get all active suppliers with coordinates
         # Then filter in Python using Haversine
-        # This is acceptable for 100-1000 suppliers; PostGIS for millions.
+        # This is acceptable for the current 10k-scale corpus; PostGIS
+        # ST_DWithin is the production path once this grows materially.
         result = await self.db.execute(
             select(Supplier).where(
                 Supplier.is_active == True,  # noqa: E712

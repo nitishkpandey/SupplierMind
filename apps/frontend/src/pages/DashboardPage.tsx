@@ -3,7 +3,7 @@ import type { QueryWithResults } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
-import { queryService } from "@/services/api";
+import { queryService, supplierService } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +19,18 @@ export default function DashboardPage() {
     queryKey: ["queryHistory"],
     queryFn: () => queryService.getHistory(1).then((r) => r.data),
   });
+  const { data: supplierStats } = useQuery({
+    queryKey: ["supplierStats"],
+    queryFn: () => supplierService.stats().then((r) => r.data),
+  });
 
   const recentQueries = historyData?.items?.slice(0, 5) ?? [];
+  const supplierIndexLabel =
+    supplierStats?.indexed_suppliers == null
+      ? "Semantic index unavailable"
+      : supplierStats.index_status === "synced"
+        ? `${supplierStats.indexed_suppliers.toLocaleString()} indexed for semantic search`
+        : `${supplierStats.indexed_suppliers.toLocaleString()} indexed; reindex needed`;
 
   const statusIcon = (status: string) => {
     if (status === "completed") return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -57,8 +67,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">100</p>
-            <p className="text-xs text-muted-foreground mt-1">In SupplierBench database</p>
+            <p className="text-3xl font-bold">
+              {supplierStats?.total_active?.toLocaleString() ?? "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Active suppliers in database</p>
+            {supplierStats ? (
+              <p className="text-xs text-muted-foreground mt-1">{supplierIndexLabel}</p>
+            ) : null}
           </CardContent>
         </Card>
         <Card className="border-zinc-200 dark:border-zinc-800 shadow-none hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
