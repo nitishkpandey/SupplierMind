@@ -215,6 +215,29 @@ def test_pending_in_search_scope_but_excluded_on_eval_path():
         db.rollback()
 
 
+def test_scope_filter_excludes_inactive_suppliers():
+    """Soft-deleted rows must not re-enter results through stale vector hits."""
+    agent = DiscoveryAgent.__new__(DiscoveryAgent)
+
+    with SyncSessionLocal() as db:
+        inactive = Supplier(
+            name="ZzqInactive Pending GmbH",
+            description="Stale vector-hit fixture",
+            status=SupplierStatus.pending_review,
+            is_active=False,
+        )
+        db.add(inactive)
+        db.flush()
+        sid = str(inactive.id)
+
+        included = agent._filter_ids_by_scope(
+            db, [sid], "both", "", exclude_pending=False
+        )
+
+        assert sid not in included
+        db.rollback()
+
+
 def test_newly_discovered_ids_are_carried_into_current_candidate_set():
     """A fresh web-discovered supplier must survive the handoff into internal
     discovery even when vector/SQL retrieval would otherwise return only older
