@@ -20,6 +20,7 @@ from typing import Optional
 from app.agents.audit_log import append_audit_entry
 from app.agents.state import AgentState
 from app.core.llm import LLMClient, get_llm_client
+from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
 
@@ -119,21 +120,21 @@ class BaseAgent(ABC):
             return [
                 {
                     "id": str(s.id),
-                    "name": s.name,
-                    "description": s.description,
-                    "category": s.category,
-                    "country": s.country,
-                    "city": s.city,
+                    "name": clean_optional_text(s.name),
+                    "description": clean_optional_text(s.description),
+                    "category": clean_optional_text(s.category),
+                    "country": clean_optional_text(s.country),
+                    "city": clean_optional_text(s.city),
                     "latitude": s.latitude,
                     "longitude": s.longitude,
-                    "certifications": s.certifications or [],
+                    "certifications": clean_text_list(s.certifications),
                     "certification_details": s.certification_details or {},
                     "source_citations": s.source_citations or {},
                     "capacity_value": s.capacity_value,
-                    "capacity_unit": s.capacity_unit,
+                    "capacity_unit": clean_optional_text(s.capacity_unit),
                     "lead_time_days": s.lead_time_days,
-                    "website": s.website,
-                    "contact_email": s.contact_email,
+                    "website": clean_optional_text(s.website),
+                    "contact_email": clean_optional_text(s.contact_email),
                 }
                 for s in suppliers
             ]

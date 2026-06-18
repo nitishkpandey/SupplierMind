@@ -7,14 +7,18 @@
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green.svg)](https://fastapi.tiangolo.com)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2-orange.svg)](https://github.com/langchain-ai/langgraph)
 
 ---
 
 ## What is SupplierMind?
 
-suppliers that did NOT exist in your database before you asked the question.
+SupplierMind is an AI-assisted supplier discovery system for procurement teams
+that need auditable results under constraints such as certifications, capacity,
+lead time, and geography. It searches approved suppliers first, can discover new
+web suppliers when requested, and holds those web suppliers for human approval
+without hiding them from the originating result list.
 
 **Example query:**
 > *"ISO 9001 certified bronze supplier within 25km of Bremen, capacity above 5000 kg/month, lead time under 21 days"*
@@ -33,8 +37,8 @@ React Frontend (TypeScript + Tailwind)
     │  Parser                              │
     │    │                                 │
     │  External Discovery                  │
-    │  (Tavily, Wikidata, OpenSanctions)   │
-    │    │  [auto-ingest new suppliers]    │
+    │  (Tavily, Geoapify, OpenSanctions)   │
+    │    │  [pending-review suppliers]     │
     │  Internal Discovery                  │
     │  (Milvus + PostgreSQL)               │
     │    │                                 │
@@ -56,14 +60,15 @@ React Frontend (TypeScript + Tailwind)
 | Embeddings | Voyage AI (voyage-3-lite) | 512-dim semantic vectors |
 | Vector DB | Milvus 2.4 | Semantic similarity search |
 | Database | PostgreSQL 16 + PostGIS | Supplier data, queries, audit logs |
+| Location | Geoapify Geocoding + Places | Mandatory city/country validation for web suppliers |
 | Cache | Redis 7 | LLM response cache, sessions |
 | Agents | LangGraph 0.2 | Stateful agent graph with cycles |
 | Backend | FastAPI + Python 3.11 | REST API + SSE streaming |
-| Frontend | React 18 + TypeScript + Vite | Production UI |
+| Frontend | React 19 + TypeScript + Vite | Production UI |
 | Styling | Tailwind CSS + shadcn/ui | Component library |
 | Maps | Leaflet + OpenStreetMap | Geospatial visualization |
 | Auth | OAuth2 (Google/GitHub) + JWT | Stateless authentication |
-| i18n | react-i18next | English, German, Hindi |
+| i18n | react-i18next | English and German UI; backend parser accepts multilingual input |
 | Infra | Docker Compose + Kubernetes | Local and production deployment |
 
 ---
@@ -72,7 +77,7 @@ React Frontend (TypeScript + Tailwind)
 
 ### Prerequisites
 - Python 3.11+, Node.js 20+, Docker Desktop, Git
-- API keys: [OpenAI](https://platform.openai.com) (required, paid), [Voyage AI](https://dash.voyageai.com) (free tier)
+- API keys: OpenAI, Voyage AI, Tavily, Geoapify Geocoding, Geoapify Places, and OpenSanctions as configured in `.env.example`
 
 ### Quick Start
 
@@ -93,9 +98,16 @@ cd apps/backend
 pip install uv
 uv sync
 uv run alembic upgrade head
-# The SupplierBench-25 corpus ships committed (data/suppliers_synthetic.json);
-# no generation step is needed. Just load it into Postgres + Milvus:
+# Load the small SupplierBench-25 demo corpus:
 uv run python scripts/ingest_suppliers.py
+
+# Load the full synthetic 10k corpus into the active Postgres database.
+# This is fast and idempotent. The dashboard count comes from this database.
+uv run python scripts/bulk_ingest_synthetic.py --force-pg --skip-milvus
+
+# Optional: build/rebuild the full semantic Milvus index.
+# This calls the embedding provider and can take a long time on free tiers.
+uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume
 uv run uvicorn app.main:app --reload --port 8000
 
 # 5. Frontend (separate terminal)
@@ -153,7 +165,7 @@ SupplierMind/
 |  |  |  |- core/              LLM providers, embeddings, vector store, rate limiter
 |  |  |  |- db/                SQLAlchemy models, repositories, Alembic migrations
 |  |  |  |- evaluation/        SupplierBench-25 harness, metrics, report
-|  |  |  '- services/          Geocoding, ingestion, query memory (Milvus)
+|  |  |  '- services/          Geoapify location enrichment, ingestion, query memory
 |  |  |- experiments/          P1 + P2 baseline paradigms
 |  |  |- data/                 Synthetic corpus generators (fixed seed 42) + benchmark queries
 |  |  |- scripts/              Drivers: evaluation, smoke tests, demos, diagnostics
@@ -162,14 +174,11 @@ SupplierMind/
 |- infra/
 |  |- docker/               docker-compose.yml (+ prod overlay) and nginx.conf
 |  '- k8s/                  Kubernetes manifests (namespace, deployments, secrets example)
-|- benchmarks/
-|  '- supplierbench25/      SupplierBench-25 pointer (definition lives in apps/backend/data)
 |- docs/
 |  |- adr/                  Architecture decision records
 |  |- supervisor/           Thesis materials for the supervisor
 |  '- verification/         Verification record (provider, traces, benchmark lock)
-|- results/                 Benchmark archives + diagnostics (cert prevalence, samples)
-|- traces/                  Captured agentic traces (groq/, gpt4o_mini/)
+|- results/                 Current benchmark archives + diagnostics
 |- scripts/                 reproduce_benchmark.ps1 — repo-level benchmark runner
 '- root files               README, ARCHITECTURE, BENCHMARK, CONTRIBUTING, LICENSE, package.json
 ```

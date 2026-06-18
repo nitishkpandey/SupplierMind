@@ -30,11 +30,16 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
   useEffect(() => {
     if (!queryId) return;
 
-    // Reset state for new query
-    setEvents([]);
-    setIsComplete(false);
-    setError(null);
-    setClarification(null);
+    let cancelled = false;
+
+    // Reset state for a new subscription after the effect commits.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setEvents([]);
+      setIsComplete(false);
+      setError(null);
+      setClarification(null);
+    });
 
     // Close any existing connection
     if (sourceRef.current) {
@@ -112,6 +117,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
     };
 
     return () => {
+      cancelled = true;
       source.close();
       sourceRef.current = null;
     };

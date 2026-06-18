@@ -34,6 +34,8 @@ import {
 import type { QueryResult } from "@/types";
 import { supplierWorkflowService } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
+import { isAxiosError } from "axios";
+import { formatSupplierLocation } from "./location";
 
 const JUSTIFICATION_MIN = 20;
 const JUSTIFICATION_MAX = 1000;
@@ -108,7 +110,8 @@ export function SupplierCard({ result }: SupplierCardProps) {
     ? "bg-amber-600"
     : "bg-muted";
 
-  const isAdmin = user?.role === "admin";
+  const canModerate = user?.role === "admin" || user?.role === "procurement_manager";
+  const supplierLocation = formatSupplierLocation(result.supplier_city, result.supplier_country);
 
   const handleAction = async (action: 'save' | 'unsave') => {
     if (isProcessing) return;
@@ -160,8 +163,8 @@ export function SupplierCard({ result }: SupplierCardProps) {
       setRecordedJustification(text);
       setPendingDecision(null);
       setJustification("");
-    } catch (e: any) {
-      const msg = e?.response?.data?.detail ?? "Request failed. Try again.";
+    } catch (e: unknown) {
+      const msg = isAxiosError(e) ? e.response?.data?.detail ?? "Request failed. Try again." : "Request failed. Try again.";
       setDecisionError(typeof msg === 'string' ? msg : "Request failed.");
     } finally {
       setIsProcessing(false);
@@ -229,12 +232,17 @@ export function SupplierCard({ result }: SupplierCardProps) {
             </div>
             
             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-              {result.supplier_city && (
+              {supplierLocation ? (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" />
-                  {result.supplier_city}{result.supplier_country ? `, ${result.supplier_country}` : ""}
+                  {supplierLocation}
                 </span>
-              )}
+              ) : tier === "pending_review" ? (
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" />
+                  Location not verified
+                </span>
+              ) : null}
               {result.distance_km != null && (
                 <span className="flex items-center gap-1 text-primary font-medium">
                   <MapPin className="w-3.5 h-3.5" />
@@ -398,7 +406,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
               </Button>
             )}
 
-            {isAdmin && tier !== 'approved' && (
+            {canModerate && tier !== 'approved' && (
               <Button
                 variant="default"
                 size="sm"
@@ -411,7 +419,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
               </Button>
             )}
 
-            {isAdmin && tier !== 'approved' && (
+            {canModerate && tier !== 'approved' && (
               <Button
                 variant="ghost"
                 size="sm"

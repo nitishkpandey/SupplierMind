@@ -115,7 +115,7 @@ async def main() -> None:
         "# Verification 03: Smoke Benchmark (3 queries x 3 paradigms)",
         "",
         f"**Date:** {datetime.now(timezone.utc).isoformat()}",
-        f"**Provider:** openai / gpt-4o-mini (groq fallback armed)",
+        f"**Provider:** OpenAI / gpt-4o-mini (no runtime fallback)",
         f"**Wall time:** {time.time() - started:.0f}s",
         "",
         "| Q | Tier | Paradigm | Returned IDs (count) | P@5 | Latency ms | Cost USD |",

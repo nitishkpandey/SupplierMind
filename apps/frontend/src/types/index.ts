@@ -14,22 +14,38 @@ export interface AuthState {
 }
 
 export type SearchScope = 'approved_only' | 'both';
+export type QueryStatus = "pending" | "processing" | "completed" | "failed" | "needs_clarification";
+export type SupplierStatus = 'approved' | 'saved' | 'discovered' | 'pending_review' | 'rejected';
 
 export interface ParsedConstraints {
   category?: string;
+  category_hint?: string;
+  product_type?: string;
+  product_keywords?: string[];
+  industry_context?: string;
+  buyer_intent?: string;
   location_name?: string;
+  location_city?: string;
+  location_country?: string;
+  location_region?: string;
+  location_lat?: number;
+  location_lng?: number;
   location_radius_km?: number;
   certifications?: string[];
+  industry_typical_certs?: string[];
   capacity_min?: number;
   capacity_unit?: string;
   lead_time_max_days?: number;
+  query_type?: "geographic_priority" | "compliance_critical" | "capability_match" | "general" | string;
+  complexity?: string;
+  original_language?: string;
 }
 
 export type ComplianceStatus = "PASS" | "FAIL" | "PARTIAL";
 export type ComplianceMatrix = Record<string, ComplianceStatus>;
 
-// Task 1.5: structured, template-based explanation assembled from validated
-// data (no LLM free text). Numbers trace to the supplier DB row.
+// Structured, template-based explanation assembled from validated data. Numbers
+// trace to the supplier DB row and do not come from LLM-generated prose.
 export interface ExplanationDetail {
   match_reasons: string[];
   concerns: string[];
@@ -57,9 +73,9 @@ export interface QueryResult {
   supplier_lead_time_days: number | null;
   supplier_website: string | null;
   supplier_source: string | null;
-  supplier_status: 'approved' | 'saved' | 'discovered' | 'pending_review' | 'rejected' | null;
-  tier: 'approved' | 'saved' | 'discovered' | 'pending_review' | null;
-  // Task 1.6: present only when sanctions screening could not complete.
+  supplier_status: SupplierStatus | null;
+  tier: Exclude<SupplierStatus, 'rejected'> | null;
+  // Present only when sanctions screening could not complete.
   sanctions_status?: 'pending_review' | null;
   total_score: number;
   constraint_score: number;
@@ -70,7 +86,7 @@ export interface QueryResult {
   explanation: string;
   explanation_detail: ExplanationDetail | null;
   distance_km: number | null;
-  // Task 2.4 — HITL admin rationale, only present on approved/rejected suppliers.
+  // Manager rationale, only present on approved/rejected suppliers.
   approval_justification?: string | null;
   approval_action?: 'approved' | 'rejected' | null;
   approval_decided_at?: string | null;
@@ -93,9 +109,9 @@ export interface Supplier {
   website: string | null;
   contact_email: string | null;
   source: string | null;
-  status: 'approved' | 'saved' | 'discovered' | 'rejected';
+  status: SupplierStatus;
   source_url: string | null;
-  source_citations: Record<string, any> | null;
+  source_citations: Record<string, unknown> | null;
   is_active: boolean;
   created_at: string;
 }
@@ -103,7 +119,7 @@ export interface Supplier {
 export interface QueryResponse {
   id: string;
   raw_query: string;
-  status: "pending" | "processing" | "completed" | "failed" | "needs_clarification";
+  status: QueryStatus;
   detected_language?: string;
   parsed_constraints?: ParsedConstraints;
   execution_time_ms?: number;
@@ -111,4 +127,29 @@ export interface QueryResponse {
   created_at: string;
   completed_at?: string;
   results?: QueryResult[];
+}
+
+export interface QueryWithResults extends QueryResponse {
+  results: QueryResult[];
+}
+
+export interface AuditEntry {
+  agent_name: string;
+  action: string;
+  reasoning?: string | null;
+  input_snapshot?: Record<string, unknown> | null;
+  output_snapshot?: { summary?: string; [key: string]: unknown } | null;
+  duration_ms?: number | null;
+  created_at?: string;
+}
+
+export interface SSEEvent {
+  type?: "agent_update" | "complete" | "error" | "needs_clarification" | string;
+  agent?: string;
+  status?: string;
+  message?: string;
+  duration_ms?: number;
+  query_id?: string;
+  result_count?: number;
+  execution_time_ms?: number;
 }

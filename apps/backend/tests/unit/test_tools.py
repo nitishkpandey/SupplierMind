@@ -1,8 +1,8 @@
 """Unit tests for the ReAct Parser tool registry + the five default tools.
 
 Tests verify the tool *contract* — name, args, return shape — not LLM output.
-External dependencies (Nominatim, Groq) are injected as fakes so the suite
-stays deterministic and offline.
+External dependencies are injected as fakes so the suite stays deterministic
+and offline.
 """
 
 from __future__ import annotations

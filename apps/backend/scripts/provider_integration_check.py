@@ -6,7 +6,7 @@ Runs the moment OPENAI_API_KEY lands in backend/.env:
   2. One end-to-end pipeline query (Parser -> Discovery -> Compliance ->
      Ranking) on GPT-4o-mini.
   3. Re-captures the Task 3.1 / 3.2 / 3.3 demo traces on GPT-4o-mini and
-     saves them under traces/gpt4o_mini/ alongside traces/groq/.
+     saves them under traces/gpt4o_mini/.
   4. Prints the estimated spend for the whole run.
 
 Prerequisites:

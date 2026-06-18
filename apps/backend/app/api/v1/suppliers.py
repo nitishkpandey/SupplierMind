@@ -1,9 +1,7 @@
-"""
-app/api/v1/suppliers.py — Supplier management and tier workflows.
+"""Supplier management and tier workflows.
 
-PRODUCTION V2: Added workflows for saving to shortlists and approving/rejecting.
-NOTE on routing: FastAPI evaluates routes top-down. Static/specific routes
-(like `/my-list`) MUST come before parameterized routes (like `/{supplier_id}`).
+FastAPI evaluates routes top-down. Static/specific routes like `/my-list` and
+`/stats` must come before parameterized routes like `/{supplier_id}`.
 """
 
 import uuid
@@ -13,7 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, update, delete, func
 
-from app.api.deps import get_current_user, require_admin, require_manager
+from app.api.deps import get_current_user, require_admin, require_any_role, require_manager
+from app.core.vector_store import get_vector_store
 from app.db.models import AuditLog, Supplier, User, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import get_db
@@ -25,6 +24,31 @@ from app.schemas.supplier import (
 )
 
 router = APIRouter()
+
+
+@router.get(
+    "/stats",
+    summary="Supplier totals for dashboard cards",
+)
+async def get_supplier_stats(
+    current_user: Annotated[User, Depends(require_any_role)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    repo = SupplierRepository(db)
+    total_active = await repo.count_active()
+    try:
+        indexed_suppliers = get_vector_store().count()
+    except Exception:
+        indexed_suppliers = None
+        index_status = "unavailable"
+    else:
+        index_status = "synced" if indexed_suppliers == total_active else "out_of_sync"
+
+    return {
+        "total_active": total_active,
+        "indexed_suppliers": indexed_suppliers,
+        "index_status": index_status,
+    }
 
 
 @router.get(
@@ -88,9 +112,13 @@ async def list_suppliers(
     country: str | None = None,
     status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: Annotated[User, Depends(require_manager)] = None,
+    current_user: Annotated[User, Depends(require_any_role)] = None,
 ) -> dict:
-    """Admin/Manager view of all active suppliers."""
+    """List active suppliers (optionally filtered by status).
+
+    Readable by any authenticated user so analysts can SEE pending_review
+    suppliers in the Pending Review tab. Approve/reject remain manager-gated.
+    """
     repo = SupplierRepository(db)
     
     conds = []
@@ -279,19 +307,17 @@ async def _record_admin_decision(
 async def approve_supplier(
     supplier_id: uuid.UUID,
     payload: SupplierApprovalRequest,
-    current_user: Annotated[User, Depends(require_admin)],
+    current_user: Annotated[User, Depends(require_manager)],
     db: AsyncSession = Depends(get_db),
 ):
     """
     Promote a discovered or pending_review supplier to Approved status (Tier 1).
-    Admin only: promotion is an org-wide governance event that affects every
-    user's 'approved_only' searches. procurement_managers use Tier 2 (saves)
-    for personal shortlists.
+    Manager-gated (admin OR procurement_manager): promotion is an org-wide
+    governance event that affects every user's 'approved_only' searches.
+    Analysts get 403.
 
-    Sprint A (HITL): web-discovered suppliers now enter as 'pending_review',
-    so both 'discovered' and 'pending_review' are valid starting states for
-    promotion. The admin gate, the justification floor (min 20 chars), and the
-    audit-log write are unchanged.
+    Web-discovered suppliers enter as 'pending_review', so both 'discovered'
+    and 'pending_review' are valid starting states for promotion.
 
     Requires a justification body (min 20 chars). The rationale is persisted
     on the supplier row AND written into audit_logs alongside agent decisions.
@@ -330,13 +356,14 @@ async def approve_supplier(
 async def reject_supplier(
     supplier_id: uuid.UUID,
     payload: SupplierApprovalRequest,
-    current_user: Annotated[User, Depends(require_admin)],
+    current_user: Annotated[User, Depends(require_manager)],
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Mark a discovered supplier as rejected. Admin only — same governance
-    rationale as approve: rejection removes the supplier from every user's
-    discovery results, not just the caller's.
+    Mark a discovered supplier as rejected. Manager-gated (admin OR
+    procurement_manager) — same governance rationale as approve: rejection
+    removes the supplier from every user's discovery results, not just the
+    caller's. Analysts get 403.
 
     Requires a justification body (min 20 chars), recorded on the supplier
     row and in audit_logs.

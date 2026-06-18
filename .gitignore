@@ -50,6 +50,7 @@ milvus_data/
 .vscode/
 !.vscode/extensions.json
 .idea/
+.codex/
 *.swp
 .DS_Store
 Thumbs.db
@@ -74,4 +75,3 @@ codebase_walkthrough.md
 known_bugs_to_triage.md
 *_sprint_plan.md
 *_plan.md
-

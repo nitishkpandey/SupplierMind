@@ -19,8 +19,9 @@ Run from backend/ with the API server up:
     uv run python scripts/smoke_test_week3.py
 
 Notes:
-  - Free-tier Groq TPM pacing makes each full pipeline run slow (1-5 min).
-    The whole script can take 30-45 minutes. Patience is part of the test.
+  - Live LLM calls and vector retrieval make each full pipeline run slow
+    (1-5 min). The whole script can take 30-45 minutes. Patience is part of
+    the test.
   - Scenario 2 seeds via the REAL pipeline (memory rows are only written on
     evaluator-accept). If a seed run is rejected, the script tops up that row
     directly through QueryMemoryService.write() and records that honestly in
@@ -46,8 +47,8 @@ EVIDENCE = (
     Path(__file__).resolve().parents[2]
     / "demo_output" / "week_3_agentic" / "smoke_test_3.4"
 )
-# Free-tier Groq pacing sleeps up to ~60s per LLM call; a full ReAct
-# pipeline run can exceed 7 minutes. 900s is the observed-safe budget.
+# Provider pacing can sleep up to ~60s per LLM call; a full ReAct pipeline run
+# can exceed 7 minutes. 900s is the observed-safe budget.
 PIPELINE_DEADLINE_S = 900
 
 
@@ -395,7 +396,7 @@ def main() -> None:
         ("scenario_4_combined", scenario_4_combined),
     ]
     # Optional CLI filter: `... smoke_test_week3.py 1 3 4` reruns a subset
-    # without re-burning Groq budget on scenarios that already passed.
+    # without re-burning live LLM budget on scenarios that already passed.
     wanted = {f"scenario_{n}" for n in sys.argv[1:]}
     if wanted:
         scenarios = [s for s in scenarios if any(s[0].startswith(w) for w in wanted)]

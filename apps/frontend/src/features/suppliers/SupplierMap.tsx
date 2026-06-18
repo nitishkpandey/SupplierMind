@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import type { QueryResult, ParsedConstraints } from "@/types";
 import type { Map } from "leaflet";
+import { formatSupplierLocation } from "./location";
 
 import "leaflet/dist/leaflet.css";
 
@@ -81,7 +82,10 @@ export function SupplierMap({ results, constraints }: SupplierMapProps) {
 
         const scoreLabel = `${Math.round(result.total_score * 100)}%`;
         const name = result.supplier_name ?? result.supplier_id.slice(0, 8);
-        const location = [result.supplier_city, result.supplier_country].filter(Boolean).join(", ");
+        const location = formatSupplierLocation(
+          result.supplier_city,
+          result.supplier_country,
+        ) ?? "Location not verified";
 
         marker.bindPopup(
           `<b>#${result.rank} ${name}</b><br>${location}<br>Match: <b>${scoreLabel}</b>`
