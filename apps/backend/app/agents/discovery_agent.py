@@ -365,7 +365,10 @@ class DiscoveryAgent(BaseAgent):
             )
 
         valid = db.execute(
-            select(Supplier.id).where(Supplier.id.in_(sids)).where(or_(*base_conds))
+            select(Supplier.id)
+            .where(Supplier.id.in_(sids))
+            .where(Supplier.is_active == True)  # noqa: E712
+            .where(or_(*base_conds))
         ).scalars().all()
 
         return {str(i) for i in valid}
