@@ -27,7 +27,6 @@ from app.db.repositories.clarification_repo import MaxTurnsReached
 from app.db.session import get_db
 from app.main import app
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────
 
 
@@ -198,6 +197,58 @@ def test_post_clarify_empty_answer_returns_422_or_400():
     assert "empty" in response.json()["detail"].lower()
 
 
+def test_stream_replays_open_clarification_from_database():
+    """SSE buffers are in-memory, so reloads/reconnects can miss events.
+
+    If the durable database state says the query is pending with an open
+    clarification, `/stream` must replay `needs_clarification` immediately.
+    """
+    from app.api.v1 import queries as q
+    from app.db.models import QueryStatus
+
+    owner = _fake_user()
+    query_id = uuid4()
+    pc = _fake_pc(user_id=owner.id, qid=query_id, turn=2)
+    pc.id = uuid4()
+    pc.clarification_question = "What delivery or capacity requirements matter most?"
+    q._sse_events[str(query_id)] = []
+
+    query = SimpleNamespace(
+        id=query_id,
+        user_id=owner.id,
+        status=QueryStatus.pending,
+        results=[],
+        execution_time_ms=None,
+        error_message=None,
+    )
+
+    mock_query_repo = MagicMock()
+    mock_query_repo.get_by_id = AsyncMock(return_value=query)
+    mock_clarification_repo = MagicMock()
+    mock_clarification_repo.get_open_for_query = AsyncMock(return_value=pc)
+
+    with patch(
+        "app.core.security.decode_access_token",
+        return_value={"sub": str(owner.id)},
+    ), patch(
+        "app.api.v1.queries.QueryRepository", return_value=mock_query_repo
+    ), patch(
+        "app.api.v1.queries.ClarificationRepository", return_value=mock_clarification_repo
+    ), patch.object(
+        q.settings, "SSE_TIMEOUT_SECONDS", 0
+    ):
+        client = TestClient(app)
+        with client.stream(
+            "GET", f"/api/v1/queries/{query_id}/stream?token=test-token"
+        ) as response:
+            body = response.read().decode("utf-8")
+
+    assert response.status_code == 200
+    assert "event: needs_clarification" in body
+    assert str(pc.id) in body
+    assert pc.clarification_question in body
+
+
 # ── 4. resume_pipeline — max-turns guardrail ─────────────────────────
 
 
@@ -230,6 +281,7 @@ async def test_resume_pipeline_raises_when_next_turn_exceeds_cap():
 @pytest.mark.asyncio
 async def test_resume_pipeline_raises_when_already_resolved():
     from datetime import datetime, timezone
+
     from app.agents.orchestrator import resume_pipeline
     from app.db.repositories.clarification_repo import ClarificationAlreadyResolved
 
@@ -319,3 +371,56 @@ async def test_degraded_clarification_fails_query_instead_of_stranding_it():
     statuses = [p.get("status") for p in update_params if "status" in p]
     from app.db.models import QueryStatus
     assert QueryStatus.failed in statuses, f"expected failed status update, got: {statuses}"
+
+
+@pytest.mark.asyncio
+async def test_resumed_pipeline_reclarification_emits_needs_clarification_event():
+    """Regression: after a user answers turn 1, the Parser may ask turn 2.
+
+    The frontend listens for the `needs_clarification` SSE event type. Emitting
+    this as a generic `agent_update` leaves the UI spinning until the 300s SSE
+    timeout even though a pending_clarifications row exists.
+    """
+    from app.api.v1 import queries as q
+
+    query_id = str(uuid4())
+    clarification_id = str(uuid4())
+    events: list[dict] = []
+    q._sse_events[query_id] = events
+
+    final_state = {
+        "needs_clarification": True,
+        "clarification_id": clarification_id,
+        "clarification_question": "What delivery or capacity requirements matter most?",
+        "turn_number": 2,
+        "audit_log": [],
+    }
+
+    fake_session = AsyncMock()
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=fake_session)
+    cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch(
+        "app.db.session.AsyncSessionLocal", MagicMock(return_value=cm)
+    ), patch.object(
+        q, "resume_pipeline", AsyncMock(return_value=final_state)
+    ):
+        await q._resume_pipeline_background(
+            clarification_id=str(uuid4()),
+            user_answer="Machinery tools",
+            query_id=query_id,
+        )
+
+    clarification_events = [
+        event for event in events if event.get("type") == "needs_clarification"
+    ]
+    assert clarification_events == [
+        {
+            "type": "needs_clarification",
+            "query_id": query_id,
+            "clarification_id": clarification_id,
+            "question": "What delivery or capacity requirements matter most?",
+            "turn_number": 2,
+        }
+    ]

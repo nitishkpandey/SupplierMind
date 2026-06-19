@@ -142,3 +142,79 @@ def test_high_score_eligible_suppliers_still_rank(monkeypatch):
     result = agent.execute(state)
 
     assert [r["supplier_id"] for r in result["ranked_suppliers"]] == supplier_ids
+
+
+def test_city_query_ranks_exact_city_above_higher_semantic_country_match(monkeypatch):
+    agent = RankingAgent.__new__(RankingAgent)
+    bremen_id = "bremen-supplier"
+    berlin_id = "berlin-supplier"
+
+    monkeypatch.setattr(
+        agent,
+        "_fetch_suppliers",
+        lambda ids: [
+            {
+                "id": berlin_id,
+                "name": "Berlin Metals Ltd.",
+                "description": "Metal supplier elsewhere in Germany.",
+                "category": "metals",
+                "country": "Germany",
+                "city": "Berlin",
+                "certifications": ["ISO 9001"],
+                "capacity_value": 30000,
+                "capacity_unit": "kg/month",
+                "lead_time_days": 30,
+                "website": "https://berlin.example",
+                "contact_email": "sales@berlin.example",
+            },
+            {
+                "id": bremen_id,
+                "name": "Bremen Metall GmbH",
+                "description": "Metal supplier located in Bremen.",
+                "category": "metals",
+                "country": "Germany",
+                "city": "Bremen",
+                "certifications": [],
+                "capacity_value": None,
+                "capacity_unit": None,
+                "lead_time_days": None,
+                "website": "https://bremen.example",
+                "contact_email": None,
+            },
+        ],
+    )
+
+    state = {
+        "parsed_constraints": {
+            "query_type": "general",
+            "location_city": "Bremen",
+            "location_country": "Germany",
+        },
+        "compliance_results": [
+            {
+                "supplier_id": berlin_id,
+                "pass_rate": 1.0,
+                "overall_pass": True,
+                "compliance_results": [],
+            },
+            {
+                "supplier_id": bremen_id,
+                "pass_rate": 1.0,
+                "overall_pass": True,
+                "compliance_results": [],
+            },
+        ],
+        "semantic_scores": {berlin_id: 0.9, bremen_id: 0.6},
+        "geo_distances": {},
+        "tier_assignments": {berlin_id: "approved", bremen_id: "pending_review"},
+        "newly_discovered_supplier_ids": [bremen_id],
+        "exclude_pending": False,
+        "audit_log": [],
+    }
+
+    result = agent.execute(state)
+
+    ranked = result["ranked_suppliers"]
+    assert ranked[0]["supplier_id"] == bremen_id
+    assert ranked[0]["proximity_score"] == 1.0
+    assert next(r for r in ranked if r["supplier_id"] == berlin_id)["proximity_score"] == 0.0

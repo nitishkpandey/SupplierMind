@@ -3,7 +3,7 @@ query that specifies lead_time_max_days, including suppliers that do not report
 a lead time (previously they silently passed the gate with no verdict at all).
 """
 
-from app.agents.compliance_agent import ComplianceAgent
+from app.agents.compliance_agent import ComplianceAgent, summarize_compliance_counts
 
 
 def _agent() -> ComplianceAgent:
@@ -57,3 +57,14 @@ def test_lead_time_far_over_limit_fails():
     verdict = _lead_time_verdict(result)
     assert verdict["status"] == "FAIL"
     assert result["overall_pass"] is False
+
+
+def test_audit_count_summary_classifies_fail_before_partial():
+    """A supplier with both PARTIAL and FAIL verdicts must count as FAIL."""
+    results = [
+        {"overall_pass": True, "has_partial": False, "compliance_results": []},
+        {"overall_pass": True, "has_partial": True, "compliance_results": []},
+        {"overall_pass": False, "has_partial": True, "compliance_results": []},
+    ]
+
+    assert summarize_compliance_counts(results) == (1, 1, 1)
