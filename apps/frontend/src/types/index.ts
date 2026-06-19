@@ -36,6 +36,8 @@ export interface ParsedConstraints {
   capacity_min?: number;
   capacity_unit?: string;
   lead_time_max_days?: number;
+  ranking_preferences?: string[];
+  unsupported_preferences?: string[];
   query_type?: "geographic_priority" | "compliance_critical" | "capability_match" | "general" | string;
   complexity?: string;
   original_language?: string;
@@ -43,6 +45,15 @@ export interface ParsedConstraints {
 
 export type ComplianceStatus = "PASS" | "FAIL" | "PARTIAL";
 export type ComplianceMatrix = Record<string, ComplianceStatus>;
+
+export interface SourceCitation {
+  url?: string;
+  source?: string;
+  source_phrase?: string;
+  confidence?: number;
+  formatted_address?: string;
+  certifications?: Record<string, SourceCitation>;
+}
 
 // Structured, template-based explanation assembled from validated data. Numbers
 // trace to the supplier DB row and do not come from LLM-generated prose.
@@ -73,6 +84,9 @@ export interface QueryResult {
   supplier_lead_time_days: number | null;
   supplier_website: string | null;
   supplier_source: string | null;
+  supplier_source_url?: string | null;
+  supplier_source_citations?: Record<string, SourceCitation> | null;
+  supplier_certification_details?: Record<string, unknown> | null;
   supplier_status: SupplierStatus | null;
   tier: Exclude<SupplierStatus, 'rejected'> | null;
   // Present only when sanctions screening could not complete.
@@ -82,6 +96,7 @@ export interface QueryResult {
   semantic_score: number;
   proximity_score: number | null;
   completeness_score: number;
+  preference_score?: number;
   compliance_matrix: ComplianceMatrix;
   explanation: string;
   explanation_detail: ExplanationDetail | null;

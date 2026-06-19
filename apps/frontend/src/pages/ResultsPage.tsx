@@ -49,6 +49,13 @@ export default function ResultsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeCount]);
 
+  useEffect(() => {
+    if (isComplete && !sseError && !clarification && queryId) {
+      queryClient.invalidateQueries({ queryKey: ["queryResult", queryId] });
+      queryClient.invalidateQueries({ queryKey: ["auditTrail", queryId] });
+    }
+  }, [isComplete, sseError, clarification, queryId, queryClient]);
+
   // Derived state for completed agents
   const completedAgents = useMemo(() => {
     const agents = events

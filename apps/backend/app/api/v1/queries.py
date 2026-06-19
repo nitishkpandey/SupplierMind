@@ -173,6 +173,11 @@ async def stream_query_progress(
     if str(query.user_id) != str(user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Query not found")
 
+    clarification_repo = ClarificationRepository(db)
+    replay_clarification = None
+    if query.status == QueryStatus.pending:
+        replay_clarification = await clarification_repo.get_open_for_query(qid)
+
     async def event_generator() -> AsyncGenerator[str, None]:
         sent_count = 0
         timeout_seconds = settings.SSE_TIMEOUT_SECONDS
@@ -180,6 +185,16 @@ async def stream_query_progress(
 
         # Connection confirmation
         yield f"event: connected\ndata: {json.dumps({'query_id': query_id})}\n\n"
+
+        if replay_clarification is not None:
+            data = {
+                "query_id": query_id,
+                "clarification_id": str(replay_clarification.id),
+                "question": replay_clarification.clarification_question,
+                "turn_number": replay_clarification.turn_number,
+            }
+            yield f"event: needs_clarification\ndata: {json.dumps(data)}\n\n"
+            return
 
         while True:
             if time.time() - start > timeout_seconds:
@@ -222,8 +237,9 @@ async def list_queries(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get paginated query history for the authenticated user."""
+    from sqlalchemy import func, select
+
     from app.db.repositories.query_repo import QueryRepository
-    from sqlalchemy import select, func
 
     query_repo = QueryRepository(db)
     queries = await query_repo.get_user_queries(current_user.id, offset=offset, limit=limit)
@@ -340,6 +356,9 @@ async def get_query(
             "supplier_lead_time_days": supplier.lead_time_days if supplier else None,
             "supplier_website": supplier.website if supplier else None,
             "supplier_source": supplier.source if supplier else None,
+            "supplier_source_url": supplier.source_url if supplier else None,
+            "supplier_source_citations": supplier.source_citations if supplier else {},
+            "supplier_certification_details": supplier.certification_details if supplier else {},
             "supplier_status": supplier.status.value if supplier else None,
             "tier": supplier.status.value if supplier else None,
             # Only present when screening couldn't complete; absence means no
@@ -396,7 +415,7 @@ async def get_audit_trail(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid query ID")
 
-    from sqlalchemy import select
+    from sqlalchemy import case, select
     query_repo = QueryRepository(db)
     query = await query_repo.get_by_id(qid)
     if query is None:
@@ -407,7 +426,24 @@ async def get_audit_trail(
     result = await db.execute(
         select(AuditLog)
         .where(AuditLog.query_id == qid)
-        .order_by(AuditLog.timestamp)
+        .order_by(
+            case(
+                {
+                    "parser": 1,
+                    "clarification_handler": 2,
+                    "external_discovery": 3,
+                    "discovery": 4,
+                    "compliance": 5,
+                    "ranking": 6,
+                    "evaluator": 7,
+                    "memory_service": 8,
+                    "orchestrator": 9,
+                },
+                value=AuditLog.agent_name,
+                else_=99,
+            ),
+            AuditLog.timestamp,
+        )
     )
     logs = result.scalars().all()
 
@@ -598,10 +634,11 @@ async def _resume_pipeline_background(
                "rephrase with more detail and resubmit."
         )
     elif final_state.get("needs_clarification"):
-        _push("agent_update", {
-            "agent": "clarification_handler",
-            "status": "needs_clarification",
-            "message": final_state.get("clarification_question") or "",
+        _push("needs_clarification", {
+            "query_id": query_id,
+            "clarification_id": final_state.get("clarification_id"),
+            "question": final_state.get("clarification_question") or "",
+            "turn_number": final_state.get("turn_number") or 1,
         })
         async with AsyncSessionLocal() as db:
             from sqlalchemy import update
