@@ -9,10 +9,11 @@ reject them without leaving the result context.
 import json
 import logging
 import time
+import unicodedata
 from typing import Optional
 
 from app.agents.base import BaseAgent
-from app.agents.state import AgentState, RankedSupplier, SupplierComplianceResult
+from app.agents.state import AgentState, SupplierComplianceResult
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,17 @@ _UNVERIFIED_FLAGS = {
 }
 
 LOW_SEMANTIC_THRESHOLD = 0.5
+SCORABLE_PREFERENCES = {"lead_time", "certifications", "capacity"}
+UNSUPPORTED_PREFERENCE_CONCERNS = {
+    "support_rating": (
+        "Support ratings or public reviews were requested, but no verified "
+        "support/review evidence is available for this supplier."
+    ),
+    "pricing": (
+        "Pricing was requested, but no verified pricing data is available "
+        "for this supplier."
+    ),
+}
 
 
 def _render_verdict_reason(r: dict) -> str:
@@ -111,7 +123,11 @@ def build_match_reasons(comp_result: dict) -> list[str]:
     ]
 
 
-def build_concerns(comp_result: dict, semantic_score: Optional[float]) -> list[str]:
+def build_concerns(
+    comp_result: dict,
+    semantic_score: Optional[float],
+    unsupported_preferences: Optional[list[str]] = None,
+) -> list[str]:
     """One concern per FAIL/PARTIAL verdict, plus a low-semantic-match note."""
     concerns = [
         _render_verdict_reason(r)
@@ -120,10 +136,14 @@ def build_concerns(comp_result: dict, semantic_score: Optional[float]) -> list[s
     ]
     if semantic_score is not None and semantic_score < LOW_SEMANTIC_THRESHOLD:
         concerns.append("Limited semantic match to the query")
+    for preference in unsupported_preferences or []:
+        concern = UNSUPPORTED_PREFERENCE_CONCERNS.get(preference)
+        if concern and concern not in concerns:
+            concerns.append(concern)
     return concerns
 
 
-def build_summary(comp_result: dict) -> str:
+def build_summary(comp_result: dict, concerns: Optional[list[str]] = None) -> str:
     """One deterministic headline sentence from the verdict mix."""
     results = comp_result.get("compliance_results", [])
     n_fail = sum(1 for r in results if r.get("status") == "FAIL")
@@ -131,6 +151,8 @@ def build_summary(comp_result: dict) -> str:
         return f"Partial match; {n_fail} requirement(s) not met."
     if any(r.get("status") == "PARTIAL" for r in results):
         return "Meets core requirements; some criteria need confirmation."
+    if concerns:
+        return "Meets hard requirements; review the noted evidence gaps."
     return "Meets all specified requirements."
 
 
@@ -188,14 +210,19 @@ def _select_top_results(
 
 
 def build_explanation(
-    supplier: dict, tier: str, comp_result: dict, semantic_score: Optional[float]
+    supplier: dict,
+    tier: str,
+    comp_result: dict,
+    semantic_score: Optional[float],
+    unsupported_preferences: Optional[list[str]] = None,
 ) -> dict:
     """Assemble the full structured explanation. No LLM involved."""
+    concerns = build_concerns(comp_result, semantic_score, unsupported_preferences)
     return {
         "match_reasons": build_match_reasons(comp_result),
-        "concerns": build_concerns(comp_result, semantic_score),
+        "concerns": concerns,
         "facts": build_facts(supplier, tier),
-        "summary": build_summary(comp_result),
+        "summary": build_summary(comp_result, concerns),
     }
 
 
@@ -214,7 +241,21 @@ class RankingAgent(BaseAgent):
         tier_assignments = state.get("tier_assignments", {})
         constraints = state.get("parsed_constraints") or {}
         has_radius = bool(constraints.get("location_radius_km"))
+        requested_city = constraints.get("location_city")
+        has_city_focus = bool(requested_city) and not has_radius
+        has_location_score = has_radius or has_city_focus
         query_type = constraints.get("query_type", "general")
+        ranking_preferences = [
+            str(pref)
+            for pref in constraints.get("ranking_preferences") or []
+            if str(pref) in SCORABLE_PREFERENCES
+        ]
+        unsupported_preferences = [
+            str(pref)
+            for pref in constraints.get("unsupported_preferences") or []
+            if str(pref) in UNSUPPORTED_PREFERENCE_CONCERNS
+        ]
+        has_preference_score = bool(ranking_preferences)
         exclude_pending = bool(state.get("exclude_pending", False))
         fresh_review_ids = set(state.get("newly_discovered_supplier_ids") or [])
 
@@ -234,10 +275,10 @@ class RankingAgent(BaseAgent):
         # ── Determine dynamic weights ─────────────────────────────────
         w_constraint = 0.40
         w_semantic = 0.25
-        w_proximity = 0.25 if has_radius else 0.0
+        w_proximity = 0.25 if has_location_score else 0.0
         w_completeness = 0.10
 
-        if query_type == "geographic_priority" and has_radius:
+        if query_type == "geographic_priority" and has_location_score:
             w_proximity = 0.40
             w_constraint = 0.30
             w_semantic = 0.20
@@ -245,18 +286,32 @@ class RankingAgent(BaseAgent):
         elif query_type == "compliance_critical":
             w_constraint = 0.50
             w_semantic = 0.20
-            w_proximity = 0.20 if has_radius else 0.0
-            w_completeness = 0.10 if has_radius else 0.30
+            w_proximity = 0.20 if has_location_score else 0.0
+            w_completeness = 0.10 if has_location_score else 0.30
         elif query_type == "capability_match":
             w_semantic = 0.40
             w_constraint = 0.30
-            w_proximity = 0.20 if has_radius else 0.0
-            w_completeness = 0.10 if has_radius else 0.30
-        elif not has_radius:
+            w_proximity = 0.20 if has_location_score else 0.0
+            w_completeness = 0.10 if has_location_score else 0.30
+        elif has_city_focus:
+            w_constraint = 0.45
+            w_semantic = 0.25
+            w_proximity = 0.20
+            w_completeness = 0.10
+        elif not has_location_score:
             # General without radius
             w_constraint = 0.50
             w_semantic = 0.35
             w_completeness = 0.15
+
+        w_preference = 0.0
+        if has_preference_score:
+            w_preference = 0.15
+            remaining = 1.0 - w_preference
+            w_constraint *= remaining
+            w_semantic *= remaining
+            w_proximity *= remaining
+            w_completeness *= remaining
 
         # ── Score each supplier ───────────────────────────────────────
         scored: list[tuple[float, SupplierComplianceResult]] = []
@@ -282,13 +337,22 @@ class RankingAgent(BaseAgent):
 
             constraint_score = comp_result["pass_rate"]
             semantic_score = semantic_scores.get(sid, 0.5)
-            proximity_score = (
-                self._calculate_proximity_score(
+            if has_radius:
+                proximity_score = self._calculate_proximity_score(
                     geo_distances.get(sid),
                     constraints.get("location_radius_km"),
                 ) or 0.0
-            ) if has_radius else 0.0
+            elif has_city_focus:
+                proximity_score = self._calculate_city_score(
+                    supplier.get("city"),
+                    str(requested_city),
+                )
+            else:
+                proximity_score = 0.0
             completeness_score = self._calculate_completeness(supplier)
+            preference_score = self._calculate_preference_score(
+                supplier, ranking_preferences
+            )
 
             # Weighted total
             total = (
@@ -296,6 +360,7 @@ class RankingAgent(BaseAgent):
                 + semantic_score * w_semantic
                 + proximity_score * w_proximity
                 + completeness_score * w_completeness
+                + preference_score * w_preference
             )
 
             # Penalise hard FAIL constraints
@@ -331,17 +396,34 @@ class RankingAgent(BaseAgent):
 
             constraint_score = comp_result["pass_rate"]
             semantic_score = semantic_scores.get(sid, 0.5)
-            proximity_score = self._calculate_proximity_score(
-                geo_distances.get(sid),
-                constraints.get("location_radius_km"),
-            ) if has_radius else None
+            if has_radius:
+                proximity_score = self._calculate_proximity_score(
+                    geo_distances.get(sid),
+                    constraints.get("location_radius_km"),
+                )
+            elif has_city_focus:
+                proximity_score = self._calculate_city_score(
+                    supplier.get("city"),
+                    str(requested_city),
+                )
+            else:
+                proximity_score = None
             completeness_score = self._calculate_completeness(supplier)
+            preference_score = self._calculate_preference_score(
+                supplier, ranking_preferences
+            )
 
             # Deterministic, template-based explanation; no LLM text.
             # Stored as a JSON string in the Text column; the API parses it back
             # into a structured object for the frontend.
             explanation = json.dumps(
-                build_explanation(supplier, tier, comp_result, semantic_score)
+                build_explanation(
+                    supplier,
+                    tier,
+                    comp_result,
+                    semantic_score,
+                    unsupported_preferences,
+                )
             )
 
             compliance_matrix = {
@@ -356,8 +438,11 @@ class RankingAgent(BaseAgent):
                 "total_score": round(total_score, 4),
                 "constraint_score": round(constraint_score, 4),
                 "semantic_score": round(semantic_score, 4),
-                "proximity_score": round(proximity_score, 4) if proximity_score else None,
+                "proximity_score": (
+                    round(proximity_score, 4) if proximity_score is not None else None
+                ),
                 "completeness_score": round(completeness_score, 4),
+                "preference_score": round(preference_score, 4),
                 "compliance_matrix": compliance_matrix,
                 "explanation": explanation,
                 "distance_km": round(geo_distances[sid], 2) if sid in geo_distances else None,
@@ -379,7 +464,8 @@ class RankingAgent(BaseAgent):
             ),
             duration_ms=duration_ms,
             reasoning=f"Dynamic weights: constraint={w_constraint}, "
-                      f"semantic={w_semantic}, proximity={w_proximity}, completeness={w_completeness}. "
+                      f"semantic={w_semantic}, proximity={w_proximity}, "
+                      f"completeness={w_completeness}, preference={w_preference}. "
                       f"Applied tier boosts.",
         )
 
@@ -400,6 +486,46 @@ class RankingAgent(BaseAgent):
         if radius_km == 0:
             return 1.0
         return max(0.0, 1.0 - (distance_km / (radius_km * PROXIMITY_DECAY_FACTOR)))
+
+    def _calculate_city_score(self, supplier_city: object, requested_city: str) -> float:
+        if not supplier_city or not requested_city:
+            return 0.0
+        return 1.0 if self._normalise_city(supplier_city) == self._normalise_city(requested_city) else 0.0
+
+    def _calculate_preference_score(
+        self, supplier: dict, preferences: list[str]
+    ) -> float:
+        scores: list[float] = []
+
+        if "lead_time" in preferences:
+            lead_time = supplier.get("lead_time_days")
+            if lead_time is None:
+                scores.append(0.25)
+            elif lead_time <= 14:
+                scores.append(1.0)
+            elif lead_time <= 30:
+                scores.append(0.8)
+            elif lead_time <= 60:
+                scores.append(0.5)
+            else:
+                scores.append(0.2)
+
+        if "certifications" in preferences:
+            cert_count = len(clean_text_list(supplier.get("certifications")))
+            scores.append(min(1.0, cert_count / 3))
+
+        if "capacity" in preferences:
+            scores.append(0.75 if supplier.get("capacity_value") is not None else 0.25)
+
+        if not scores:
+            return 0.0
+        return sum(scores) / len(scores)
+
+    @staticmethod
+    def _normalise_city(value: object) -> str:
+        text = unicodedata.normalize("NFKD", str(value or ""))
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        return " ".join(text.casefold().split())
 
     def _calculate_completeness(self, supplier: dict) -> float:
         fields = [

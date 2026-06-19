@@ -277,6 +277,20 @@ def quote_or_fail_verdict(
     return "PARTIAL", None
 
 
+def summarize_compliance_counts(results: list[SupplierComplianceResult]) -> tuple[int, int, int]:
+    """Return full-pass, partial-only, and fail supplier counts for audit logs."""
+    pass_count = sum(
+        1 for result in results
+        if result.get("overall_pass") and not result.get("has_partial")
+    )
+    partial_count = sum(
+        1 for result in results
+        if result.get("overall_pass") and result.get("has_partial")
+    )
+    fail_count = sum(1 for result in results if not result.get("overall_pass"))
+    return pass_count, partial_count, fail_count
+
+
 LEAD_TIME_GRACE_MULTIPLIER = 1.15   # 15% over limit → PARTIAL instead of FAIL
 LOCATION_GRACE_MULTIPLIER = 1.10    # 10% outside radius → PARTIAL instead of FAIL
 CAPACITY_PARTIAL_THRESHOLD = 0.80   # within 20% of min → PARTIAL instead of FAIL
@@ -391,14 +405,13 @@ class ComplianceAgent(BaseAgent):
         )
 
         duration_ms = int((time.time() - start) * 1000)
-        pass_count = sum(1 for r in compliance_results if r["overall_pass"])
-        partial_count = sum(1 for r in compliance_results if r["has_partial"] and not r["overall_pass"])
+        pass_count, partial_count, fail_count = summarize_compliance_counts(compliance_results)
 
         self._log_audit(
             state,
             action="compliance_check_completed",
             input_summary=f"{len(suppliers)} suppliers, constraints: {list(constraints.keys())}",
-            output_summary=f"PASS={pass_count}, PARTIAL={partial_count}, FAIL={len(suppliers)-pass_count-partial_count}",
+            output_summary=f"PASS={pass_count}, PARTIAL={partial_count}, FAIL={fail_count}",
             duration_ms=duration_ms,
             reasoning=(
                 "Hybrid validation: deterministic short-circuit for unambiguous cases "

@@ -18,6 +18,16 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 HIGH_QUALITY_THRESHOLD = 0.6
+SEMANTIC_QUALITY_THRESHOLD = 0.5
+
+
+def _is_high_quality_result(result: dict, constraints: dict) -> bool:
+    """Auto-accept only when blended score and semantic match are both healthy."""
+    if result.get("total_score", 0.0) <= HIGH_QUALITY_THRESHOLD:
+        return False
+    if constraints.get("product_type") and result.get("semantic_score", 0.5) < SEMANTIC_QUALITY_THRESHOLD:
+        return False
+    return True
 
 EVALUATOR_PROMPT = """You are the final quality control agent in a supplier discovery pipeline.
 
@@ -66,8 +76,12 @@ class EvaluatorAgent(BaseAgent):
         search_scope = state.get("search_scope", "approved_only")
         constraints = state.get("parsed_constraints") or {}
 
-        # If we have great results or maxed out retries, skip LLM call
-        high_quality_count = sum(1 for r in ranked if r["total_score"] > HIGH_QUALITY_THRESHOLD)
+        # If we have great results or maxed out retries, skip LLM call. A high
+        # blended score alone is not enough: broad constraints can inflate the
+        # score even when semantic relevance is weak.
+        high_quality_count = sum(
+            1 for r in ranked if _is_high_quality_result(r, constraints)
+        )
         if high_quality_count >= 3 or retries >= settings.EVALUATOR_MAX_RETRIES:
             state["evaluator_verdict"] = "auto_accept"
             state["evaluator_should_retry"] = False
@@ -91,6 +105,7 @@ class EvaluatorAgent(BaseAgent):
             results_lines.append(
                 f"- Supplier: {r['supplier_id']} (Tier: {r['tier']})\n"
                 f"  Score: {r['total_score']:.0%}\n"
+                f"  Semantic match: {r.get('semantic_score', 0.5):.0%}\n"
                 f"  Explanation: {r['explanation']}"
             )
         results_summary = "\n\n".join(results_lines) if results_lines else "NO RESULTS FOUND."

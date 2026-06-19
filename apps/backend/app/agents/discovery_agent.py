@@ -11,19 +11,28 @@ import json
 import logging
 import time
 from typing import Optional
-from sqlalchemy import select, or_, and_, func, Text
+
+from sqlalchemy import Text, func, or_, select
 
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState
-from app.db.session import SyncSessionLocal
 from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
+from app.db.session import SyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
 MIN_RESULTS = 5
 MAX_RETRIES = 3
 RRF_K = 60
+
+# Parser categories that are valid procurement concepts but absent from the
+# current synthetic SupplierBench corpus. Expand them to nearby corpus
+# categories so structured retrieval does not collapse to zero.
+CATEGORY_EXPANSIONS = {
+    "tools_hardware": ("tools_hardware", "machinery", "metals", "construction_materials"),
+    "office_supplies": ("office_supplies", "electronics", "software_services", "packaging", "textiles"),
+}
 
 RELAXATION_PROMPT = """You are a procurement search optimizer.
 A search returned too few results. Decide which ONE constraint to relax.
@@ -141,34 +150,36 @@ class DiscoveryAgent(BaseAgent):
                 # Strategy 2: Structured SQL filter
                 # We do this manually here to inject the scope filter, since repository method is static
                 category = constraints.get("category_hint")
+                category_values = self._category_filter_values(category)
                 country = self._extract_country_from_constraints(constraints)
                 certs = constraints.get("certifications")
                 product_terms = self._product_keyword_terms(constraints)
 
-                has_structured_filters = bool(category or country or certs or product_terms)
+                has_structured_filters = bool(category_values or country or certs or product_terms)
                 structured = []
                 if has_structured_filters:
-                    query = select(Supplier).where(Supplier.is_active == True).where(scope_filter)
-
-                    if category:
-                        query = query.where(Supplier.category == category)
-                    if country:
-                        query = query.where(Supplier.country == country)
-                    if certs:
-                        for c in certs:
-                            query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
-                    if product_terms:
-                        term_filters = []
-                        for term in product_terms:
-                            pattern = f"%{term}%"
-                            term_filters.extend([
-                                Supplier.name.ilike(pattern),
-                                Supplier.description.ilike(pattern),
-                                Supplier.category.ilike(pattern),
-                            ])
-                        query = query.where(or_(*term_filters))
-
+                    query = self._build_structured_query(
+                        scope_filter=scope_filter,
+                        category_values=category_values,
+                        country=country,
+                        certs=certs,
+                        product_terms=product_terms,
+                    )
                     structured = db.execute(query.limit(20)).scalars().all()
+
+                    if (
+                        not structured
+                        and len(category_values) > 1
+                        and product_terms
+                    ):
+                        query = self._build_structured_query(
+                            scope_filter=scope_filter,
+                            category_values=category_values,
+                            country=country,
+                            certs=certs,
+                            product_terms=[],
+                        )
+                        structured = db.execute(query.limit(20)).scalars().all()
                 structured_ranked = {str(s.id): i + 1 for i, s in enumerate(structured)}
                 logger.debug("[discovery] Structured filter: %d results", len(structured))
 
@@ -384,6 +395,52 @@ class DiscoveryAgent(BaseAgent):
         if constraints.get("location_name"):
             parts.append(f"location: {constraints['location_name']}")
         return " | ".join(parts)
+
+    @staticmethod
+    def _category_filter_values(category: object) -> list[str]:
+        """Return exact category plus corpus-compatible related categories."""
+        if not isinstance(category, str) or not category.strip():
+            return []
+        key = category.strip()
+        expanded = CATEGORY_EXPANSIONS.get(key, (key,))
+        values: list[str] = []
+        seen: set[str] = set()
+        for value in expanded:
+            if value not in seen:
+                seen.add(value)
+                values.append(value)
+        return values
+
+    @staticmethod
+    def _build_structured_query(
+        *,
+        scope_filter,
+        category_values: list[str],
+        country: str | None,
+        certs: list[str] | None,
+        product_terms: list[str],
+    ):
+        query = select(Supplier).where(Supplier.is_active.is_(True)).where(scope_filter)
+
+        if category_values:
+            query = query.where(Supplier.category.in_(category_values))
+        if country:
+            query = query.where(Supplier.country == country)
+        if certs:
+            for c in certs:
+                query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
+        if product_terms:
+            term_filters = []
+            for term in product_terms:
+                pattern = f"%{term}%"
+                term_filters.extend([
+                    Supplier.name.ilike(pattern),
+                    Supplier.description.ilike(pattern),
+                    Supplier.category.ilike(pattern),
+                ])
+            query = query.where(or_(*term_filters))
+
+        return query
 
     @staticmethod
     def _product_keyword_terms(constraints: dict) -> list[str]:
