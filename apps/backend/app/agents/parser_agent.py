@@ -59,6 +59,16 @@ _PLACEHOLDER_PRODUCT_RE = re.compile(
     r"stuff|things?|items?|something|anything|supplies|materials|"
     r"suppliers?|vendors?|manufacturers?|providers?|sources?|products?)"
     r"|"
+    # supplier-quality phrases are preferences, not a sourcable product.
+    r"(?:(?:approved|best|big|cheap|cheapest|genuine|global|large|leading|"
+    r"local|nearby|qualified|reliable|small|strategic|support|trusted|verified)\s+)+"
+    r"(?:suppliers?|vendors?|manufacturers?|providers?|sources?)"
+    r"|"
+    # support/rating wording describes a preference, not the thing sourced.
+    r"(?:customer\s+)?support(?:\s+(?:on|for)\s+(?:products?|items?|orders?))?"
+    r"|"
+    r"(?:highest|best)\s+(?:rating|ratings|reviews?)"
+    r"|"
     # generic noun + placeholder tail, e.g. "materials for our project"
     r"(?:stuff|things?|items?|materials|supplies|something|products?|suppliers?)\s+"
     r"for\s+(?:our|my|your|their|the)\b.*"
@@ -103,7 +113,7 @@ _QUERY_STOPWORDS = frozenset({
     "thing", "things", "item", "items", "material", "materials", "supplies",
     "product", "products", "project", "projects", "requirement",
     "requirements", "business", "company", "order", "usual", "and", "or",
-    "of", "to", "with", "what", "who",
+    "of", "on", "to", "with", "what", "who",
 })
 
 
@@ -144,7 +154,368 @@ _NON_PRODUCT_QUERY_TOKENS = frozenset({
     "certified", "certification", "certifications", "compliant",
     "lead", "time", "capacity", "deliver", "delivery", "month", "monthly",
     "days", "day", "under", "over", "above", "below", "more", "less",
+    "highest", "lowest", "rating", "ratings", "review", "reviews", "support",
 })
+_EMPTY_CONSTRAINT_STRINGS = frozenset({
+    "",
+    "null",
+    "none",
+    "unknown",
+    "undefined",
+    "not specified",
+    "not provided",
+    "n/a",
+    "na",
+})
+
+_LOCATION_CONSTRAINT_KEYS = (
+    "location_city",
+    "location_country",
+    "location_region",
+    "location_radius_km",
+)
+_OPERATIONAL_CONSTRAINT_KEYS = (
+    "certifications",
+    "capacity_min",
+    "lead_time_max_days",
+)
+_PREFERENCE_SIGNAL_RE = re.compile(
+    r"\b(?:"
+    r"rank(?:ed|ing)?|prioriti[sz]e|prefer(?:red|ence)?|best|cheapest|"
+    r"fastest|closest|nearest|proximity|rating|ratings|review|reviews|"
+    r"price|pricing|reasonable|affordable|lowest\s+lead|shortest\s+lead|"
+    r"highest\s+capacity|most\s+capacity|good|genuine|quality|reliable|"
+    r"trusted|verified"
+    r")\b",
+    re.IGNORECASE,
+)
+_SUPPLIER_QUALITY_WORDS = frozenset({
+    "approved", "best", "big", "cheap", "cheapest", "genuine", "global",
+    "large", "leading", "local", "nearby", "qualified", "reliable",
+    "reasonable", "rating", "ratings", "review", "reviews", "small",
+    "strategic", "support", "trusted", "verified",
+})
+_RANKING_PREFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "lead_time",
+        re.compile(
+            r"\b(?:fast(?:est)?|quick(?:est)?|short(?:est)?\s+lead|"
+            r"low(?:est)?\s+lead|less\s+delivery|delivery\s+time|"
+            r"lead\s*time|turnaround|deliver\s+(?:fast|quickly|soon))\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "certifications",
+        re.compile(
+            r"\b(?:certified|certification|certifications|compliant|quality|"
+            r"reliable|genuine|trusted|verified|valid\s+certified)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "capacity",
+        re.compile(
+            r"\b(?:highest\s+capacity|most\s+capacity|large\s+capacity|"
+            r"capacity|throughput|production\s+volume)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "proximity",
+        re.compile(r"\b(?:closest|nearest|nearby|local|proximity)\b", re.IGNORECASE),
+    ),
+)
+_UNSUPPORTED_PREFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "support_rating",
+        re.compile(
+            r"\b(?:highest\s+rating|rating|ratings|review|reviews|"
+            r"customer\s+support|support\s+rating|after[-\s]?sales|warranty)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "pricing",
+        re.compile(
+            r"\b(?:price|pricing|cost|reasonable\s+pricing|affordable|"
+            r"cheap(?:est)?|low(?:est)?\s+price)\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+_CAPACITY_SIGNAL_RE = re.compile(
+    r"\b(?:"
+    r"capacity|throughput|output|production|produce|manufactur(?:e|ing)|"
+    r"per\s+(?:day|week|month|year)|monthly|weekly|annually|/day|/week|"
+    r"/month|/year"
+    r")\b",
+    re.IGNORECASE,
+)
+_LEAD_TIME_PATTERNS = (
+    re.compile(
+        r"\b(?:deliver(?:y)?|lead\s*time|turnaround|ship(?:ping)?)"
+        r"[^0-9]{0,50}(\d+(?:\.\d+)?)\s*(?:days?|d)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:within|under|below|less\s+than|in)\s+"
+        r"(\d+(?:\.\d+)?)\s*(?:days?|d)\s*(?:max(?:imum)?|or\s+less)?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(\d+(?:\.\d+)?)\s*(?:days?|d)\s*(?:max(?:imum)?|or\s+less)\b",
+        re.IGNORECASE,
+    ),
+)
+_ORDER_ITEM_RE = re.compile(
+    r"\b\d+(?:[.,]\d+)?\s*(?:k|m|b)?\s+(?P<item>[A-Za-z][A-Za-z0-9+&()./-]*(?:\s+[A-Za-z][A-Za-z0-9+&()./-]*){0,5})",
+    re.IGNORECASE,
+)
+_ORDER_ITEM_TAIL_RE = re.compile(
+    r"\b(?:"
+    r"and\s+who|who|that|which|with|within|inside|where|near|from|"
+    r"can\s+you|could\s+you|please|find\s+me|find|source|search|"
+    r"deliver(?:y)?|lead\s*time|supplier(?:s)?\s+should|vendor(?:s)?\s+should"
+    r")\b.*$",
+    re.IGNORECASE,
+)
+
+
+def _is_capacity_quantity(step: dict, obs: dict) -> bool:
+    """True when a parsed quantity is a supplier-capacity constraint."""
+    unit = obs.get("normalized_unit") or obs.get("unit")
+    if not isinstance(unit, str) or not unit.strip():
+        return False
+    text = " ".join(
+        str(v)
+        for v in (
+            obs.get("input"),
+            (step.get("action_input") or {}).get("text"),
+        )
+        if v
+    )
+    normalised_unit = unit.strip().lower()
+    if "/day" in normalised_unit or "/week" in normalised_unit:
+        return True
+    if "/month" in normalised_unit or "/year" in normalised_unit:
+        return True
+    return bool(text and _CAPACITY_SIGNAL_RE.search(text))
+
+
+def _raw_query_states_capacity(raw_query: str) -> bool:
+    """True when the user text explicitly asks for supplier capacity."""
+    return bool(raw_query and _CAPACITY_SIGNAL_RE.search(raw_query))
+
+
+def _capacity_value_matches(left: object, right: object) -> bool:
+    """Loose numeric equality for capacity values copied through JSON memory."""
+    try:
+        return float(left) == float(right)
+    except (TypeError, ValueError):
+        return left == right
+
+
+def _trace_has_matching_memory_capacity(trace: list[dict], raw: dict, raw_query: str) -> bool:
+    """True when capacity in Finish matches a prior query retrieved by memory."""
+    if not _MEMORY_REFERENCE_RE.search(raw_query or ""):
+        return False
+    raw_value = raw.get("capacity_min")
+    raw_unit = raw.get("capacity_unit")
+    if raw_value is None or not raw_unit:
+        return False
+
+    for step in trace:
+        if step.get("action") != "lookup_past_query":
+            continue
+        observation = step.get("observation")
+        rows = observation if isinstance(observation, list) else []
+        if isinstance(observation, dict):
+            rows = observation.get("results") or observation.get("rows") or observation.get("matches") or []
+        for row in rows:
+            constraints = (row or {}).get("constraints") if isinstance(row, dict) else {}
+            if not isinstance(constraints, dict):
+                continue
+            if (
+                _capacity_value_matches(raw_value, constraints.get("capacity_min"))
+                and str(raw_unit).strip().lower()
+                == str(constraints.get("capacity_unit") or "").strip().lower()
+            ):
+                return True
+    return False
+
+
+def _clear_non_capacity_quantity(
+    raw: dict,
+    raw_query: str,
+    *,
+    preserve_memory_capacity: bool = False,
+) -> None:
+    """Drop LLM-promoted buyer order quantities from capacity fields.
+
+    A purchase request like "buy 1000 wrenches" is demand context. Treating it
+    as "supplier must have capacity_min=1000 wrenches" creates a hard
+    compliance gate that can erase otherwise relevant suppliers. Capacity stays
+    only when the user actually used capacity/throughput/per-period language.
+    """
+    if raw.get("capacity_min") is None and raw.get("capacity_unit") is None:
+        return
+    if preserve_memory_capacity:
+        return
+    if _raw_query_states_capacity(raw_query):
+        return
+    raw["capacity_min"] = None
+    raw["capacity_unit"] = None
+
+
+def _extract_lead_time_days(raw_query: str) -> Optional[int]:
+    """Recover a lead-time ceiling from common delivery phrasings."""
+    for pattern in _LEAD_TIME_PATTERNS:
+        match = pattern.search(raw_query or "")
+        if not match:
+            continue
+        try:
+            return max(1, int(float(match.group(1))))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _extract_order_items(raw_query: str) -> list[str]:
+    """Extract product line items from purchase quantities in the query."""
+    items: list[str] = []
+    seen: set[str] = set()
+
+    def add_item(value: str) -> None:
+        item = _ORDER_ITEM_TAIL_RE.sub("", value or "").strip(" .,-")
+        item = re.sub(r"^\d+(?:[.,]\d+)?\s*(?:k|m|b)?\s+", "", item, flags=re.IGNORECASE)
+        item = re.sub(r"\s+", " ", item).lower()
+        item = re.sub(r"^(?:and|of|for|the|a|an)\s+", "", item)
+        item = re.sub(r"^(?:many\s+other|other|additional|extra)\s+", "", item)
+        item = re.sub(r"\b(?:pieces?|pcs|qty|quantity)\b$", "", item).strip()
+        if not item or item in _QUERY_STOPWORDS or item in _SUPPLIER_QUALITY_WORDS:
+            return
+        if item not in seen:
+            seen.add(item)
+            items.append(item)
+
+    quantity_matches: list[re.Match[str]] = []
+    for segment in re.split(r"[,;]|\band\s+(?=\d)", raw_query or "", flags=re.IGNORECASE):
+        segment = segment.strip()
+        if not segment:
+            continue
+        for match in _ORDER_ITEM_RE.finditer(segment):
+            quantity_matches.append(match)
+            add_item(match.group("item"))
+
+    # Shopping-list queries often state one quantity followed by multiple
+    # comma-separated products: "1000 wrench, socket wrench, torque tools".
+    # The first product has the quantity; the follow-on products are still part
+    # of the same demand and should strengthen retrieval keywords.
+    if quantity_matches:
+        first = quantity_matches[0]
+        tail = _ORDER_ITEM_TAIL_RE.sub("", (raw_query or "")[first.end():])
+        for part in re.split(r"[,;]|\band\b", tail, flags=re.IGNORECASE):
+            add_item(part)
+    return items
+
+
+def _keywords_from_items(items: list[str]) -> list[str]:
+    """Build compact semantic-search keywords from extracted line items."""
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        for keyword in (item, *re.findall(r"[a-zA-Z][a-zA-Z0-9+.-]{2,}", item)):
+            key = keyword.lower()
+            if key in seen or key in _QUERY_STOPWORDS:
+                continue
+            seen.add(key)
+            keywords.append(keyword)
+    return keywords[:7]
+
+
+def _extract_ranking_preferences(raw_query: str) -> tuple[list[str], list[str]]:
+    """Split user ranking intent into supported signals and evidence gaps.
+
+    Supported preferences map to fields we can actually score (lead time,
+    certifications, capacity, proximity). Unsupported preferences are useful
+    audit/UI signals, but they must not be silently treated as satisfied.
+    """
+    supported: list[str] = []
+    unsupported: list[str] = []
+    seen_supported: set[str] = set()
+    seen_unsupported: set[str] = set()
+    text = raw_query or ""
+
+    for key, pattern in _RANKING_PREFERENCE_PATTERNS:
+        if pattern.search(text) and key not in seen_supported:
+            seen_supported.add(key)
+            supported.append(key)
+
+    for key, pattern in _UNSUPPORTED_PREFERENCE_PATTERNS:
+        if pattern.search(text) and key not in seen_unsupported:
+            seen_unsupported.add(key)
+            unsupported.append(key)
+
+    return supported, unsupported
+
+
+def _should_replace_product_with_order_items(product_type: object, items: list[str]) -> bool:
+    """True when line items are more trustworthy than the current product."""
+    if not isinstance(product_type, str) or not product_type.strip():
+        return True
+    if _is_placeholder_product(product_type):
+        return True
+    product_tokens = {
+        token.lower()
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9+.-]{2,}", product_type)
+        if token.lower() not in _QUERY_STOPWORDS
+        and token.lower() not in _SUPPLIER_QUALITY_WORDS
+    }
+    if not product_tokens:
+        return True
+    item_tokens = {
+        token.lower()
+        for item in items
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9+.-]{2,}", item)
+    }
+    return bool(item_tokens) and product_tokens.isdisjoint(item_tokens)
+
+
+def _raw_query_mentions_any(raw_query: str, values: list[object]) -> bool:
+    """Return True when any non-empty value appears in the user text."""
+    lowered = (raw_query or "").lower()
+    for value in values:
+        value = _clean_optional_text(value)
+        if not value:
+            continue
+        if value.lower() in lowered:
+            return True
+    return False
+
+
+def _clean_optional_text(value: object) -> Optional[str]:
+    """Convert common LLM null sentinels into real None values."""
+    if not isinstance(value, str):
+        return None if value is None else str(value)
+    cleaned = value.strip()
+    if cleaned.lower() in _EMPTY_CONSTRAINT_STRINGS:
+        return None
+    return cleaned
+
+
+def _constraint_value_present(value: object) -> bool:
+    """True when a constraint value contains business meaning."""
+    if isinstance(value, list):
+        return any(_constraint_value_present(item) for item in value)
+    return _clean_optional_text(value) is not None
+
+
+def _question_mentions_location(text: object) -> bool:
+    """True when a clarification question already asks for search geography."""
+    if not isinstance(text, str):
+        return False
+    return bool(re.search(r"\b(?:city|country|location|where|region)\b", text, re.IGNORECASE))
 
 # ── Final constraint schema — what Finish must emit ──────────────────
 FINISH_SCHEMA = {
@@ -174,6 +545,12 @@ FINISH_SCHEMA = {
     "capacity_min": "capacity floor (number) or null",
     "capacity_unit": "capacity unit (string) or null",
     "lead_time_max_days": "lead-time ceiling in days (number) or null",
+    "ranking_preferences": [
+        "supported user ranking signals: lead_time, certifications, capacity, proximity"
+    ],
+    "unsupported_preferences": [
+        "requested signals that need external evidence, e.g. support_rating, pricing"
+    ],
     "query_type": "geographic_priority | compliance_critical | capability_match | general",
     "complexity": "simple | medium | complex",
     "original_language": "en | de | other",
@@ -229,7 +606,7 @@ def _parse_react_response(text: str) -> _ReActStep:
                 raise ValueError(
                     f"Action Input is not valid JSON: {e}. First 200 chars: "
                     f"{payload[start:start + 200]!r}"
-                )
+                ) from e
     return _ReActStep(
         thought=thought_m.group(1).strip(),
         action=action_m.group(1).strip(),
@@ -309,7 +686,8 @@ class ParserAgent(BaseAgent):
         raw_query = state["raw_query"]
         user_id = state.get("user_id", "")
 
-        memory_context = self._load_user_memory(user_id)
+        memory_context_requested = self._raw_query_requests_memory_context(raw_query)
+        memory_context = self._load_user_memory(user_id) if memory_context_requested else None
         # Task 3.3 — on a resumed run, pass the partial constraints from the
         # paused turn so the Parser doesn't re-extract from scratch.
         prior_partial = state.get("previous_partial_constraints") or None
@@ -461,7 +839,17 @@ class ParserAgent(BaseAgent):
                 }
             else:
                 try:
-                    result = tool.fn(**step.action_input)
+                    if step.action == "lookup_past_query" and not memory_context_requested:
+                        result = {
+                            "results": [],
+                            "skipped": True,
+                            "reason": (
+                                "Memory lookup is only allowed when the user "
+                                "explicitly asks to reuse prior search context."
+                            ),
+                        }
+                    else:
+                        result = tool.fn(**step.action_input)
                     entry["observation"] = result if isinstance(result, (dict, list)) else {"value": result}
                 except TypeError as e:
                     entry["observation"] = {"error": "bad_args", "detail": str(e)}
@@ -489,9 +877,11 @@ class ParserAgent(BaseAgent):
             final_constraints, trace, raw_query=raw_query, prior_partial=prior_partial
         )
         confidence = float(final_constraints.get("confidence", 0.5) or 0.5)
+        finish_payload_requested_clarification = bool(
+            final_constraints.get("clarification_needed")
+        )
         legacy_clarification_needed = (
-            bool(final_constraints.get("clarification_needed"))
-            or confidence < CLARIFICATION_THRESHOLD
+            finish_payload_requested_clarification or confidence < CLARIFICATION_THRESHOLD
         )
         legacy_clarification_question = final_constraints.get("clarification_question")
 
@@ -500,15 +890,27 @@ class ParserAgent(BaseAgent):
         # their own clarification text and we don't override them.
         composed_question: Optional[str] = None
         if terminated_by == "finish":
+            turn_number = int(state.get("turn_number") or 1)
             composed_question = self._decide_clarification(
                 constraints=constraints,
                 trace=trace,
                 raw_query=raw_query,
                 confidence=confidence,
                 memory_context=memory_context,
+                turn_number=turn_number,
             )
 
-        if composed_question is not None:
+        if (
+            finish_payload_requested_clarification
+            and legacy_clarification_question
+            and constraints.get("product_type")
+            and not self._has_any_constraint(constraints, _LOCATION_CONSTRAINT_KEYS)
+            and _question_mentions_location(legacy_clarification_question)
+        ):
+            clarification_needed = True
+            clarification_question = legacy_clarification_question
+            composed_question = None
+        elif composed_question is not None:
             clarification_needed = True
             clarification_question = composed_question
         else:
@@ -657,6 +1059,7 @@ class ParserAgent(BaseAgent):
         raw_query: str,
         confidence: float,
         memory_context: Optional[str],
+        turn_number: int = 1,
     ) -> Optional[str]:
         """Task 3.3 — decide whether to interrupt the pipeline with a question.
 
@@ -682,19 +1085,86 @@ class ParserAgent(BaseAgent):
             )
             if constraints.get(k)
         )
+        has_location_constraint = self._has_any_constraint(
+            constraints, _LOCATION_CONSTRAINT_KEYS
+        )
+        location_can_be_unbounded = self._raw_query_allows_unbounded_location(raw_query)
 
         # Rule 1 — missing product, no explicit memory reference.
         if not has_product and not memory_can_supply_product:
+            missing = (
+                "product_and_location"
+                if not has_location_constraint and not location_can_be_unbounded
+                else "product"
+            )
             return self._compose_clarification_question(
-                raw_query, constraints, missing="product"
+                raw_query, constraints, missing=missing
             )
 
         # Rule 1b — the model inferred/borrowed a product for a location-only
         # query. Do not let semantic memory or industry inference decide what
         # the user wants unless the user explicitly asked to reuse context.
         if not raw_has_product_signal and not memory_can_supply_product:
+            missing = (
+                "product_and_location"
+                if not has_location_constraint and not location_can_be_unbounded
+                else "product"
+            )
             return self._compose_clarification_question(
-                raw_query, constraints, missing="product"
+                raw_query, constraints, missing=missing
+            )
+
+        has_operational_constraint = self._has_any_constraint(
+            constraints, _OPERATIONAL_CONSTRAINT_KEYS
+        )
+        has_ranking_preference = self._raw_query_has_preference_signal(raw_query)
+        has_precise_location = bool(
+            self._has_any_constraint(
+                constraints,
+                ("location_city", "location_region", "location_radius_km"),
+            )
+        )
+
+        # Rule 1c — do not run open-ended web discovery without a search
+        # geography unless the user explicitly asks for a global/unbounded
+        # search. This remains true on resumed turns: if the first answer only
+        # supplied the product, the next agentic step is to ask where to look.
+        if has_product and not has_location_constraint and not location_can_be_unbounded:
+            if not has_operational_constraint and not has_ranking_preference:
+                return self._compose_clarification_question(
+                    raw_query, constraints, missing="location_or_requirements"
+                )
+            return self._compose_clarification_question(
+                raw_query, constraints, missing="location"
+            )
+
+        # Resumed turns should converge. Once the user has supplied the
+        # missing product/service and at least one narrowing signal exists, do
+        # not keep asking for optional preferences until the max-turn guard
+        # fails the query.
+        if (
+            turn_number > 1
+            and has_product
+            and (
+                has_location_constraint
+                or has_operational_constraint
+                or has_ranking_preference
+            )
+        ):
+            return None
+
+        # Rule 1e — product + country is still broad when the user gives no
+        # certification, delivery, capacity, radius, city/region, or ranking
+        # preference. Ask what should drive the result quality.
+        if (
+            has_product
+            and self._has_any_constraint(constraints, ("location_country",))
+            and not has_precise_location
+            and not has_operational_constraint
+            and not has_ranking_preference
+        ):
+            return self._compose_clarification_question(
+                raw_query, constraints, missing="operational_preference"
             )
 
         # Rule 2 — low confidence AND sparse constraints.
@@ -714,9 +1184,35 @@ class ParserAgent(BaseAgent):
         return None
 
     @staticmethod
+    def _has_any_constraint(constraints: dict, keys: tuple[str, ...]) -> bool:
+        """True when any named constraint is present and meaningful."""
+        for key in keys:
+            value = constraints.get(key)
+            if _constraint_value_present(value):
+                return True
+        return False
+
+    @staticmethod
     def _raw_query_requests_memory_context(raw_query: str) -> bool:
         """True when the user explicitly refers back to prior context."""
         return bool(_MEMORY_REFERENCE_RE.search(raw_query or ""))
+
+    @staticmethod
+    def _raw_query_has_preference_signal(raw_query: str) -> bool:
+        """True when the user states how results should be prioritized."""
+        return bool(_extract_ranking_preferences(raw_query)[0] or _PREFERENCE_SIGNAL_RE.search(raw_query or ""))
+
+    @staticmethod
+    def _raw_query_allows_unbounded_location(raw_query: str) -> bool:
+        """True when the user explicitly opts into an unconstrained geography."""
+        lowered = (raw_query or "").lower()
+        return bool(
+            re.search(
+                r"\b(?:global|worldwide|anywhere|international|no\s+location\s+"
+                r"preference|any\s+(?:country|location|region)|all\s+countries)\b",
+                lowered,
+            )
+        )
 
     @staticmethod
     def _raw_query_has_product_signal(raw_query: str, constraints: dict) -> bool:
@@ -726,12 +1222,12 @@ class ParserAgent(BaseAgent):
         if not tokens:
             return False
 
-        ignored = set(_QUERY_STOPWORDS) | set(_NON_PRODUCT_QUERY_TOKENS)
+        ignored = set(_QUERY_STOPWORDS) | set(_NON_PRODUCT_QUERY_TOKENS) | set(_SUPPLIER_QUALITY_WORDS)
         for key in (
             "location_name", "location_city", "location_country", "location_region",
         ):
-            value = constraints.get(key)
-            if isinstance(value, str):
+            value = _clean_optional_text(constraints.get(key))
+            if value:
                 ignored.update(re.findall(r"[a-zA-Z0-9]+", value.lower()))
         for cert in constraints.get("certifications") or []:
             if isinstance(cert, str):
@@ -772,6 +1268,9 @@ class ParserAgent(BaseAgent):
         the LLM call fails, fall back to a deterministic template so the
         feature never crashes the Parser end-to-end.
         """
+        if missing in {"product_and_location", "location"}:
+            return self._fallback_clarification(missing)
+
         summary = self._format_constraints_for_clarification(partial_constraints)
         prompt = (
             f'A procurement user asked: "{raw_query}"\n\n'
@@ -817,12 +1316,15 @@ class ParserAgent(BaseAgent):
             ("Capacity floor", "capacity_min"),
         ):
             v = constraints.get(key)
-            if not v:
+            if not _constraint_value_present(v):
                 rows.append(f"  - {label}: (not specified)")
             elif isinstance(v, list):
-                rows.append(f"  - {label}: {', '.join(str(x) for x in v) or '(not specified)'}")
+                cleaned_values = [
+                    cleaned for item in v if (cleaned := _clean_optional_text(item))
+                ]
+                rows.append(f"  - {label}: {', '.join(cleaned_values) or '(not specified)'}")
             else:
-                rows.append(f"  - {label}: {v}")
+                rows.append(f"  - {label}: {_clean_optional_text(v) or '(not specified)'}")
         return "\n".join(rows)
 
     @staticmethod
@@ -850,10 +1352,27 @@ class ParserAgent(BaseAgent):
                 "What product are you sourcing? For example: packaging, "
                 "electronics, or raw materials."
             )
+        if missing == "product_and_location":
+            return (
+                "What product are you sourcing, and which city or country "
+                "should I search in?"
+            )
+        if missing == "location":
+            return "Which city or country should I search in?"
         if missing == "placeholder":
             return (
                 "Could you say which product or service you need? "
                 "Your last message did not name one."
+            )
+        if missing == "location_or_requirements":
+            return (
+                "Where should I search, or do you have lead time, capacity, "
+                "or certification requirements?"
+            )
+        if missing == "operational_preference":
+            return (
+                "What matters most for this search: certification, lead time, "
+                "capacity, or proximity?"
             )
         return (
             "Could you give a bit more detail — product, certifications, "
@@ -1083,13 +1602,78 @@ class ParserAgent(BaseAgent):
             raw.setdefault("capacity_min", cap.get("min_value"))
             raw.setdefault("capacity_unit", cap.get("unit"))
 
+        text_fields = (
+            "product_type",
+            "industry_context",
+            "buyer_intent",
+            "category_hint",
+            "location_name",
+            "location_city",
+            "location_country",
+            "location_region",
+            "capacity_unit",
+            "query_type",
+            "complexity",
+            "original_language",
+        )
+        for key in text_fields:
+            if key in raw:
+                raw[key] = _clean_optional_text(raw.get(key))
+
+        if isinstance(raw.get("product_keywords"), list):
+            raw["product_keywords"] = [
+                cleaned
+                for value in raw["product_keywords"]
+                if (cleaned := _clean_optional_text(value))
+            ]
+        if isinstance(raw.get("certifications"), list):
+            raw["certifications"] = [
+                cleaned
+                for value in raw["certifications"]
+                if (cleaned := _clean_optional_text(value))
+            ]
+        if isinstance(raw.get("industry_typical_certs"), list):
+            raw["industry_typical_certs"] = [
+                cleaned
+                for value in raw["industry_typical_certs"]
+                if (cleaned := _clean_optional_text(value))
+            ]
+        if isinstance(raw.get("ranking_preferences"), list):
+            raw["ranking_preferences"] = [
+                cleaned
+                for value in raw["ranking_preferences"]
+                if (cleaned := _clean_optional_text(value))
+            ]
+        if isinstance(raw.get("unsupported_preferences"), list):
+            raw["unsupported_preferences"] = [
+                cleaned
+                for value in raw["unsupported_preferences"]
+                if (cleaned := _clean_optional_text(value))
+            ]
+
+        if raw.get("lead_time_max_days") is None:
+            raw["lead_time_max_days"] = _extract_lead_time_days(raw_query)
+
         # If a geocode_location observation succeeded but the LLM dropped
         # lat/lng from Finish, restore them from the trace.
         if raw.get("location_lat") is None or raw.get("location_lng") is None:
             for step in trace:
                 if step.get("action") == "geocode_location":
                     obs = step.get("observation") or {}
-                    if obs.get("found"):
+                    if obs.get("found") and (
+                        _raw_query_mentions_any(
+                            raw_query,
+                            [
+                                obs.get("city"),
+                                obs.get("country"),
+                                (step.get("action_input") or {}).get("location_name"),
+                            ],
+                        )
+                        or any(
+                            (prior_partial or {}).get(k)
+                            for k in ("location_city", "location_country", "location_region")
+                        )
+                    ):
                         raw.setdefault("location_lat", obs.get("lat"))
                         raw.setdefault("location_lng", obs.get("lng"))
                         raw.setdefault("location_city", raw.get("location_city") or obs.get("city"))
@@ -1128,12 +1712,24 @@ class ParserAgent(BaseAgent):
             for step in trace:
                 if step.get("action") == "parse_quantity_unit":
                     obs = step.get("observation") or {}
-                    if obs.get("parsed") and obs.get("value") is not None:
+                    if (
+                        obs.get("parsed")
+                        and obs.get("value") is not None
+                        and _is_capacity_quantity(step, obs)
+                    ):
                         if raw.get("capacity_min") is None:
                             raw["capacity_min"] = obs.get("value")
                         if raw.get("capacity_unit") is None:
                             raw["capacity_unit"] = obs.get("normalized_unit") or obs.get("unit")
                         break
+
+        _clear_non_capacity_quantity(
+            raw,
+            raw_query,
+            preserve_memory_capacity=_trace_has_matching_memory_capacity(
+                trace, raw, raw_query
+            ),
+        )
 
         # Promote infer_industry_context for industry_context + a best-effort
         # product_type when the LLM emitted an empty Finish payload.
@@ -1148,13 +1744,34 @@ class ParserAgent(BaseAgent):
                     if not raw.get("product_type"):
                         # The LLM's own Action Input is the closest thing to a
                         # product label that survived the trace.
-                        product_desc = (step.get("action_input") or {}).get("product_description")
+                        product_desc = _clean_optional_text(
+                            (step.get("action_input") or {}).get("product_description")
+                        )
                         if product_desc:
                             raw["product_type"] = product_desc
                     break
 
-        location_city = raw.get("location_city")
-        location_country = raw.get("location_country")
+        order_items = _extract_order_items(raw_query)
+        if order_items:
+            if _should_replace_product_with_order_items(raw.get("product_type"), order_items):
+                raw["product_type"] = ", ".join(order_items)
+            existing_keywords = list(raw.get("product_keywords") or [])
+            merged_keywords = [*existing_keywords, *_keywords_from_items(order_items)]
+            deduped_keywords: list[str] = []
+            seen_keywords: set[str] = set()
+            for keyword in merged_keywords:
+                if not isinstance(keyword, str) or not keyword.strip():
+                    continue
+                key = keyword.strip().lower()
+                if key in seen_keywords:
+                    continue
+                seen_keywords.add(key)
+                deduped_keywords.append(keyword.strip())
+            raw["product_keywords"] = deduped_keywords[:7]
+
+        location_city = _clean_optional_text(raw.get("location_city"))
+        location_country = _clean_optional_text(raw.get("location_country"))
+        location_region = _clean_optional_text(raw.get("location_region"))
         # Phase E (Rule 1 pollution): a generic procurement noun ("suppliers",
         # "manufacturers", ...) is never a country — drop it so the discovery
         # structured filter doesn't search Supplier.country == 'suppliers' and
@@ -1181,6 +1798,14 @@ class ParserAgent(BaseAgent):
         if _is_placeholder_product(product_type):
             product_type = None
 
+        ranking_preferences, unsupported_preferences = _extract_ranking_preferences(raw_query)
+        for value in raw.get("ranking_preferences") or []:
+            if value in {"lead_time", "certifications", "capacity", "proximity"} and value not in ranking_preferences:
+                ranking_preferences.append(value)
+        for value in raw.get("unsupported_preferences") or []:
+            if value in {"support_rating", "pricing"} and value not in unsupported_preferences:
+                unsupported_preferences.append(value)
+
         # Cert provenance guard: keep only user-stated certs in the hard
         # `certifications` gate; route inference-tool certs to the soft
         # `industry_typical_certs`; drop certs with no provenance at all.
@@ -1198,7 +1823,7 @@ class ParserAgent(BaseAgent):
             "location_name": location_name,
             "location_city": location_city,
             "location_country": location_country,
-            "location_region": raw.get("location_region"),
+            "location_region": location_region,
             "location_lat": raw.get("location_lat"),
             "location_lng": raw.get("location_lng"),
             "location_radius_km": raw.get("location_radius_km"),
@@ -1208,6 +1833,8 @@ class ParserAgent(BaseAgent):
             "capacity_min": raw.get("capacity_min"),
             "capacity_unit": raw.get("capacity_unit"),
             "lead_time_max_days": raw.get("lead_time_max_days"),
+            "ranking_preferences": ranking_preferences,
+            "unsupported_preferences": unsupported_preferences,
 
             "query_type": raw.get("query_type") or "general",
             "complexity": raw.get("complexity") or "medium",
@@ -1232,7 +1859,9 @@ class ParserAgent(BaseAgent):
             "certifications": [],
             "capacity_min": None,
             "capacity_unit": None,
-            "lead_time_max_days": None,
+            "lead_time_max_days": _extract_lead_time_days(raw_query),
+            "ranking_preferences": [],
+            "unsupported_preferences": [],
             "query_type": "general",
             "complexity": "medium",
             "original_language": "en",
@@ -1247,7 +1876,14 @@ class ParserAgent(BaseAgent):
         for step in trace:
             obs = step.get("observation") or {}
             action = step.get("action")
-            if action == "geocode_location" and obs.get("found"):
+            if action == "geocode_location" and obs.get("found") and _raw_query_mentions_any(
+                raw_query,
+                [
+                    obs.get("city"),
+                    obs.get("country"),
+                    (step.get("action_input") or {}).get("location_name"),
+                ],
+            ):
                 fallback["location_city"] = fallback.get("location_city") or obs.get("city")
                 fallback["location_country"] = fallback.get("location_country") or obs.get("country")
                 fallback["location_lat"] = obs.get("lat")
@@ -1269,16 +1905,36 @@ class ParserAgent(BaseAgent):
                     and not _is_placeholder_product(product_desc)
                 ):
                     fallback["product_type"] = product_desc
-            elif action == "parse_quantity_unit" and obs.get("parsed"):
+            elif (
+                action == "parse_quantity_unit"
+                and obs.get("parsed")
+                and _is_capacity_quantity(step, obs)
+            ):
                 fallback["capacity_min"] = fallback["capacity_min"] or obs.get("value")
                 fallback["capacity_unit"] = (
                     fallback["capacity_unit"] or obs.get("normalized_unit") or obs.get("unit")
                 )
 
+        order_items = _extract_order_items(raw_query)
+        if order_items:
+            if _should_replace_product_with_order_items(fallback["product_type"], order_items):
+                fallback["product_type"] = ", ".join(order_items)
+            fallback["product_keywords"] = _keywords_from_items(order_items)
+
+        _clear_non_capacity_quantity(fallback, raw_query)
+        (
+            fallback["ranking_preferences"],
+            fallback["unsupported_preferences"],
+        ) = _extract_ranking_preferences(raw_query)
+
         # Tokenise the raw query for at least some product keywords so the
         # downstream semantic search has *something* to work with.
         if not fallback["product_keywords"]:
-            words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9]{2,}", raw_query)]
+            words = [
+                w for w in re.findall(r"[A-Za-z][A-Za-z0-9]{2,}", raw_query)
+                if w.lower() not in _QUERY_STOPWORDS
+                and w.lower() not in _SUPPLIER_QUALITY_WORDS
+            ]
             fallback["product_keywords"] = words[:5]
             fallback["product_type"] = fallback["product_type"] or " ".join(words[:3]) or None
 
@@ -1292,6 +1948,7 @@ class ParserAgent(BaseAgent):
                 fallback["certifications"],
                 fallback["location_country"] or fallback["location_city"],
                 fallback["capacity_min"],
+                fallback["lead_time_max_days"],
             ) if v
         )
         if not _is_placeholder_product(fallback["product_type"]) and (

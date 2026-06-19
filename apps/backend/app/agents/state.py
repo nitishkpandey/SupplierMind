@@ -13,7 +13,8 @@ LangGraph initialises the state dict at the start of a pipeline run.
 If a field has no default, LangGraph raises an error on initialisation.
 """
 
-from typing import Any, Optional
+from typing import Optional
+
 from typing_extensions import TypedDict
 
 
@@ -41,6 +42,8 @@ class ParsedConstraints(TypedDict, total=False):
     capacity_min: Optional[float]
     capacity_unit: Optional[str]
     lead_time_max_days: Optional[int]
+    ranking_preferences: Optional[list[str]]       # Supported ranking signals from user text
+    unsupported_preferences: Optional[list[str]]   # Requested signals with no trusted data source
 
     # Query metadata
     query_type: Optional[str]
@@ -76,6 +79,7 @@ class RankedSupplier(TypedDict):
     semantic_score: float
     proximity_score: Optional[float]
     completeness_score: float
+    preference_score: float
     compliance_matrix: dict[str, str]   # {constraint: "PASS"/"FAIL"/"PARTIAL"}
     explanation: str                     # LLM-generated explanation
     distance_km: Optional[float]

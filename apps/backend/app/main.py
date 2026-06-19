@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.middleware import RequestIDMiddleware, RateLimitMiddleware
+from app.middleware import RateLimitMiddleware, RequestIDMiddleware
 
 # Configure console logging for backend & agent processes
 logging.basicConfig(
@@ -81,7 +81,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         vector_store = create_vector_store()
         set_vector_store_instance(vector_store)
-        logger.info("Vector store initialized: %d suppliers indexed", vector_store.count())
+        indexed_count = vector_store.count()
+        logger.info("Vector store initialized: %d suppliers indexed", indexed_count)
+        _log_supplier_index_health(indexed_count)
     except Exception as e:
         logger.warning("Vector store unavailable at startup: %s", e)
         logger.warning("Run ingestion after starting: python scripts/ingest_suppliers.py")
@@ -120,13 +122,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIDMiddleware)
 
     # Register routers
-    from app.api.v1 import health
-    from app.api.v1 import auth
-    from app.api.v1 import queries
-    from app.api.v1 import evaluation
-    from app.api.v1 import suppliers
-    from app.api.v1 import metrics
-    from app.api.v1 import users
+    from app.api.v1 import auth, evaluation, health, metrics, queries, suppliers, users
 
     app.include_router(health.router, tags=["Health"])
     app.include_router(
@@ -161,6 +157,34 @@ def create_app() -> FastAPI:
     )
 
     return app
+
+
+def _log_supplier_index_health(indexed_count: int) -> None:
+    """Warn when Postgres has many active suppliers not present in vector search."""
+    try:
+        from sqlalchemy import func, select
+
+        from app.db.models import Supplier
+        from app.db.session import SyncSessionLocal
+
+        with SyncSessionLocal() as db:
+            active_count = db.execute(
+                select(func.count())
+                .select_from(Supplier)
+                .where(Supplier.is_active == True)  # noqa: E712
+            ).scalar_one()
+    except Exception as e:  # noqa: BLE001 - startup health must not block boot
+        logger.warning("Could not compare supplier DB/vector counts: %s", e)
+        return
+
+    if active_count and indexed_count < active_count:
+        logger.warning(
+            "Supplier vector index is incomplete: %d indexed vs %d active in Postgres. "
+            "Run `uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume` "
+            "from apps/backend to continue indexing.",
+            indexed_count,
+            active_count,
+        )
 
 
 app = create_app()

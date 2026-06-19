@@ -21,13 +21,12 @@ from typing import Any
 import pytest
 
 from app.agents.parser_agent import MAX_REACT_ITERATIONS, ParserAgent
-from app.agents.tools import Tool, ToolRegistry
+from app.agents.tools import ToolRegistry
 from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
 from app.agents.tools.geocode import geocode_location_tool
 from app.agents.tools.industry_context import infer_industry_context_tool
 from app.agents.tools.past_query_stub import lookup_past_query_tool
 from app.agents.tools.quantity_parser import parse_quantity_unit_tool
-
 
 # ── Fakes ────────────────────────────────────────────────────────────
 
@@ -279,7 +278,7 @@ def test_same_args_dedup_intercepts_repeat_call():
         "location_country": "Germany",
         "location_region": None,
         "location_radius_km": None,
-        "certifications": [],
+        "certifications": ["ISO 9001"],
         "capacity_min": None,
         "capacity_unit": None,
         "lead_time_max_days": None,
@@ -297,7 +296,7 @@ def test_same_args_dedup_intercepts_repeat_call():
     ])
     parser = _make_parser(llm, registry)
 
-    out = parser.execute(_make_state("packaging supplier in Germany"))
+    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
 
     trace = out["react_trace"]
     assert trace[1]["action"] == "geocode_location"
@@ -354,7 +353,7 @@ def test_react_trace_lands_in_audit_log_output_snapshot():
         "location_country": "Germany",
         "location_region": None,
         "location_radius_km": None,
-        "certifications": [],
+        "certifications": ["ISO 9001"],
         "capacity_min": None,
         "capacity_unit": None,
         "lead_time_max_days": None,
@@ -371,7 +370,7 @@ def test_react_trace_lands_in_audit_log_output_snapshot():
     ])
     parser = _make_parser(llm, registry)
 
-    out = parser.execute(_make_state("packaging supplier in Germany"))
+    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
 
     audit = out["audit_log"]
     assert len(audit) == 1
@@ -503,6 +502,107 @@ def test_fallback_proceeds_when_trace_recovered_product_and_constraint():
     assert out["needs_clarification"] is False
     assert out["parsed_constraints"]["product_type"] == "stainless steel fasteners"
     assert out["parsed_constraints"]["location_country"] == "Germany"
+
+
+def test_fallback_treats_order_quantities_as_products_not_capacity():
+    """Purchase quantities are demand-line items, not supplier capacity.
+
+    When the ReAct loop exhausts its budget on a long procurement request, the
+    fallback extractor should recover product terms and lead time from the raw
+    text without turning "100 laptops" into a hard capacity gate.
+    """
+    registry = _build_registry(geocoder=_FakeGeocoder((52.52, 13.405)))
+    responses = [
+        'Thought: parse first quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "100 macbook desktop"}',
+        'Thought: parse second quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "50 mouse"}',
+        'Thought: mistaken location guess.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        'Thought: parse third quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "100 mouse pads"}',
+        'Thought: keep looking.\nAction: geocode_location\nAction Input: {"location_name": "Berlin"}',
+        'Thought: one more parse.\nAction: parse_quantity_unit\nAction Input: {"text": "15 days max"}',
+    ]
+    llm = _FakeLLM(responses)
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state(
+        "find the best supplier for me, I have to buy 100 macbook desktop, "
+        "and 50 mouse, and 100 mouse pads and who can deliver me the product "
+        "in 15 days max. the supplier should be genuine"
+    ))
+
+    constraints = out["parsed_constraints"]
+    assert out["react_terminated_by"] == "max_iterations"
+    assert out["needs_clarification"] is False
+    assert constraints["lead_time_max_days"] == 15
+    assert constraints["capacity_min"] is None
+    assert constraints["capacity_unit"] is None
+    assert constraints["location_country"] is None
+    assert "macbook desktop" in constraints["product_type"]
+    assert "mouse pads" in constraints["product_type"]
+    assert "macbook" in constraints["product_keywords"]
+    assert "mouse pads" in constraints["product_keywords"]
+
+
+def test_finish_payload_treats_purchase_quantities_as_products_not_capacity():
+    """The normal Finish path must not turn buyer demand into capacity.
+
+    This pins the live failure class where the LLM finished successfully with
+    capacity_min=1000/capacity_unit="tools" after parsing a shopping-list
+    request. The quantity describes the order, not monthly supplier capacity.
+    """
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((51.1657, 10.4515)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"tools_hardware","common_certs":["ISO 9001"],"typical_units":"units/month"}'
+        ]),
+    )
+    finish_payload = {
+        "product_type": "tools",
+        "product_keywords": ["wrench", "socket wrench", "torque tools", "tools"],
+        "industry_context": "tools_hardware",
+        "buyer_intent": "any",
+        "category_hint": "tools_hardware",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": 1000,
+        "capacity_unit": "tools",
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "medium",
+        "original_language": "en",
+        "confidence": 0.85,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: understand category.\nAction: infer_industry_context\n'
+        'Action Input: {"product_description": "wrench, socket wrench, torque tools and tools"}',
+        'Thought: parse order quantity.\nAction: parse_quantity_unit\n'
+        'Action Input: {"text": "1000 tools"}',
+        'Thought: geocode country.\nAction: geocode_location\n'
+        'Action Input: {"location_name": "Germany"}',
+        f'Thought: done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state(
+        "I want to buy 1000 wrench, socket wrench, torque tools and many other "
+        "tools, can you find me the good and reliable suppliers for this inside "
+        "Germany."
+    ))
+
+    constraints = out["parsed_constraints"]
+    assert out["needs_clarification"] is False
+    assert constraints["capacity_min"] is None
+    assert constraints["capacity_unit"] is None
+    assert constraints["product_type"] == "tools"
+    assert constraints["category_hint"] == "tools_hardware"
+    assert "wrench" in constraints["product_keywords"]
+    assert "socket wrench" in constraints["product_keywords"]
+    assert "torque tools" in constraints["product_keywords"]
+    assert "tools" in constraints["product_keywords"]
 
 
 # -- Cert provenance guard (cert-hallucination fix) ---------------------------

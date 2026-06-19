@@ -13,17 +13,13 @@ from typing import Any
 
 import pytest
 
-from app.agents.parser_agent import (
-    CLARIFICATION_CONFIDENCE_FLOOR,
-    ParserAgent,
-)
+from app.agents.parser_agent import ParserAgent
 from app.agents.tools import Tool, ToolRegistry
 from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
 from app.agents.tools.geocode import geocode_location_tool
 from app.agents.tools.industry_context import infer_industry_context_tool
 from app.agents.tools.past_query_stub import lookup_past_query_tool
 from app.agents.tools.quantity_parser import parse_quantity_unit_tool
-
 
 # ── Fakes ────────────────────────────────────────────────────────────
 
@@ -70,7 +66,7 @@ def _build_registry(geocoder=None, lookup_fn=None) -> ToolRegistry:
         reg.register(lookup_past_query_tool())
     else:
         # Override the stub with a fake that returns the supplied memory rows.
-        from app.agents.tools.past_query_stub import _DESCRIPTION, _ARGS_SCHEMA
+        from app.agents.tools.past_query_stub import _ARGS_SCHEMA, _DESCRIPTION
         reg.register(
             Tool(
                 name="lookup_past_query",
@@ -210,6 +206,47 @@ def test_missing_product_triggers_clarification_rule_1():
     assert len(clarification_entries) == 1
     assert clarification_entries[0]["action"] == "clarification_raised"
     assert clarification_entries[0]["output_summary"] == q
+
+
+def test_supplier_quality_phrase_is_not_a_product():
+    """A phrase like "large suppliers" describes supplier preference/scale,
+    not the product being sourced, so the Parser should ask for the product."""
+    geocoder = _FakeGeocoder((52.52, 13.405))
+    registry = _build_registry(geocoder=geocoder)
+
+    finish_payload = {
+        "product_type": "large suppliers",
+        "product_keywords": ["large", "suppliers"],
+        "industry_context": None,
+        "buyer_intent": "any",
+        "category_hint": None,
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "geographic_priority",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.8,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: geocode Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: done.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+        "What product are you sourcing? For example: electronics, packaging, or raw materials.",
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("Find large suppliers in Germany."))
+
+    assert out["needs_clarification"] is True
+    assert out["pipeline_status"] == "needs_clarification"
+    assert "product" in (out["clarification_question"] or "").lower()
 
 
 # ── 3. Low confidence + sparse constraints → clarification ───────────
@@ -371,6 +408,153 @@ def test_generic_location_query_with_memory_hit_still_asks_for_product():
     assert out["needs_clarification"] is True
     assert out["pipeline_status"] == "needs_clarification"
     assert "product" in (out["clarification_question"] or "").lower()
+
+
+def test_product_only_query_asks_for_location_or_requirements():
+    """A product-only query is still too weak for procurement discovery.
+
+    The parser should ask one high-value follow-up instead of searching the
+    entire supplier bench for an unconstrained product.
+    """
+    registry = _build_registry(geocoder=_FakeGeocoder((0.0, 0.0)))
+
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging"],
+        "industry_context": "packaging",
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": None,
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.85,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        f'Thought: Product identified.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+        "Where should I search, or do you have lead time, capacity, or certification requirements?",
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("packaging suppliers"))
+
+    assert out["needs_clarification"] is True
+    assert out["pipeline_status"] == "needs_clarification"
+    question = out["clarification_question"] or ""
+    assert any(
+        word in question.lower()
+        for word in ("where", "location", "lead", "capacity", "certification")
+    )
+
+
+def test_broad_country_product_query_asks_for_operational_preference():
+    """Product + country can still be too broad.
+
+    For a country-wide search with no certification, lead-time, capacity, radius,
+    or ranking preference, the agent should ask what matters most before
+    returning arbitrary-looking suppliers.
+    """
+    registry = _build_registry(geocoder=_FakeGeocoder((51.1657, 10.4515)))
+
+    finish_payload = {
+        "product_type": "packaging",
+        "product_keywords": ["packaging"],
+        "industry_context": "packaging",
+        "buyer_intent": "any",
+        "category_hint": "packaging",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.85,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        'Thought: Geocode Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        f'Thought: Product and country are clear.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+        "What matters most: certification, lead time, capacity, or proximity?",
+    ])
+    parser = _make_parser(llm, registry)
+
+    out = parser.execute(_make_state("packaging suppliers in Germany"))
+
+    assert out["needs_clarification"] is True
+    assert out["pipeline_status"] == "needs_clarification"
+    question = out["clarification_question"] or ""
+    assert any(
+        word in question.lower()
+        for word in ("certification", "lead", "capacity", "proximity")
+    )
+
+
+def test_resumed_query_with_product_and_country_does_not_ask_optional_preferences():
+    """After the user answers a product clarification, product + country is
+    enough to start discovery.
+
+    Optional preferences are useful, but they must not burn the remaining
+    clarification turns and hit the max-turn guard.
+    """
+    registry = _build_registry(geocoder=_FakeGeocoder((51.1657, 10.4515)))
+
+    finish_payload = {
+        "product_type": "machinery tools",
+        "product_keywords": ["machinery", "tools", "angle wrench", "socket wrench"],
+        "industry_context": "tools_hardware",
+        "buyer_intent": "any",
+        "category_hint": "tools_hardware",
+        "location_city": None,
+        "location_country": "Germany",
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.85,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    llm = _FakeLLM([
+        f'Thought: Product is now clear.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, registry)
+    state = _make_state(
+        "find a supplier in germany\n\n"
+        "User clarification: tools like, angle wrench, socket wrench"
+    )
+    state["turn_number"] = 2
+    state["previous_partial_constraints"] = {
+        "product_type": None,
+        "location_country": "Germany",
+        "location_name": "Germany",
+    }
+
+    out = parser.execute(state)
+
+    assert out["needs_clarification"] is False
+    assert out["pipeline_status"] == "running"
+    assert out["parsed_constraints"]["product_type"] == "machinery tools"
+    assert out["parsed_constraints"]["location_country"] == "Germany"
 
 
 # ── 5. Fallback path (max_iterations) is not double-clarified ────────

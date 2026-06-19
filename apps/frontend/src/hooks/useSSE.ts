@@ -24,6 +24,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
   const [error, setError] = useState<string | null>(null);
   const [clarification, setClarification] = useState<ClarificationSignal | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
+  const terminalEventRef = useRef(false);
   const { accessToken } = useAuthStore();
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
@@ -39,6 +40,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
       setIsComplete(false);
       setError(null);
       setClarification(null);
+      terminalEventRef.current = false;
     });
 
     // Close any existing connection
@@ -72,6 +74,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
       } catch {
         // Ignored empty catch block
       }
+      terminalEventRef.current = true;
       setIsComplete(true);
       source.close();
     });
@@ -89,6 +92,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
       } catch {
         console.warn("[SSE] Failed to parse needs_clarification:", e.data);
       }
+      terminalEventRef.current = true;
       setIsComplete(true);
       source.close();
     });
@@ -100,17 +104,17 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
       } catch {
         setError("Pipeline failed");
       }
+      terminalEventRef.current = true;
       setIsComplete(true);
       source.close();
     });
 
     // onerror fires when connection drops (not when server sends error event)
     source.onerror = (e) => {
-      // If already complete, this is just cleanup
-      if (!isComplete) {
+      // If a terminal SSE event already arrived, this is just cleanup.
+      if (!terminalEventRef.current) {
         console.warn("[SSE] Connection error:", e);
-        // Don't set error here — the pipeline might still be running
-        // Poll for results as fallback
+        setError("Lost connection while waiting for the discovery pipeline.");
         setIsComplete(true);
       }
       source.close();
@@ -129,6 +133,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
     setIsComplete(false);
     setError(null);
     setClarification(null);
+    terminalEventRef.current = false;
   };
 
   return { events, isComplete, error, clarification, reset };

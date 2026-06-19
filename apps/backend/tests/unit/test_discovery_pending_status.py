@@ -120,6 +120,37 @@ def test_pending_supplier_still_gets_embedded():
     )
 
 
+def test_web_discovered_certification_evidence_persisted_in_details():
+    captured, _, _ = _ingest_one(
+        {
+            "name": "Certified Bremen Metals GmbH",
+            "description": "Metal supplier with verified quality system.",
+            "country": "Germany",
+            "certifications": ["ISO 9001"],
+            "source_citations": {
+                "certifications": {
+                    "url": "https://certified.example/quality",
+                    "source_phrase": "Certified according to ISO 9001:2015.",
+                    "certifications": {
+                        "ISO 9001": {
+                            "url": "https://certified.example/quality",
+                            "source_phrase": "Certified according to ISO 9001:2015.",
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    supplier = captured[0]
+    assert supplier.certification_details == {
+        "ISO 9001": {
+            "source_url": "https://certified.example/quality",
+            "source_phrase": "Certified according to ISO 9001:2015.",
+        }
+    }
+
+
 def test_external_discovery_rejects_supplier_without_verified_location():
     """Web suppliers must not be ingested unless location enrichment verifies
     city/country/coordinates. This prevents Pending Review from filling with
@@ -338,6 +369,69 @@ def test_structured_keyword_search_uses_postgres_corpus_when_vector_index_misses
             "parsed_constraints": {
                 "product_type": unique_kw,
                 "product_keywords": [unique_kw],
+            },
+            "newly_discovered_supplier_ids": [],
+            "candidate_supplier_ids": [],
+            "semantic_scores": {},
+            "geo_distances": {},
+            "relaxed_constraints": [],
+            "tier_assignments": {},
+            "retry_count": 3,
+            "search_scope": "approved_only",
+            "user_id": "",
+            "exclude_pending": False,
+            "audit_log": [],
+        }
+
+        with patch("app.core.vector_store.get_vector_store", return_value=fake_vs), patch(
+            "app.agents.discovery_agent.SyncSessionLocal",
+            return_value=fake_session_cm,
+        ):
+            result = agent.execute(state)
+
+        assert supplier_id in result["candidate_supplier_ids"]
+        assert result["tier_assignments"][supplier_id] == "approved"
+
+        db.rollback()
+
+
+def test_structured_search_expands_missing_parser_category_to_corpus_category():
+    """Parser categories absent from the corpus should not dead-end SQL.
+
+    `tools_hardware` is a valid parser category, but the current synthetic
+    bench stores related suppliers under categories such as `machinery`.
+    Discovery should expand the category and still return candidates for
+    downstream ranking instead of relying only on vector search.
+    """
+    agent = DiscoveryAgent.__new__(DiscoveryAgent)
+    unique_kw = "zzqtoolcategoryfallback"
+
+    with SyncSessionLocal() as db:
+        supplier = Supplier(
+            name="Zzq Tooling Machinery GmbH",
+            description=f"{unique_kw} industrial equipment manufacturer.",
+            category="machinery",
+            country="ZZQland",
+            status=SupplierStatus.approved,
+            is_active=True,
+        )
+        db.add(supplier)
+        db.flush()
+        supplier_id = str(supplier.id)
+
+        fake_vs = MagicMock()
+        fake_vs.search.return_value = []
+        fake_session_cm = MagicMock()
+        fake_session_cm.__enter__.return_value = db
+        fake_session_cm.__exit__.return_value = False
+
+        state = {
+            "raw_query": "Find wrench and torque tool suppliers in ZZQland",
+            "parsed_constraints": {
+                "category_hint": "tools_hardware",
+                "location_country": "ZZQland",
+                "product_type": "tools",
+                "product_keywords": ["wrench", "torque tools"],
             },
             "newly_discovered_supplier_ids": [],
             "candidate_supplier_ids": [],

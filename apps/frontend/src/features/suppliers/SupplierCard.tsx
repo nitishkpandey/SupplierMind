@@ -31,7 +31,7 @@ import {
   Bookmark,
   Gavel,
 } from "lucide-react";
-import type { QueryResult } from "@/types";
+import type { QueryResult, SourceCitation } from "@/types";
 import { supplierWorkflowService } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
 import { isAxiosError } from "axios";
@@ -78,6 +78,46 @@ function ScoreBar({ label, value, color = "bg-primary" }: { label: string; value
   );
 }
 
+function citationHasText(citation: SourceCitation | undefined): citation is SourceCitation {
+  return Boolean(citation?.source_phrase || citation?.formatted_address);
+}
+
+function citationText(citation: SourceCitation): string {
+  return citation.source_phrase || citation.formatted_address || "";
+}
+
+function EvidenceRow({
+  label,
+  citation,
+}: {
+  label: string;
+  citation: SourceCitation;
+}) {
+  const text = citationText(citation);
+  if (!text) return null;
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium text-foreground">{label}</span>
+        {citation.url && (
+          <a
+            href={citation.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-primary hover:underline flex-shrink-0"
+          >
+            Source
+          </a>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+        {text}
+      </p>
+    </div>
+  );
+}
+
 export function SupplierCard({ result }: SupplierCardProps) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
@@ -112,6 +152,18 @@ export function SupplierCard({ result }: SupplierCardProps) {
 
   const canModerate = user?.role === "admin" || user?.role === "procurement_manager";
   const supplierLocation = formatSupplierLocation(result.supplier_city, result.supplier_country);
+  const sourceCitations = result.supplier_source_citations ?? {};
+  const capacityCitation = sourceCitations.capacity;
+  const locationCitation = sourceCitations.location;
+  const certificationCitation = sourceCitations.certifications;
+  const perCertificationCitations = certificationCitation?.certifications ?? {};
+  const isWebDiscovered = result.supplier_source === "web_discovery";
+  const hasEvidence =
+    citationHasText(capacityCitation) ||
+    citationHasText(locationCitation) ||
+    citationHasText(certificationCitation) ||
+    Object.keys(perCertificationCitations).length > 0 ||
+    isWebDiscovered;
 
   const handleAction = async (action: 'save' | 'unsave') => {
     if (isProcessing) return;
@@ -342,6 +394,37 @@ export function SupplierCard({ result }: SupplierCardProps) {
               {result.explanation}
             </p>
           )
+        )}
+
+        {hasEvidence && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Evidence
+            </div>
+
+            {citationHasText(capacityCitation) && (
+              <EvidenceRow label="Capacity" citation={capacityCitation} />
+            )}
+
+            {result.supplier_certifications && result.supplier_certifications.length > 0 ? (
+              <div className="space-y-2">
+                {result.supplier_certifications.map((cert) => {
+                  const citation = perCertificationCitations[cert] ?? certificationCitation;
+                  if (!citationHasText(citation)) return null;
+                  return <EvidenceRow key={cert} label={cert} citation={citation} />;
+                })}
+              </div>
+            ) : isWebDiscovered ? (
+              <p className="text-xs text-muted-foreground">
+                No quality certifications verified from extracted source text.
+              </p>
+            ) : null}
+
+            {citationHasText(locationCitation) && (
+              <EvidenceRow label="Location" citation={locationCitation} />
+            )}
+          </div>
         )}
 
         {/* Expandable scores */}

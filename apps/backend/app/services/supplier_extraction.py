@@ -15,8 +15,9 @@ import json
 import logging
 import re
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
+from app.agents.compliance_agent import CERT_TAXONOMY
 from app.core.llm import get_llm_client
 from app.services.page_fetcher import fetch_page_content
 from app.utils.text_normalization import clean_optional_text, clean_text_list
@@ -35,6 +36,44 @@ _DIRECTORY_HOST_MARKERS = (
     "g2.com", "capterra.com", "trustpilot.com", "clutch.co", "gartner.com",
 )
 _DIRECTORY_PATH_MARKERS = ("/blog/", "/news/", "/article", "/press", "/wiki/")
+_QUALITY_PAGE_PATHS = (
+    "/quality",
+    "/quality-management",
+    "/certifications",
+    "/certificates",
+    "/downloads",
+    "/about",
+    "/about-us",
+    "/company",
+)
+_LOCATION_PAGE_PATHS = (
+    "/contact",
+    "/kontakt",
+    "/imprint",
+    "/impressum",
+    "/legal-notice",
+    "/company/contact",
+)
+_CERT_PAGE_FETCH_LIMIT = 4
+_LOCATION_PAGE_FETCH_LIMIT = 6
+_DISCOVERY_CERT_SKIP = {"GDPR"}
+_SPECIAL_CERT_PATTERNS = {
+    "CE": re.compile(
+        r"\bCE(?:\s+(?:certified|certification|compliance|conformity|mark(?:ing)?)|-mark(?:ing)?)\b",
+        re.IGNORECASE,
+    ),
+    "ISO 9001": re.compile(r"\bISO(?:/IEC)?[\s/-]*9001(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "ISO 14001": re.compile(r"\bISO(?:/IEC)?[\s/-]*14001(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "ISO 27001": re.compile(r"\bISO(?:/IEC)?[\s/-]*27001(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "ISO 45001": re.compile(r"\bISO(?:/IEC)?[\s/-]*45001(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "ISO 22000": re.compile(r"\bISO(?:/IEC)?[\s/-]*22000(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "IATF 16949": re.compile(r"\bIATF[\s/-]*16949(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
+    "AS9100": re.compile(r"\bAS[\s/-]*9100[A-Z]?\b", re.IGNORECASE),
+    "OEKO-TEX Standard 100": re.compile(
+        r"\bOEKO[\s-]*TEX(?:\s+Standard)?\s*100\b",
+        re.IGNORECASE,
+    ),
+}
 
 
 STAGE_1_PROMPT = """You are evaluating whether a web search result is a supplier company.
@@ -207,9 +246,26 @@ class SupplierExtractionService:
             self._verify_facts(parsed, full_content)
         )
 
+        location_evidence = {}
+        if not verified.get("city") and not verified.get("address"):
+            location_evidence = self._discover_location_from_site(url)
+            if location_evidence:
+                verified["city"] = verified.get("city") or location_evidence.get("city")
+                verified["country"] = verified.get("country") or location_evidence.get("country")
+                verified["address"] = verified.get("address") or location_evidence.get("address")
+
         # Validate name
         if not verified.get("name"):
             return None
+
+        cert_evidence = self._find_certification_mentions(
+            full_content,
+            url,
+            verified.get("certifications") or None,
+        )
+        if not verified.get("certifications"):
+            cert_evidence = self._discover_certifications_from_site(url, full_content)
+            verified["certifications"] = list(cert_evidence.keys())
 
         # Build source_citations dict
         citations_dict = {}
@@ -221,6 +277,23 @@ class SupplierExtractionService:
                     "url": url,
                     "source_phrase": source_phrase[:300],
                 }
+        if location_evidence:
+            citations_dict["location"] = {
+                "url": location_evidence["url"],
+                "source_phrase": location_evidence["source_phrase"],
+            }
+        if cert_evidence:
+            first = next(iter(cert_evidence.values()))
+            summary_phrase = "; ".join(
+                f"{cert}: {evidence['source_phrase']}"
+                for cert, evidence in cert_evidence.items()
+            )
+            existing = citations_dict.get("certifications") or {}
+            citations_dict["certifications"] = {
+                "url": existing.get("url") or first["url"],
+                "source_phrase": existing.get("source_phrase") or summary_phrase[:300],
+                "certifications": cert_evidence,
+            }
 
         return {
             "name": verified["name"],
@@ -290,18 +363,18 @@ class SupplierExtractionService:
 
         # Verify certifications
         if verified.get("certifications"):
-            verified_certs = []
-            for cert in verified["certifications"]:
-                cert_clean = str(cert).lower().replace(":", "").replace(" ", "")
-                source_clean = source_lower.replace(":", "").replace(" ", "")
-                if cert_clean in source_clean or str(cert).lower() in source_lower:
-                    verified_certs.append(cert)
-                else:
-                    logger.info(
-                        "[extraction] Hallucination guard: cert %r not in source",
-                        cert
-                    )
-            verified["certifications"] = verified_certs
+            cert_evidence = self._find_certification_mentions(
+                source_text,
+                "",
+                verified.get("certifications") or [],
+            )
+            dropped = set(map(str, verified.get("certifications") or [])) - set(cert_evidence)
+            for cert in sorted(dropped):
+                logger.info(
+                    "[extraction] Hallucination guard: cert %r is not a verified known standard",
+                    cert,
+                )
+            verified["certifications"] = list(cert_evidence.keys())
 
         return verified
 
@@ -329,6 +402,218 @@ class SupplierExtractionService:
             cleaned["capacity_unit"] = None
 
         return cleaned
+
+    def _discover_certifications_from_site(
+        self,
+        source_url: str,
+        source_text: str,
+    ) -> dict[str, dict]:
+        evidence = self._find_certification_mentions(source_text, source_url)
+        if evidence:
+            return evidence
+
+        for url in self._quality_page_candidates(source_url)[:_CERT_PAGE_FETCH_LIMIT]:
+            page_text = fetch_page_content(url)
+            if not page_text:
+                continue
+            evidence.update(self._find_certification_mentions(page_text, url))
+            if evidence:
+                break
+        return evidence
+
+    @classmethod
+    def _find_certification_mentions(
+        cls,
+        text: str,
+        url: str,
+        target_certs: Optional[list[str]] = None,
+    ) -> dict[str, dict]:
+        if not text:
+            return {}
+
+        cert_names = target_certs or list(CERT_TAXONOMY.keys())
+        evidence: dict[str, dict] = {}
+        for cert in cert_names:
+            cert_name = str(cert).strip()
+            if not cert_name or cert_name in _DISCOVERY_CERT_SKIP:
+                continue
+            canonical = cls._canonical_discovery_cert(cert_name)
+            if canonical is None:
+                logger.info(
+                    "[extraction] Dropping non-standard certification phrase: %r",
+                    cert_name,
+                )
+                continue
+            pattern = cls._cert_pattern(canonical)
+            match = pattern.search(text)
+            if not match:
+                continue
+            evidence[canonical] = {
+                "url": url,
+                "source_phrase": cls._source_phrase(text, match.start(), match.end()),
+            }
+        return evidence
+
+    @staticmethod
+    def _canonical_discovery_cert(cert_name: str) -> str | None:
+        compact = re.sub(r":\s*\d{4}", "", cert_name.strip(), flags=re.IGNORECASE)
+        compact = re.sub(r"\s+", " ", compact).strip()
+        for known in CERT_TAXONOMY:
+            if compact.casefold() == known.casefold():
+                return known
+            if SupplierExtractionService._cert_pattern(known).search(compact):
+                return known
+        for known in _SPECIAL_CERT_PATTERNS:
+            if SupplierExtractionService._cert_pattern(known).search(compact):
+                return known
+        return None
+
+    @staticmethod
+    def _cert_pattern(cert_name: str) -> re.Pattern:
+        special = _SPECIAL_CERT_PATTERNS.get(cert_name)
+        if special is not None:
+            return special
+        parts = re.findall(r"[A-Za-z0-9]+", cert_name)
+        if not parts:
+            return re.compile(r"a^")
+        pattern = r"\b" + r"[\s/-]*".join(re.escape(part) for part in parts) + r"\b"
+        return re.compile(pattern, re.IGNORECASE)
+
+    @staticmethod
+    def _source_phrase(text: str, start: int, end: int) -> str:
+        left = max(text.rfind(".", 0, start), text.rfind("\n", 0, start))
+        right_candidates = [
+            pos for pos in (text.find(".", end), text.find("\n", end)) if pos != -1
+        ]
+        phrase_start = left + 1 if left != -1 else max(0, start - 100)
+        phrase_end = min(right_candidates) + 1 if right_candidates else min(len(text), end + 160)
+        phrase = clean_optional_text(text[phrase_start:phrase_end]) or text[start:end]
+        return phrase[:300]
+
+    @staticmethod
+    def _quality_page_candidates(source_url: str) -> list[str]:
+        parsed = urlparse(source_url)
+        if not parsed.scheme or not parsed.netloc:
+            return []
+
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        paths = list(_QUALITY_PAGE_PATHS)
+        first_segment = next((p for p in parsed.path.split("/") if p), "")
+        if first_segment in {"en", "de", "fr", "es", "it"}:
+            paths = [f"/{first_segment}{path}" for path in _QUALITY_PAGE_PATHS] + paths
+
+        candidates: list[str] = []
+        seen: set[str] = {source_url.rstrip("/")}
+        for path in paths:
+            candidate = urljoin(base, path).rstrip("/")
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            candidates.append(candidate)
+        return candidates
+
+    def _discover_location_from_site(self, source_url: str) -> dict:
+        candidates = self._site_page_candidates(source_url, _LOCATION_PAGE_PATHS)
+        for url in candidates[:_LOCATION_PAGE_FETCH_LIMIT]:
+            page_text = fetch_page_content(url)
+            if not page_text:
+                continue
+            location = self._find_german_address(page_text, url)
+            if location:
+                return location
+        return {}
+
+    @staticmethod
+    def _site_page_candidates(source_url: str, paths: tuple[str, ...]) -> list[str]:
+        parsed = urlparse(source_url)
+        if not parsed.scheme or not parsed.netloc:
+            return []
+
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        first_segment = next((p for p in parsed.path.split("/") if p), "")
+        candidate_paths = list(paths)
+        if first_segment in {"en", "de", "fr", "es", "it", "en_us", "en-gb"}:
+            candidate_paths = [f"/{first_segment}{path}" for path in paths] + candidate_paths
+
+        candidates: list[str] = []
+        seen: set[str] = {source_url.rstrip("/")}
+        for path in candidate_paths:
+            candidate = urljoin(base, path).rstrip("/")
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            candidates.append(candidate)
+        return candidates
+
+    @staticmethod
+    def _find_german_address(text: str, url: str) -> dict:
+        pattern = re.compile(
+            r"(?P<street>[A-ZÄÖÜ][A-Za-zÄÖÜäöüß .'-]{2,80}?"
+            r"(?:straße|strasse|str\.|weg|allee|platz|ring|damm|gasse|ufer)"
+            r"\s+\d+[A-Za-z]?)?[,\s]{0,12}"
+            r"(?P<postcode>\b\d{5}\b)\s+"
+            r"(?P<city>[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]+"
+            r"(?:\s+(?:am|an|im|in|ob|unter|[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]+)){0,4})",
+            re.IGNORECASE,
+        )
+        for match in pattern.finditer(text):
+            city = clean_optional_text(match.group("city"))
+            if not city:
+                continue
+            city = SupplierExtractionService._clean_german_city(city)
+            if not city:
+                continue
+            street = SupplierExtractionService._clean_german_street(
+                clean_optional_text(match.group("street")) or ""
+            )
+            postcode = match.group("postcode")
+            address_parts = [
+                part for part in (street, f"{postcode} {city}", "Germany") if part
+            ]
+            source_phrase = clean_optional_text(
+                text[max(0, match.start() - 60): match.end() + 80]
+            )
+            return {
+                "city": city,
+                "country": "Germany",
+                "address": ", ".join(address_parts),
+                "url": url,
+                "source_phrase": (source_phrase or f"{postcode} {city}")[:300],
+            }
+        return {}
+
+    @staticmethod
+    def _clean_german_city(city: str) -> str:
+        cleaned = re.sub(
+            r"\s+(Germany|Deutschland|Tel|Phone|Fax|Email|E-Mail).*$",
+            "",
+            city,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"\s+(GmbH|AG|KG|Co\.?|Ltd\.?|Limited|Inc\.?).*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]*"
+            r"(straße|strasse|str\.|weg|allee|platz|ring|damm|gasse|ufer).*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        return cleaned.strip(" ,.-")
+
+    @staticmethod
+    def _clean_german_street(street: str) -> str:
+        cleaned = re.sub(
+            r"^.*\b(?:GmbH|AG|KG|Co\.?|Ltd\.?|Limited|Inc\.?)\s+",
+            "",
+            street,
+            flags=re.IGNORECASE,
+        )
+        return cleaned.strip(" ,.-")
 
     def _infer_category(self, parsed: dict) -> Optional[str]:
         """Heuristic category from product/industry keywords."""
