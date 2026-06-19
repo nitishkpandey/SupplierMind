@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     NOMINATIM_USER_AGENT: str = "suppliermind-thesis/1.0"
     GEOAPIFY_GEOCODING_API_KEY: str = ""
     GEOAPIFY_PLACES_API_KEY: str = ""
+    GEOAPIFY_PLACES_CATEGORIES: str = "office.company,production.factory,commercial"
     GEOAPIFY_TIMEOUT_SECONDS: float = 10.0
     GEOAPIFY_MIN_CONFIDENCE: float = 0.6
 

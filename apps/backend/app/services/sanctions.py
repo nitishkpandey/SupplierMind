@@ -119,6 +119,14 @@ class SanctionsService:
         Screen a company against sanctions lists.
         Cache-first, then API with bounded backoff, then pending_review.
         """
+        if not settings.OPENSANCTIONS_API_KEY:
+            return SanctionsResult(
+                is_flagged=False,
+                risk_score=0.0,
+                status="pending_review",
+                reason="OpenSanctions API key is not configured",
+            )
+
         key = normalize_company_name(name)
         cached = _cache_get(key)
         if cached is not None:
@@ -143,6 +151,19 @@ class SanctionsService:
                 last_error = f"HTTP {status_code}"
                 self._sleep(BACKOFF_SCHEDULE[attempt])
                 continue
+
+            if status_code in (401, 403):
+                logger.warning(
+                    "[sanctions] %s check pending review (API authorization failed: HTTP %d)",
+                    name,
+                    status_code,
+                )
+                return SanctionsResult(
+                    is_flagged=False,
+                    risk_score=0.0,
+                    status="pending_review",
+                    reason=f"OpenSanctions authorization failed (HTTP {status_code})",
+                )
 
             # Non-retryable non-200 (e.g. 400/404): not a screening failure,
             # just no usable data. Treat as clear and move on.

@@ -63,19 +63,23 @@ class GeoapifyLocationService:
 
     def enrich(self, supplier: dict, constraints: dict | None = None) -> VerifiedLocation | None:
         constraints = constraints or {}
+        if self._supplier_conflicts_with_constraints(supplier, constraints):
+            return None
 
         if self.geocoding_api_key:
             query, expected_name = self._build_geocoding_query(supplier, constraints)
             if query:
                 location = self._geocode(query, expected_name=expected_name)
-                if location:
+                if location and self._matches_constraints(location, constraints):
                     return location
 
         if self.places_api_key:
-            return self._places_lookup(
+            location = self._places_lookup(
                 name=clean_optional_text(supplier.get("name")),
                 constraints=constraints,
             )
+            if location and self._matches_constraints(location, constraints):
+                return location
 
         return None
 
@@ -96,10 +100,6 @@ class GeoapifyLocationService:
                     parts.append(value)
             return ", ".join(parts), None
 
-        parts = [value for value in (city, country) if value]
-        if parts:
-            return ", ".join(parts), None
-
         name = clean_optional_text(supplier.get("name"))
         region = clean_optional_text(
             constraints.get("location_city") or constraints.get("location_name")
@@ -107,9 +107,17 @@ class GeoapifyLocationService:
         constraint_country = clean_optional_text(
             constraints.get("location_country") or constraints.get("country")
         )
-        context = [value for value in (region, constraint_country) if value]
+
+        if city:
+            parts = [value for value in (city, country or constraint_country) if value]
+            return ", ".join(parts), None
+
+        context = self._dedupe_location_parts([region, constraint_country])
         if name and context:
             return ", ".join([name, *context]), name
+
+        if name and country:
+            return ", ".join([name, country]), name
 
         return None, None
 
@@ -158,7 +166,7 @@ class GeoapifyLocationService:
             return None
 
         params = {
-            "categories": "commercial",
+            "categories": settings.GEOAPIFY_PLACES_CATEGORIES,
             "name": name,
             "limit": 1,
             "apiKey": self.places_api_key,
@@ -252,6 +260,44 @@ class GeoapifyLocationService:
             if rect:
                 return rect
         return None
+
+    @staticmethod
+    def _dedupe_location_parts(values: list[str | None]) -> list[str]:
+        parts: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            cleaned = clean_optional_text(value)
+            if not cleaned:
+                continue
+            key = cleaned.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            parts.append(cleaned)
+        return parts
+
+    @staticmethod
+    def _matches_constraints(location: VerifiedLocation, constraints: dict) -> bool:
+        requested_country = clean_optional_text(
+            constraints.get("location_country") or constraints.get("country")
+        )
+        if requested_country and location.country.casefold() != requested_country.casefold():
+            return False
+        return True
+
+    @staticmethod
+    def _supplier_conflicts_with_constraints(supplier: dict, constraints: dict) -> bool:
+        requested_country = clean_optional_text(
+            constraints.get("location_country") or constraints.get("country")
+        )
+        supplier_country = clean_optional_text(supplier.get("country"))
+        if (
+            requested_country
+            and supplier_country
+            and supplier_country.casefold() != requested_country.casefold()
+        ):
+            return True
+        return False
 
 
 def _normalize_name(value: str) -> str:

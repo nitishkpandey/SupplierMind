@@ -8,13 +8,13 @@ from typing import Optional
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState
 from app.core.config import settings
-from app.db.session import SyncSessionLocal
+from app.core.vector_store import get_vector_store
 from app.db.models import Supplier, SupplierStatus
-from app.services.web_search import get_web_search_service
+from app.db.session import SyncSessionLocal
+from app.services.location_enrichment import VerifiedLocation, get_location_enrichment_service
 from app.services.sanctions import get_sanctions_service
 from app.services.supplier_extraction import SupplierExtractionService
-from app.services.location_enrichment import get_location_enrichment_service, VerifiedLocation
-from app.core.vector_store import get_vector_store
+from app.services.web_search import get_web_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +65,15 @@ class ExternalDiscoveryAgent(BaseAgent):
         constraints = state.get("parsed_constraints") or {}
 
         # ── Step 1: Web search ───────────────────────────────────────
+        max_web_results = max(settings.EXTERNAL_DISCOVERY_MAX_RESULTS, 10)
         web_results = self.web_search.search_suppliers(
             category=constraints.get("category_hint") or constraints.get("category"),
             country=self._extract_country_from_constraints(constraints),
-            city=self._extract_city_from_constraints(constraints),
+            city=constraints.get("location_city"),
             certifications=constraints.get("certifications"),
-            max_results=settings.EXTERNAL_DISCOVERY_MAX_RESULTS,
+            product_terms=self._product_terms_from_constraints(constraints),
+            raw_query=state.get("raw_query"),
+            max_results=max_web_results,
         )
 
         logger.info("[external_discovery] Web search: %d candidates", len(web_results))
@@ -233,9 +236,28 @@ class ExternalDiscoveryAgent(BaseAgent):
         }
         supplier["source_citations"] = citations
 
+    @staticmethod
+    def _product_terms_from_constraints(constraints: dict) -> list[str]:
+        terms: list[str] = []
+        if constraints.get("product_type"):
+            terms.append(str(constraints["product_type"]))
+        terms.extend(str(term) for term in constraints.get("product_keywords") or [])
+
+        cleaned_terms: list[str] = []
+        seen: set[str] = set()
+        for term in terms:
+            cleaned = " ".join(term.strip().split())
+            key = cleaned.casefold()
+            if not cleaned or key in seen:
+                continue
+            seen.add(key)
+            cleaned_terms.append(cleaned)
+        return cleaned_terms[:8]
+
     def _is_duplicate(self, db, name: str, country: Optional[str]) -> bool:
         """Check if a supplier already exists by name + country (case-insensitive)."""
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         query = select(Supplier).where(
             func.lower(Supplier.name) == name.lower(),
             Supplier.is_active == True,  # noqa: E712
@@ -268,7 +290,7 @@ class ExternalDiscoveryAgent(BaseAgent):
                         latitude=s.get("latitude"),
                         longitude=s.get("longitude"),
                         certifications=s.get("certifications") or [],
-                        certification_details={},
+                        certification_details=self._certification_details_from_citations(s),
                         capacity_value=s.get("capacity_value"),
                         capacity_unit=s.get("capacity_unit"),
                         lead_time_days=s.get("lead_time_days"),
@@ -302,3 +324,27 @@ class ExternalDiscoveryAgent(BaseAgent):
             logger.error("[external_discovery] Ingestion failed: %s", e)
 
         return new_ids
+
+    @staticmethod
+    def _certification_details_from_citations(supplier: dict) -> dict:
+        certifications = supplier.get("certifications") or []
+        citations = supplier.get("source_citations") or {}
+        cert_citation = citations.get("certifications") if isinstance(citations, dict) else None
+        per_cert = {}
+        if isinstance(cert_citation, dict):
+            per_cert = cert_citation.get("certifications") or {}
+
+        details = {}
+        for cert in certifications:
+            evidence = per_cert.get(cert) if isinstance(per_cert, dict) else None
+            if isinstance(evidence, dict):
+                details[cert] = {
+                    "source_url": evidence.get("url"),
+                    "source_phrase": evidence.get("source_phrase"),
+                }
+            elif isinstance(cert_citation, dict):
+                details[cert] = {
+                    "source_url": cert_citation.get("url"),
+                    "source_phrase": cert_citation.get("source_phrase"),
+                }
+        return details
