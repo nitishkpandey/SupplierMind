@@ -122,8 +122,10 @@ async def test_p2_retrieval_returns_k_and_prompt_contains_candidates():
         fetch_suppliers=_fake_fetch(suppliers),
     )
 
-    assert vs.calls == [("packaging supplier in Munich", 10)]
-    # The prompt the LLM saw lists all 10 candidates.
+    # P2 over-fetches (top_k * 3) then filters to approved+active and truncates
+    # to top_k, so a pending/quarantined vector can't occupy a candidate slot.
+    assert vs.calls == [("packaging supplier in Munich", 30)]
+    # The prompt the LLM saw lists all 10 candidates (fetch returned 10 ≤ top_k).
     user_msg = llm.calls[0][1]["content"]
     assert "1. Supplier 1" in user_msg and "10. Supplier 10" in user_msg
     # Index picks map back to records.

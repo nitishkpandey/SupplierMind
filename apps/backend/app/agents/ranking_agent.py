@@ -14,7 +14,11 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.agents.state import AgentState, SupplierComplianceResult
-from app.utils.text_normalization import clean_optional_text, clean_text_list
+from app.utils.text_normalization import (
+    clean_optional_text,
+    clean_text_list,
+    normalise_supplier_name_for_dedupe,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,14 @@ PROXIMITY_DECAY_FACTOR = 2  # Linear decay: score = 0 at distance = radius × th
 # Constraints whose verdict reason is already a deterministic, data-built string
 # in the compliance agent (safe to reuse verbatim). Everything else is a cert,
 # which we phrase from scratch so no LLM prose enters the explanation.
-_STRUCTURED_CONSTRAINTS = {"capacity", "lead_time", "location_radius", "country", "category"}
+_STRUCTURED_CONSTRAINTS = {
+    "capacity",
+    "lead_time",
+    "location_radius",
+    "country",
+    "category",
+    "product_fit",
+}
 
 # Quote-or-fail flags that mean "claim could not be verified".
 _UNVERIFIED_FLAGS = {
@@ -209,6 +220,35 @@ def _select_top_results(
     return top_results
 
 
+def _dedupe_key_for_supplier(supplier: dict) -> tuple[str, str] | None:
+    name_key = normalise_supplier_name_for_dedupe(str(supplier.get("name") or ""))
+    if not name_key:
+        return None
+    country_key = (clean_optional_text(supplier.get("country")) or "").casefold()
+    return name_key, country_key
+
+
+def _dedupe_scored_results(
+    scored: list[tuple[float, SupplierComplianceResult]],
+    supplier_map: dict[str, dict],
+) -> tuple[list[tuple[float, SupplierComplianceResult]], int]:
+    """Collapse duplicate supplier rows before visible ranking selection."""
+    deduped: list[tuple[float, SupplierComplianceResult]] = []
+    seen: set[tuple[str, str]] = set()
+    dropped = 0
+
+    for item in sorted(scored, key=lambda x: x[0], reverse=True):
+        key = _dedupe_key_for_supplier(supplier_map.get(_supplier_id(item), {}))
+        if key is not None:
+            if key in seen:
+                dropped += 1
+                continue
+            seen.add(key)
+        deduped.append(item)
+
+    return deduped, dropped
+
+
 def build_explanation(
     supplier: dict,
     tier: str,
@@ -318,6 +358,8 @@ class RankingAgent(BaseAgent):
 
         excluded_fail = 0
         excluded_pending = 0
+        excluded_city_mismatch = 0
+        excluded_duplicates = 0
         below_threshold = 0
         forced_review_ids: set[str] = set()
         for comp_result in compliance_results:
@@ -334,6 +376,11 @@ class RankingAgent(BaseAgent):
 
             supplier = supplier_map.get(sid, {})
             is_fresh_review_candidate = tier == "pending_review" and sid in fresh_review_ids
+            if has_city_focus and self._has_known_city_mismatch(
+                supplier.get("city"), str(requested_city)
+            ):
+                excluded_city_mismatch += 1
+                continue
 
             constraint_score = comp_result["pass_rate"]
             semantic_score = semantic_scores.get(sid, 0.5)
@@ -385,6 +432,7 @@ class RankingAgent(BaseAgent):
             if is_fresh_review_candidate:
                 forced_review_ids.add(sid)
 
+        scored, excluded_duplicates = _dedupe_scored_results(scored, supplier_map)
         top_results = _select_top_results(scored, forced_review_ids)
 
         # ── Generate explanations for top results ─────────────────────
@@ -460,6 +508,8 @@ class RankingAgent(BaseAgent):
                 f"{below_threshold} candidates excluded below score threshold ({MINIMUM_SCORE}). "
                 f"{excluded_fail} excluded for FAIL verdict. "
                 f"{excluded_pending} pending excluded for eval. "
+                f"{excluded_city_mismatch} excluded for city mismatch. "
+                f"{excluded_duplicates} duplicate supplier row(s) collapsed. "
                 f"{len(forced_review_ids)} fresh review candidate(s) kept visible."
             ),
             duration_ms=duration_ms,
@@ -491,6 +541,11 @@ class RankingAgent(BaseAgent):
         if not supplier_city or not requested_city:
             return 0.0
         return 1.0 if self._normalise_city(supplier_city) == self._normalise_city(requested_city) else 0.0
+
+    def _has_known_city_mismatch(self, supplier_city: object, requested_city: str) -> bool:
+        if not supplier_city or not requested_city:
+            return False
+        return self._normalise_city(supplier_city) != self._normalise_city(requested_city)
 
     def _calculate_preference_score(
         self, supplier: dict, preferences: list[str]

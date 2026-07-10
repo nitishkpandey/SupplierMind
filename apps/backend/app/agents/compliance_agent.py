@@ -78,6 +78,16 @@ _NORM_TO_KEY: dict[str, str] = {
 # (e.g. 'OEKO-TEX 100' → digits are non-adjacent after normalization).
 _CERT_ALIASES: dict[str, str] = {
     "OEKOTEX100": "OEKO-TEX Standard 100",
+    "TISAXAL2": "TISAX",
+    "TISAXAL3": "TISAX",
+    "TISAXASSESSMENT": "TISAX",
+    "DINENISO6789": "DIN EN 6789",
+    "ISO6789": "DIN EN 6789",
+    "BIFMAANSI": "BIFMA/ANSI",
+    "ANSIBIFMA": "BIFMA/ANSI",
+    "BIFMAANSIX51": "BIFMA/ANSI",
+    "ANSIBIFMAX51": "BIFMA/ANSI",
+    "ANSIBIFMAE3": "BIFMA/ANSI",
 }
 
 
@@ -122,6 +132,12 @@ def taxonomy_cert_verdict(
         sup_key = canonical_cert_key(sup_cert)
         if sup_key is None:
             continue
+        if sup_key == req_key:
+            return {
+                "status": "PASS",
+                "reason": f"{sup_cert} resolves to required {req_key}",
+                "matched_via": "canonical_equal",
+            }
         supersedes = {
             canonical_cert_key(c)
             for c in CERT_TAXONOMY[sup_key].get("contains_or_supersedes", [])
@@ -297,6 +313,19 @@ CAPACITY_PARTIAL_THRESHOLD = 0.80   # within 20% of min → PARTIAL instead of F
 CATEGORY_CONFIDENCE = 0.60          # below ranking hard-fail threshold of 0.8
 LLM_CERT_CONFIDENCE = 0.80          # LLM reasoning certainty for cert equivalence
 
+PRODUCT_FIT_CONFIDENCE = 1.0
+_CATEGORY_COMPATIBILITY = {
+    "tools_hardware": {"tools_hardware", "machinery", "metals"},
+    "office_supplies": {"office_supplies"},
+}
+_PRODUCT_TOKEN_STOPWORDS = {
+    "supplier", "suppliers", "manufacturer", "manufacturers", "vendor", "vendors",
+    "distributor", "distributors", "company", "companies", "gmbh", "ag", "ltd",
+    "certified", "certification", "certifications", "iso", "din", "en", "ansi",
+    "bifma", "with", "without", "and", "or", "for", "the", "a", "an", "in",
+    "near", "within", "under", "over", "above", "below", "days", "day", "km",
+}
+
 COMPLIANCE_BATCH_SYSTEM_PROMPT = """You are a procurement compliance expert. Return JSON only.
 
 Validate multiple certifications for a single supplier in one response.
@@ -322,6 +351,80 @@ _QUOTE_FLAG_MESSAGES = {
     "low_confidence": "LLM confidence below floor",
     "quote_unverifiable": "LLM quote could not be verified",
 }
+
+
+def _normalise_category(value: object) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _compatible_categories(required: str, actual: str) -> bool:
+    if not required or not actual:
+        return True
+    allowed = _CATEGORY_COMPATIBILITY.get(required, {required})
+    return actual in allowed
+
+
+def _product_tokens(values: list[object]) -> set[str]:
+    tokens: set[str] = set()
+    for value in values:
+        if isinstance(value, list):
+            tokens.update(_product_tokens(value))
+            continue
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9+-]{2,}", str(value or "").casefold()):
+            if token not in _PRODUCT_TOKEN_STOPWORDS and not token.isdigit():
+                tokens.add(token)
+    return tokens
+
+
+def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[ComplianceResult]:
+    """Deterministically reject obvious product/category mismatches."""
+    req_category = _normalise_category(
+        constraints.get("category_hint") or constraints.get("category")
+    )
+    sup_category = _normalise_category(supplier.get("category"))
+    category_ok = _compatible_categories(req_category, sup_category)
+
+    product_terms = [
+        constraints.get("product_type"),
+        *(constraints.get("product_keywords") or []),
+    ]
+    required_tokens = _product_tokens(product_terms)
+    supplier_tokens = _product_tokens([
+        supplier.get("name"),
+        supplier.get("description"),
+        supplier.get("category"),
+        *(supplier.get("primary_products") or []),
+    ])
+    text_overlap = bool(required_tokens & supplier_tokens) if required_tokens else True
+
+    if req_category and sup_category and not category_ok and not text_overlap:
+        return {
+            "constraint_name": "product_fit",
+            "status": "FAIL",
+            "reason": (
+                f"Supplier category '{supplier.get('category')}' and description "
+                f"do not match requested product '{constraints.get('product_type')}'"
+            ),
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if req_category and sup_category and category_ok:
+        return {
+            "constraint_name": "product_fit",
+            "status": "PASS",
+            "reason": f"Supplier category '{supplier.get('category')}' matches product scope",
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if required_tokens and text_overlap:
+        return {
+            "constraint_name": "product_fit",
+            "status": "PASS",
+            "reason": "Supplier text overlaps requested product terms",
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    return None
 
 
 class ComplianceAgent(BaseAgent):
@@ -449,6 +552,11 @@ class ComplianceAgent(BaseAgent):
                 ),
                 "confidence": CATEGORY_CONFIDENCE,
             })
+
+        fit_result = product_fit_verdict(supplier, constraints)
+        if fit_result is not None:
+            results.append(fit_result)
+            sc_count += 1
 
         # ── Short-circuit: Hard country mismatch ──────────────────────
         # Semantic search can surface out-of-country suppliers (structured

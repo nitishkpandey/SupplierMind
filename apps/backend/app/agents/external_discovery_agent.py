@@ -15,8 +15,11 @@ from app.services.location_enrichment import VerifiedLocation, get_location_enri
 from app.services.sanctions import get_sanctions_service
 from app.services.supplier_extraction import SupplierExtractionService
 from app.services.web_search import get_web_search_service
+from app.utils.text_normalization import normalise_supplier_name_for_dedupe
 
 logger = logging.getLogger(__name__)
+
+_WEB_RESULT_CEILING = 6
 
 
 class ExternalDiscoveryAgent(BaseAgent):
@@ -65,7 +68,10 @@ class ExternalDiscoveryAgent(BaseAgent):
         constraints = state.get("parsed_constraints") or {}
 
         # ── Step 1: Web search ───────────────────────────────────────
-        max_web_results = max(settings.EXTERNAL_DISCOVERY_MAX_RESULTS, 10)
+        max_web_results = min(
+            max(settings.EXTERNAL_DISCOVERY_MAX_RESULTS, 3),
+            _WEB_RESULT_CEILING,
+        )
         web_results = self.web_search.search_suppliers(
             category=constraints.get("category_hint") or constraints.get("category"),
             country=self._extract_country_from_constraints(constraints),
@@ -255,18 +261,22 @@ class ExternalDiscoveryAgent(BaseAgent):
         return cleaned_terms[:8]
 
     def _is_duplicate(self, db, name: str, country: Optional[str]) -> bool:
-        """Check if a supplier already exists by name + country (case-insensitive)."""
-        from sqlalchemy import func, select
+        """Check if a supplier already exists by normalized name + country."""
+        from sqlalchemy import select
 
-        query = select(Supplier).where(
-            func.lower(Supplier.name) == name.lower(),
-            Supplier.is_active == True,  # noqa: E712
-        )
+        target = normalise_supplier_name_for_dedupe(name)
+        if not target:
+            return False
+
+        query = select(Supplier).where(Supplier.is_active == True)  # noqa: E712
         if country:
             query = query.where(Supplier.country == country)
 
         result = db.execute(query)
-        return result.scalars().first() is not None
+        for supplier in result.scalars().all():
+            if normalise_supplier_name_for_dedupe(supplier.name or "") == target:
+                return True
+        return False
 
     def _ingest_suppliers(self, suppliers: list[dict]) -> list[str]:
         """Add new suppliers to PostgreSQL (as pending_review) and Milvus."""

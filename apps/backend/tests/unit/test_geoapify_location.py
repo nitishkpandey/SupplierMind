@@ -74,6 +74,7 @@ def test_geoapify_places_fallback_uses_company_name_and_query_context():
         geocoding_api_key="",
         places_api_key="places-key",
         client=client,
+        places_categories="commercial",
     )
 
     location = service.enrich(

@@ -53,6 +53,21 @@ async def main() -> None:
         action="store_true",
         help="Also run the P1 (single-prompt) and P2 (RAG) paradigm baselines",
     )
+    parser.add_argument(
+        "--p1",
+        action="store_true",
+        help="Run only P1 (single-prompt)",
+    )
+    parser.add_argument(
+        "--p2",
+        action="store_true",
+        help="Run only P2 (RAG)",
+    )
+    parser.add_argument(
+        "--p3",
+        action="store_true",
+        help="Run only P3 (SupplierMind)",
+    )
     args = parser.parse_args()
 
     if args.report_only:
@@ -61,8 +76,21 @@ async def main() -> None:
         generate_thesis_report()
         return
 
+    specific_run = args.p1 or args.p2 or args.p3
+    
+    if specific_run:
+        run_suppliermind = args.p3
+        run_baselines = False
+        run_p1 = args.p1
+        run_p2 = args.p2
+    else:
+        run_suppliermind = not args.baselines_only
+        run_baselines = True
+        run_p1 = args.paradigms
+        run_p2 = args.paradigms
+
     # Initialize vector store (required for SupplierMind and P2)
-    if not args.baselines_only or args.paradigms:
+    if run_suppliermind or run_p2:
         logger.info("Initializing vector store...")
         from app.core.config import settings
         from app.core.vector_store import create_vector_store, set_vector_store_instance
@@ -77,10 +105,11 @@ async def main() -> None:
     from app.evaluation.runner import run_full_evaluation
 
     results = await run_full_evaluation(
-        run_suppliermind=not args.baselines_only,
-        run_baselines=True,
+        run_suppliermind=run_suppliermind,
+        run_baselines=run_baselines,
         query_limit=args.limit,
-        run_paradigm_baselines=args.paradigms,
+        run_p1=run_p1,
+        run_p2=run_p2,
     )
 
     logger.info("Generating thesis report...")

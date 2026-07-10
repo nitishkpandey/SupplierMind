@@ -50,12 +50,14 @@ class GeoapifyLocationService:
         client: Any | None = None,
         timeout_seconds: float | None = None,
         min_confidence: float | None = None,
+        places_categories: str | None = None,
     ) -> None:
         self.geocoding_api_key = geocoding_api_key if geocoding_api_key is not None else settings.GEOAPIFY_GEOCODING_API_KEY
         self.places_api_key = places_api_key if places_api_key is not None else settings.GEOAPIFY_PLACES_API_KEY
         self.client = client or httpx.Client()
         self.timeout_seconds = timeout_seconds or settings.GEOAPIFY_TIMEOUT_SECONDS
         self.min_confidence = min_confidence if min_confidence is not None else settings.GEOAPIFY_MIN_CONFIDENCE
+        self.places_categories = places_categories or settings.GEOAPIFY_PLACES_CATEGORIES
 
     @property
     def is_available(self) -> bool:
@@ -166,7 +168,7 @@ class GeoapifyLocationService:
             return None
 
         params = {
-            "categories": settings.GEOAPIFY_PLACES_CATEGORIES,
+            "categories": self.places_categories,
             "name": name,
             "limit": 1,
             "apiKey": self.places_api_key,

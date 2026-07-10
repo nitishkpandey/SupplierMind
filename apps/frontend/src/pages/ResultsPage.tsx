@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryService } from "@/services/api";
@@ -26,15 +26,36 @@ const AGENT_STEPS = [
 
 export default function ResultsPage() {
   const { queryId } = useParams<{ queryId: string }>();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   const [showMap, setShowMap] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
+  const isHistoryView = searchParams.get("view") === "history";
 
-  // SSE for live progress
   const queryClient = useQueryClient();
   const [resumeCount, setResumeCount] = useState(0);
+
+  const { data: queryData, isLoading } = useQuery<QueryWithResults>({
+    queryKey: ["queryResult", queryId],
+    queryFn: () => queryService.getResult(queryId!).then((r) => r.data),
+    enabled: !!queryId,
+    refetchInterval: false,
+  });
+
+  const shouldStream =
+    !!queryId &&
+    !isHistoryView &&
+    (queryData?.status === "pending" || queryData?.status === "processing");
+
+  // SSE for live progress only. History views fetch the persisted result
+  // snapshot and never subscribe to the agent stream.
   const { events, isComplete, error: sseError, clarification, reset: resetSSE } =
-    useSSE(queryId ?? null, resumeCount);
+    useSSE(shouldStream ? queryId ?? null : null, resumeCount);
+  const awaitingFinalSnapshot =
+    shouldStream &&
+    isComplete &&
+    queryData?.status !== "completed" &&
+    queryData?.status !== "failed";
 
   // After the user answers a clarification we re-subscribe to the same
   // stream so the resumed pipeline's events flow through this hook. The
@@ -64,18 +85,13 @@ export default function ResultsPage() {
     return Array.from(new Set(agents));
   }, [events]);
 
-  // Poll for results after SSE completes
-  const { data: queryData, isLoading } = useQuery<QueryWithResults>({
-    queryKey: ["queryResult", queryId],
-    queryFn: () => queryService.getResult(queryId!).then((r) => r.data),
-    enabled: isComplete && !sseError && !!queryId,
-    refetchInterval: false,
-  });
-
   const { data: auditData } = useQuery({
     queryKey: ["auditTrail", queryId],
     queryFn: () => queryService.getAuditTrail(queryId!).then((r) => r.data),
-    enabled: showAudit && isComplete && !!queryId,
+    enabled:
+      showAudit &&
+      !!queryId &&
+      (isHistoryView || isComplete || queryData?.status === "completed"),
   });
 
   const handleExportCSV = () => {
@@ -101,7 +117,7 @@ export default function ResultsPage() {
   // Surfaces when the Parser pauses with a question. The card renders
   // beneath the agent-steps strip so the user sees the pipeline made
   // progress before being asked for more input.
-  if (clarification && queryId) {
+  if (!isHistoryView && clarification && queryId) {
     return (
       <div className="p-8 max-w-2xl mx-auto space-y-6">
         <div className="text-center space-y-2">
@@ -124,7 +140,7 @@ export default function ResultsPage() {
   }
 
   // ── Processing state ─────────────────────────────────────────────
-  if (!isComplete) {
+  if (shouldStream && !isComplete) {
     const progress = (completedAgents.length / AGENT_STEPS.length) * 100;
 
     return (
@@ -206,7 +222,7 @@ export default function ResultsPage() {
   }
 
   // ── Loading results ──────────────────────────────────────────────
-  if (isLoading || !queryData) {
+  if (isLoading || awaitingFinalSnapshot || !queryData) {
     return (
       <div className="p-8 space-y-4">
         <Skeleton className="h-8 w-64" />

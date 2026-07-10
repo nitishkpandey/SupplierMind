@@ -30,9 +30,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 BACKEND = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND.parents[1]
 RESULTS_SRC = BACKEND / "data" / "evaluation_results.json"
 REPORT_SRC = BACKEND / "data" / "thesis_report.json"
-RUN_DIR = BACKEND.parent / "results" / f"run_{datetime.now():%Y%m%d}"
+RUN_DIR = REPO_ROOT / "results" / f"run_{datetime.now():%Y%m%d}"
 PLOTS = RUN_DIR / "plots"
 
 SYSTEMS = {
@@ -246,8 +247,11 @@ def main() -> None:
     header = [
         f"# Benchmark run {datetime.now(timezone.utc).isoformat()}",
         "",
-        "Corpus: live pool (10,136 suppliers in Postgres / 10,127 in Milvus).",
+        "Corpus: frozen curated-100 supplier corpus "
+        "(approved + active rows only; pending-review and quarantined rows excluded).",
         "Provider: OpenAI gpt-4o-mini only; no runtime fallback.",
+        "Clarification policy: in non-interactive batch mode, a SupplierMind "
+        "clarification request is scored as an empty returned set.",
         "",
         "| Paradigm | Tier | n | P@5 | MRR | CSR | Latency ms | Cost USD |",
         "|----------|------|---|-----|-----|-----|-----------|----------|",

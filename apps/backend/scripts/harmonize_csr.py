@@ -33,7 +33,7 @@ from app.evaluation.metrics import constraint_satisfaction_rate_from_suppliers
 from app.evaluation.runner import _convert_benchmark_constraints
 
 BACKEND = Path(__file__).resolve().parents[1]
-ROOT = BACKEND.parent
+ROOT = BACKEND.parents[1]
 TIERS = ["simple", "medium", "hard"]
 
 

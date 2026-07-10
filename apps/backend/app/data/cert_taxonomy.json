@@ -218,5 +218,38 @@
     "contains_or_supersedes": [],
     "complementary": [],
     "common_in_industries": ["food_ingredients"]
+  },
+  "TISAX": {
+    "full_name": "Trusted Information Security Assessment Exchange",
+    "category": "information_security",
+    "what_it_covers": "Automotive industry information security assessment and exchange framework",
+    "issuer": "ENX Association",
+    "equivalent_to": [],
+    "NOT_equivalent_to": ["ISO 9001"],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 27001", "IATF 16949"],
+    "common_in_industries": ["automotive", "electronics", "software_services"]
+  },
+  "DIN EN 6789": {
+    "full_name": "DIN EN ISO 6789 Torque Tools Standard",
+    "category": "tools_calibration",
+    "what_it_covers": "Requirements and calibration methods for hand torque tools",
+    "issuer": "DIN / CEN / ISO",
+    "equivalent_to": ["ISO 6789"],
+    "NOT_equivalent_to": [],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 9001"],
+    "common_in_industries": ["tools_hardware", "machinery", "automotive"]
+  },
+  "BIFMA/ANSI": {
+    "full_name": "ANSI/BIFMA Furniture Safety and Performance Standards",
+    "category": "furniture_performance",
+    "what_it_covers": "Office and institutional furniture safety, durability, and performance standards",
+    "issuer": "ANSI / BIFMA",
+    "equivalent_to": ["ANSI/BIFMA"],
+    "NOT_equivalent_to": [],
+    "contains_or_supersedes": [],
+    "complementary": ["ISO 9001"],
+    "common_in_industries": ["office_supplies"]
   }
 }

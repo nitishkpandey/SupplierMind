@@ -41,13 +41,13 @@ Top Results Returned:
 Analyze the quality of these results:
 1. Are there at least 3 high-quality matches (score > 60%)?
 2. Did we fail because constraints were too strict?
-3. Did we fail because we only searched 'approved_only' suppliers?
+{scope_diagnostic}
 
 Decide if the pipeline should RETRY with modified parameters.
 You can only retry if you haven't exceeded the max retries.
 
 Valid retry strategies:
-- "expand_scope": Change search_scope from 'approved_only' to 'both' to search the web.
+{retry_strategies}
 - "relax_constraints": Drop the least important constraint.
 - "broaden_location": Increase the radius.
 - "none": Accept the results as they are (or we already retried).
@@ -56,8 +56,45 @@ Return JSON only:
 {{
   "verdict": "accept" | "retry" | "fail",
   "reasoning": "Explain your evaluation",
-  "retry_strategy": "expand_scope" | "relax_constraints" | "broaden_location" | "none"
+  "retry_strategy": {retry_strategy_schema}
 }}"""
+
+
+def build_evaluator_prompt(
+    *,
+    raw_query: str,
+    parsed_constraints: dict,
+    search_scope: str,
+    results_summary: str,
+) -> str:
+    """Render a scope-aware evaluator prompt."""
+    if search_scope == "approved_only":
+        scope_diagnostic = "3. Did we fail because we only searched 'approved_only' suppliers?"
+        retry_strategies = (
+            "- \"expand_scope\": Change search_scope from 'approved_only' "
+            "to 'both' to search the web."
+        )
+        retry_strategy_schema = (
+            "\"expand_scope\" | \"relax_constraints\" | "
+            "\"broaden_location\" | \"none\""
+        )
+    else:
+        scope_diagnostic = (
+            "3. Search scope already includes approved and web-discovered "
+            "suppliers; do not diagnose this as an approved-only search."
+        )
+        retry_strategies = "- Scope expansion is unavailable because search_scope is already 'both'."
+        retry_strategy_schema = "\"relax_constraints\" | \"broaden_location\" | \"none\""
+
+    return EVALUATOR_PROMPT.format(
+        raw_query=raw_query,
+        parsed_constraints=json.dumps({k: v for k, v in parsed_constraints.items() if v}),
+        search_scope=search_scope,
+        results_summary=results_summary,
+        scope_diagnostic=scope_diagnostic,
+        retry_strategies=retry_strategies,
+        retry_strategy_schema=retry_strategy_schema,
+    )
 
 
 class EvaluatorAgent(BaseAgent):
@@ -110,9 +147,9 @@ class EvaluatorAgent(BaseAgent):
             )
         results_summary = "\n\n".join(results_lines) if results_lines else "NO RESULTS FOUND."
 
-        prompt = EVALUATOR_PROMPT.format(
+        prompt = build_evaluator_prompt(
             raw_query=state["raw_query"],
-            parsed_constraints=json.dumps({k: v for k, v in constraints.items() if v}),
+            parsed_constraints=constraints,
             search_scope=search_scope,
             results_summary=results_summary,
         )

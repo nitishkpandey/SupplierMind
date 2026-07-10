@@ -15,6 +15,7 @@ from typing import Optional
 from sqlalchemy import Text, func, or_, select
 
 from app.agents.base import BaseAgent
+from app.agents.compliance_agent import canonical_cert_key
 from app.agents.state import AgentState
 from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
@@ -428,7 +429,11 @@ class DiscoveryAgent(BaseAgent):
             query = query.where(Supplier.country == country)
         if certs:
             for c in certs:
-                query = query.where(func.cast(Supplier.certifications, Text).ilike(f"%{c}%"))
+                cert_filters = [
+                    func.cast(Supplier.certifications, Text).ilike(f"%{term}%")
+                    for term in DiscoveryAgent._cert_search_terms(c)
+                ]
+                query = query.where(or_(*cert_filters))
         if product_terms:
             term_filters = []
             for term in product_terms:
@@ -460,6 +465,40 @@ class DiscoveryAgent(BaseAgent):
             seen.add(key)
             terms.append(cleaned)
         return terms[:8]
+
+    @staticmethod
+    def _cert_search_terms(cert: object) -> list[str]:
+        """Return common stored spellings for a required certification."""
+        if not cert:
+            return []
+        raw = " ".join(str(cert).strip().split())
+        canonical = canonical_cert_key(raw) or raw
+        variants = {
+            raw,
+            canonical,
+        }
+        if canonical == "ISO 9001":
+            variants.update({"ISO 9001:2015", "DIN EN ISO 9001"})
+        elif canonical == "AS9100":
+            variants.update({"AS9100D", "AS 9100"})
+        elif canonical == "IATF 16949":
+            variants.update({"IATF 16949:2016", "IATF 16949-2016"})
+        elif canonical == "TISAX":
+            variants.update({"TISAX AL2", "TISAX AL3"})
+        elif canonical == "DIN EN 6789":
+            variants.update({"ISO 6789", "DIN EN ISO 6789"})
+        elif canonical == "BIFMA/ANSI":
+            variants.update({"ANSI/BIFMA", "BIFMA ANSI", "ANSI BIFMA"})
+
+        output: list[str] = []
+        seen: set[str] = set()
+        for value in variants:
+            key = value.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            output.append(value)
+        return output
 
     def _decide_relaxation(
         self,
