@@ -33,6 +33,10 @@ def _default_log() -> Path:
 def main() -> None:
     run_dir = ROOT / (sys.argv[1] if len(sys.argv) > 1 else f"results/run_{datetime.now():%Y%m%d}")
     log_path = Path(sys.argv[2]) if len(sys.argv) > 2 else _default_log()
+    if not log_path.exists() and not log_path.is_absolute():
+        repo_relative = ROOT / log_path
+        if repo_relative.exists():
+            log_path = repo_relative
     data = json.loads((run_dir / "evaluation_results.json").read_text(encoding="utf-8"))
     pq = data["per_query_metrics"]
     benchmark = json.loads(

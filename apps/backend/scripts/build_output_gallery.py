@@ -23,7 +23,8 @@ from app.db.session import AsyncSessionLocal
 from app.db.models import Supplier
 
 BACKEND = Path(__file__).resolve().parents[1]
-OUT = BACKEND.parent / "docs" / "supervisor" / "output_gallery.md"
+REPO_ROOT = BACKEND.parents[1]
+OUT = REPO_ROOT / "docs" / "supervisor" / "output_gallery.md"
 GALLERY_QUERIES = [1, 10, 14, 23, 19]
 SYSTEMS = [
     ("p1_singleprompt", "P1 — Single prompt (parametric memory)"),
@@ -71,6 +72,42 @@ def evidence_block(rec: dict, names: dict[str, str]) -> list[str]:
             line += "; failed: " + "; ".join(fails[:2])
         out.append(line)
     return out
+
+
+def observation_block(qn: int, pq: dict) -> str:
+    """Short, data-derived observation for the selected query."""
+    p1 = next(r for r in pq["p1_singleprompt"] if r["query_number"] == qn)
+    p2 = next(r for r in pq["p2_rag"] if r["query_number"] == qn)
+    p3 = next(r for r in pq["suppliermind"] if r["query_number"] == qn)
+
+    parts = []
+    if p1.get("raw_names") and not p1.get("retrieved_ids"):
+        parts.append("P1 produced parametric supplier names but no corpus-resolved IDs")
+    else:
+        parts.append(f"P1 resolved {len(p1.get('retrieved_ids') or [])} corpus IDs")
+
+    parts.append(
+        f"P2 returned {len(p2.get('retrieved_ids') or [])} suppliers "
+        f"(P@5={p2['precision_at_5']:.2f})"
+    )
+
+    p3_ids = p3.get("retrieved_ids") or []
+    if not p3_ids and not p3.get("compliance_data"):
+        parts.append(
+            "P3 returned no suppliers before compliance evidence, consistent with "
+            "clarification or early-stop behavior"
+        )
+    elif not p3_ids:
+        parts.append(
+            f"P3 gathered compliance evidence but ranked no supplier "
+            f"(CSR={p3['constraint_satisfaction_rate']:.2f})"
+        )
+    else:
+        parts.append(
+            f"P3 returned {len(p3_ids)} evidence-gated supplier(s) "
+            f"(P@5={p3['precision_at_5']:.2f}, CSR={p3['constraint_satisfaction_rate']:.2f})"
+        )
+    return "; ".join(parts) + "."
 
 
 async def main() -> None:
@@ -130,7 +167,7 @@ async def main() -> None:
             if reasoning and sys_key != "suppliermind":
                 snippet = reasoning[:600] + ("…" if len(reasoning) > 600 else "")
                 lines += ["**Model reasoning:**", "", f"> {snippet}", ""]
-        lines += ["**Observation:** _TODO_", ""]
+        lines += ["**Observation:** " + observation_block(qn, pq), ""]
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")

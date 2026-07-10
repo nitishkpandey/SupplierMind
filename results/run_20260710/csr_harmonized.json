@@ -1,0 +1,198 @@
+{
+  "definition": "csr_harmonized = constraint_satisfaction_rate_from_suppliers over P3's returned suppliers vs benchmark constraints \u2014 the identical scorer used for P1/P2/keyword/manual. csr_self_assessed = original runner value from the compliance agent's own verdicts (may include agent-inferred constraints absent from the benchmark).",
+  "all": {
+    "csr_self_assessed": 0.4653333333333333,
+    "csr_harmonized": 0.4023333333333333
+  },
+  "per_tier": {
+    "simple": {
+      "csr_self_assessed": 0.075,
+      "csr_harmonized": 0.0
+    },
+    "medium": {
+      "csr_self_assessed": 0.6558333333333333,
+      "csr_harmonized": 0.7608333333333334
+    },
+    "hard": {
+      "csr_self_assessed": 0.6392857142857142,
+      "csr_harmonized": 0.35
+    }
+  },
+  "per_query": [
+    {
+      "query_number": 1,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 2,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 3,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 4,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 5,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 6,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.6,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 7,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 8,
+      "difficulty": "simple",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 9,
+      "difficulty": "medium",
+      "csr_self_assessed": 1.0,
+      "csr_harmonized": 1.0,
+      "n_returned": 5
+    },
+    {
+      "query_number": 10,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.7916666666666666,
+      "csr_harmonized": 0.875,
+      "n_returned": 2
+    },
+    {
+      "query_number": 11,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.6,
+      "csr_harmonized": 1.0,
+      "n_returned": 2
+    },
+    {
+      "query_number": 12,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.5666666666666667,
+      "csr_harmonized": 1.0,
+      "n_returned": 1
+    },
+    {
+      "query_number": 13,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.4666666666666667,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 14,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.8666666666666667,
+      "csr_harmonized": 1.0,
+      "n_returned": 3
+    },
+    {
+      "query_number": 15,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.75,
+      "csr_harmonized": 1.0,
+      "n_returned": 1
+    },
+    {
+      "query_number": 16,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.7666666666666666,
+      "csr_harmonized": 1.0,
+      "n_returned": 2
+    },
+    {
+      "query_number": 17,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.0,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 18,
+      "difficulty": "medium",
+      "csr_self_assessed": 0.75,
+      "csr_harmonized": 0.7333333333333333,
+      "n_returned": 5
+    },
+    {
+      "query_number": 19,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.765,
+      "csr_harmonized": 0.75,
+      "n_returned": 1
+    },
+    {
+      "query_number": 20,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.835,
+      "csr_harmonized": 0.7,
+      "n_returned": 2
+    },
+    {
+      "query_number": 21,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.35,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 22,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.8,
+      "csr_harmonized": 1.0,
+      "n_returned": 1
+    },
+    {
+      "query_number": 23,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.46,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 24,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.6799999999999999,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    },
+    {
+      "query_number": 25,
+      "difficulty": "hard",
+      "csr_self_assessed": 0.585,
+      "csr_harmonized": 0.0,
+      "n_returned": 0
+    }
+  ]
+}
