@@ -280,6 +280,38 @@ _ORDER_ITEM_TAIL_RE = re.compile(
     r")\b.*$",
     re.IGNORECASE,
 )
+_PRODUCT_COMMAND_RE = re.compile(
+    r"^\s*(?:find|source|search(?:\s+for)?|show\s+me|looking\s+for|"
+    r"i\s+need|we\s+need|need|needs|want|procure|buy|get)\s+",
+    re.IGNORECASE,
+)
+_PRODUCT_SPLIT_RE = re.compile(
+    r"\b(?:suppliers?|manufacturers?|vendors?|distributors?|providers?)\b",
+    re.IGNORECASE,
+)
+_PRODUCT_TAIL_SPLIT_RE = re.compile(
+    r"\b(?:in|near|within|inside|around|with|that|which|who|can|could|"
+    r"and\s+can|under|over|above|below|capacity|lead\s*time|delivery|"
+    r"compliant)\b",
+    re.IGNORECASE,
+)
+_CERT_MENTION_RE = re.compile(
+    r"\b(?:DIN\s+EN\s+)?(?:ISO(?:/IEC)?\s*[-/]?\s*\d{3,5}(?::\s*\d{4})?|"
+    r"AS\s*[-/]?\s*9100[A-Z]?|IATF\s*[-/]?\s*16949(?:[-:]\s*\d{4})?|"
+    r"TISAX(?:\s+AL\d)?|(?:ANSI\s*/\s*BIFMA|BIFMA\s*/\s*ANSI)(?:\s+[A-Z0-9.]+)?|"
+    r"DIN\s+EN\s+6789)\b",
+    re.IGNORECASE,
+)
+_PRODUCT_TOKEN_BLOCKLIST = (
+    set(_QUERY_STOPWORDS)
+    | set(_NON_PRODUCT_QUERY_TOKENS)
+    | set(_SUPPLIER_QUALITY_WORDS)
+    | {
+        "certified", "certification", "certifications", "compliant", "can",
+        "could", "deliver", "delivery", "lead", "time", "days", "day", "km",
+        "kms", "within", "under", "above", "below",
+    }
+)
 
 
 def _is_capacity_quantity(step: dict, obs: dict) -> bool:
@@ -480,6 +512,95 @@ def _should_replace_product_with_order_items(product_type: object, items: list[s
         for token in re.findall(r"[A-Za-z][A-Za-z0-9+.-]{2,}", item)
     }
     return bool(item_tokens) and product_tokens.isdisjoint(item_tokens)
+
+
+def _constraint_location_tokens(raw: dict) -> set[str]:
+    tokens: set[str] = set()
+    for key in ("location_name", "location_city", "location_country", "location_region"):
+        value = _clean_optional_text(raw.get(key))
+        if value:
+            tokens.update(re.findall(r"[A-Za-z0-9]+", value.casefold()))
+    return tokens
+
+
+def _clean_product_phrase(value: object, raw: dict) -> Optional[str]:
+    """Strip constraint/cert/location debris from a candidate product phrase."""
+    text = _clean_optional_text(value)
+    if not text:
+        return None
+
+    text = _CERT_MENTION_RE.sub(" ", text)
+    text = _PRODUCT_COMMAND_RE.sub("", text)
+    text = _PRODUCT_TAIL_SPLIT_RE.split(text, maxsplit=1)[0]
+    text = re.sub(r"[,;|]+", " ", text)
+    text = re.sub(
+        r"\b(?:certified|certification|certifications|compliant|supplier|"
+        r"suppliers|manufacturer|manufacturers|vendor|vendors|distributor|"
+        r"distributors)\b",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    blocked = set(_PRODUCT_TOKEN_BLOCKLIST) | _constraint_location_tokens(raw)
+    tokens = [
+        token.casefold()
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9+&.-]*", text)
+        if token.casefold() not in blocked and not token.isdigit()
+    ]
+    if not tokens:
+        return None
+    return " ".join(tokens)
+
+
+def _is_constraint_soup_product(value: object, raw: dict) -> bool:
+    """True when product_type contains only constraints/location filler."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if _clean_product_phrase(value, raw):
+        return False
+    return bool(
+        re.search(
+            r"\b(?:certification|certifications|certified|km|days?|lead|"
+            r"capacity|within|under|above|below|can|deliver)\b",
+            value,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _extract_product_from_raw_query(raw_query: str, raw: dict) -> Optional[str]:
+    """Recover the requested product from common 'X supplier' phrasing."""
+    text = " ".join((raw_query or "").replace("\n", " ").split())
+    if not text:
+        return None
+
+    before_supplier = _PRODUCT_SPLIT_RE.split(text, maxsplit=1)[0]
+    candidate = _clean_product_phrase(before_supplier, raw)
+    if candidate:
+        return candidate
+
+    without_command = _PRODUCT_COMMAND_RE.sub("", text)
+    candidate = _clean_product_phrase(without_command, raw)
+    if candidate:
+        return candidate
+
+    return None
+
+
+def _merge_product_keyword(raw_keywords: list[object], product_type: Optional[str], raw: dict) -> list[str]:
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for value in ([product_type] if product_type else []) + list(raw_keywords or []):
+        cleaned = _clean_product_phrase(value, raw)
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        keywords.append(cleaned)
+    return keywords[:7]
 
 
 def _raw_query_mentions_any(raw_query: str, values: list[object]) -> bool:
@@ -1797,6 +1918,17 @@ class ParserAgent(BaseAgent):
         product_type = raw.get("product_type")
         if _is_placeholder_product(product_type):
             product_type = None
+        if _is_constraint_soup_product(product_type, raw):
+            product_type = None
+        recovered_product = _extract_product_from_raw_query(raw_query, raw)
+        if not product_type and recovered_product:
+            product_type = recovered_product
+
+        raw["product_keywords"] = _merge_product_keyword(
+            list(raw.get("product_keywords") or []),
+            product_type,
+            raw,
+        )
 
         ranking_preferences, unsupported_preferences = _extract_ranking_preferences(raw_query)
         for value in raw.get("ranking_preferences") or []:

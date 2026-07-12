@@ -60,7 +60,6 @@ export default function MySuppliersPage() {
     fetchAll();
   }, []);
 
-  const approved = suppliers.filter((s) => s.status === "approved");
   const saved = suppliers.filter((s) => s.status === "saved");
 
   const openDecision = (supplier: Supplier, action: "approve" | "reject") => {
@@ -92,9 +91,7 @@ export default function MySuppliersPage() {
     try {
       if (action === "approve") {
         await supplierWorkflowService.approve(supplier.id, text);
-        // Remove from pending and surface it under Approved Vendors.
         setPending((prev) => prev.filter((s) => s.id !== supplier.id));
-        setSuppliers((prev) => [...prev, { ...supplier, status: "approved" }]);
       } else {
         await supplierWorkflowService.reject(supplier.id, text);
         setPending((prev) => prev.filter((s) => s.id !== supplier.id));
@@ -118,16 +115,12 @@ export default function MySuppliersPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">My Suppliers</h1>
         <p className="text-muted-foreground">
-          Manage your personal shortlist and view company-approved vendors.
+          Manage your personal shortlist and review web-discovered suppliers.
         </p>
       </div>
 
-      <Tabs defaultValue="approved" className="w-full">
+      <Tabs defaultValue="saved" className="w-full">
         <TabsList className="mb-6">
-          <TabsTrigger value="approved" className="gap-2">
-            <ShieldCheck className="w-4 h-4" />
-            Approved Vendors ({approved.length})
-          </TabsTrigger>
           <TabsTrigger value="saved" className="gap-2">
             <Bookmark className="w-4 h-4" />
             My Shortlist ({saved.length})
@@ -137,20 +130,6 @@ export default function MySuppliersPage() {
             Pending Review ({pending.length})
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="approved" className="space-y-4">
-          {approved.length === 0 ? (
-            <div className="text-center p-12 bg-muted/30 rounded-xl border border-dashed">
-              <ShieldCheck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-              <h3 className="text-lg font-medium">No approved suppliers yet</h3>
-              <p className="text-muted-foreground text-sm mt-1">Discover new suppliers and ask a manager to approve them.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {approved.map((s) => <SimpleSupplierCard key={s.id} supplier={s} />)}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="saved" className="space-y-4">
           {saved.length === 0 ? (

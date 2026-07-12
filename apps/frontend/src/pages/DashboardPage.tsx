@@ -129,7 +129,7 @@ export default function DashboardPage() {
               {recentQueries.map((query: QueryWithResults) => (
                 <Link
                   key={query.id}
-                  to={`/query/${query.id}/results`}
+                  to={`/query/${query.id}/results?view=history`}
                   className="flex items-center gap-3 p-3 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800"
                 >
                   {statusIcon(query.status)}

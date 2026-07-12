@@ -37,9 +37,9 @@ _DIRECTORY_HOST_MARKERS = (
 )
 _DIRECTORY_PATH_MARKERS = ("/blog/", "/news/", "/article", "/press", "/wiki/")
 _QUALITY_PAGE_PATHS = (
+    "/certifications",
     "/quality",
     "/quality-management",
-    "/certifications",
     "/certificates",
     "/downloads",
     "/about",
@@ -49,13 +49,13 @@ _QUALITY_PAGE_PATHS = (
 _LOCATION_PAGE_PATHS = (
     "/contact",
     "/kontakt",
-    "/imprint",
     "/impressum",
+    "/imprint",
     "/legal-notice",
     "/company/contact",
 )
-_CERT_PAGE_FETCH_LIMIT = 4
-_LOCATION_PAGE_FETCH_LIMIT = 6
+_CERT_PAGE_FETCH_LIMIT = 2
+_LOCATION_PAGE_FETCH_LIMIT = 3
 _DISCOVERY_CERT_SKIP = {"GDPR"}
 _SPECIAL_CERT_PATTERNS = {
     "CE": re.compile(
@@ -69,6 +69,12 @@ _SPECIAL_CERT_PATTERNS = {
     "ISO 22000": re.compile(r"\bISO(?:/IEC)?[\s/-]*22000(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
     "IATF 16949": re.compile(r"\bIATF[\s/-]*16949(?:\s*:\s*\d{4})?\b", re.IGNORECASE),
     "AS9100": re.compile(r"\bAS[\s/-]*9100[A-Z]?\b", re.IGNORECASE),
+    "TISAX": re.compile(r"\bTISAX(?:\s+(?:AL|Assessment\s+Level)\s*\d)?\b", re.IGNORECASE),
+    "DIN EN 6789": re.compile(r"\b(?:DIN\s+EN\s+)?(?:ISO\s+)?6789\b", re.IGNORECASE),
+    "BIFMA/ANSI": re.compile(
+        r"\b(?:ANSI\s*/\s*BIFMA|BIFMA\s*/\s*ANSI)(?:\s+[A-Z0-9.]+)?\b",
+        re.IGNORECASE,
+    ),
     "OEKO-TEX Standard 100": re.compile(
         r"\bOEKO[\s-]*TEX(?:\s+Standard)?\s*100\b",
         re.IGNORECASE,

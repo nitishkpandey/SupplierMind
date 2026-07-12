@@ -51,16 +51,28 @@ def _supplier_doc(s: dict) -> str:
 
 
 async def _fetch_suppliers(ids: list[str]) -> list[dict]:
-    """Load supplier rows for the retrieved ids, preserving retrieval order."""
+    """Load supplier rows for the retrieved ids, preserving retrieval order.
+
+    Only approved + active suppliers are materialised: pending_review /
+    discovered / quarantined (is_active=False) rows are dropped here so a vector
+    that leaked into the ANN result can never become a P2 candidate. Callers
+    over-fetch and truncate so this filtering does not shrink the top-k.
+    """
     from sqlalchemy import select
 
-    from app.db.models import Supplier
+    from app.db.models import Supplier, SupplierStatus
     from app.db.session import AsyncSessionLocal
 
     if not ids:
         return []
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Supplier).where(Supplier.id.in_(ids)))
+        result = await db.execute(
+            select(Supplier).where(
+                Supplier.id.in_(ids),
+                Supplier.status == SupplierStatus.approved,
+                Supplier.is_active == True,  # noqa: E712
+            )
+        )
         rows = {str(s.id): s for s in result.scalars().all()}
     out = []
     for sid in ids:
@@ -139,9 +151,13 @@ async def run_paradigm2(
         fetch_suppliers = _fetch_suppliers
 
     start = time.time()
-    hits = vector_store.search(query, top_k=top_k)
-    ids = [h.supplier_id for h in hits]
-    suppliers = await fetch_suppliers(ids)
+    # Over-fetch, then filter to approved+active and truncate to top_k, so a
+    # pending/discovered/quarantined vector can never occupy a top_k candidate
+    # slot. Use a 3x buffer; raise if the index ever holds >2/3 non-approved.
+    hits = vector_store.search(query, top_k=top_k * 3)
+    retrieved_ids = [h.supplier_id for h in hits]
+    suppliers = (await fetch_suppliers(retrieved_ids))[:top_k]
+    ids = [s["id"] for s in suppliers]
 
     if not suppliers:
         return ParadigmResult(

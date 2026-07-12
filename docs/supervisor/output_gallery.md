@@ -1,6 +1,6 @@
 # Output Gallery — Three Paradigms Side by Side
 
-Benchmark run `77e41957-9464-4883-860f-fe76155eed06` (GPT-4o-mini, 2026-06-13).
+Benchmark run `1b6417b9-15a4-4422-b188-cd4bae6ed038` (GPT-4o-mini, 2026-07-10).
 Five representative queries; per paradigm: returned suppliers, the
 reasoning/evidence it produced, latency and cost. Built by
 `backend/scripts/build_output_gallery.py`, no manual edits to outputs.
@@ -13,66 +13,42 @@ Ground truth: 5 matching supplier(s) in the corpus.
 
 ### P1 — Single prompt (parametric memory)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.00 · 3.5s · $0.0001*
+*P@5 0.00 · MRR 0.00 · CSR 0.00 · 2.7s · $0.0001*
 
 **Returned:**
 - Thyssenkrupp AG *(not in corpus)*
 - Salzgitter AG *(not in corpus)*
 - Klockner & Co SE *(not in corpus)*
-- Aalberts N.V. *(not in corpus)*
-- Metallbau GmbH *(not in corpus)*
+- Metallbau Schmid GmbH *(not in corpus)*
+- Häfner Metall GmbH *(not in corpus)*
 
 **Model reasoning:**
 
-> One of the largest steel producers in Germany, Thyssenkrupp offers a wide range of metal products and services.; A major player in the steel industry, Salzgitter AG provides various metal products and has a strong presence in Germany.; A leading metal distributor in Europe, Klockner & Co offers a variety of metals and services across Germany.; Specializes in advanced metal solutions and has operations in Germany, providing high-quality metal products.; A local supplier known for custom metal fabrication and a range of metal products tailored to specific needs.
+> A leading global steel and materials company based in Germany, known for its wide range of metal products.; One of the largest steel producers in Germany, offering various metal products and solutions.; A major distributor of steel and metal products in Germany, providing a wide selection of materials.; A regional supplier specializing in custom metal fabrication and supply in Germany.; A supplier of various metal products, including sheets and profiles, catering to different industries in Germany.
 
 ### P2 — RAG (retrieve top-10, one prompt)
 
-*P@5 0.20 · MRR 1.00 · CSR 1.00 · 5.0s · $0.0003*
+*P@5 0.80 · MRR 1.00 · CSR 1.00 · 3.5s · $0.0003*
 
 **Returned:**
 - Duesseldorf Metals AG
-- Düsseldorf Metals GmbH & Co. KG
-- Dortmund Metals GmbH & Co. KG
-- Cologne Metals AG
-- Cologne Foundry GmbH & Co. KG
+- Dortmund Metals AG
+- Munich Metals Ltd.
+- Stuttgart Metals GmbH
+- Berlin Metals Ltd.
 
 **Model reasoning:**
 
-> Duesseldorf Metals AG is located in Düsseldorf, Germany, and specializes in precision metal components including steel, aluminum, and copper alloys. It has ISO certifications and a significant monthly capacity.; Düsseldorf Metals GmbH & Co. KG is also based in Düsseldorf, Germany, and manufactures precision metal components. Although it lacks certifications, it serves key industries and has a reasonable capacity.; Dortmund Metals GmbH & Co. KG is located in Dortmund, Germany, and has a high capacity for manufacturing precision metal components. It serves multiple industries, making it a strong…
+> Duesseldorf Metals AG is located in Düsseldorf, Germany, and specializes in precision metal components with a high capacity of 39552.0 kg/month.; Dortmund Metals AG is based in Dortmund, Germany, and has a strong certification profile including AS9100 and IATF 16949, with a capacity of 5664.0 kg/month.; Munich Metals Ltd. is located in Munich, Germany, and specializes in precision metal components with a capacity of 2603.0 kg/month.; Stuttgart Metals GmbH is situated in Stuttgart, Germany, and has a capacity of 8741.0 kg/month, along with multiple relevant certifications.; Berlin Metals Ltd. i…
 
 ### P3 — SupplierMind (agentic, evidence-gated)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.75 · 59.6s · $0.0045*
+*P@5 0.00 · MRR 0.00 · CSR 0.00 · 10.7s · $0.0011*
 
 **Returned:**
-- Frankfurt Steel GmbH & Co. KG
-- Dortmund Alloys AG
-- Dortmund Steel GmbH
-- Munich Steel GmbH & Co. KG
-- Düsseldorf Alloys AG
+- *(no suppliers returned)*
 
-**Per-constraint verdicts:**
-- **Frankfurt Steel GmbH & Co. KG** — 3/4 constraints PASS; failed: OHSAS 18001: ISO 45001 supersedes OHSAS 18001, indicating a related certification. [unverified: quote_unverifiable]
-- **Dortmund Alloys AG** — 3/4 constraints PASS; failed: OHSAS 18001: ISO 45001 is a related certification that supersedes OHSAS 18001.
-- **Dortmund Steel GmbH** — 3/4 constraints PASS; failed: OHSAS 18001: The supplier does not hold OHSAS 18001 or any directly equivalent certification.
-- **Munich Steel GmbH & Co. KG** — 3/4 constraints PASS; failed: OHSAS 18001: The supplier does not hold OHSAS 18001 or any related certification.
-- **ed2cb08b-e1e9-c802-bd1e-b0481db6e10f** — 2/4 constraints PASS; failed: ISO 14001: Supplier does not hold ISO 14001 or any related certification.; OHSAS 18001: Supplier does not hold OHSAS 18001 or any related certification.
-- **Düsseldorf Alloys AG** — 2/4 constraints PASS; failed: AS9100: IATF 16949 is explicitly not equivalent to AS9100; OHSAS 18001: The supplier does not hold any related certification to OHSAS 18001.
-- **6957597b-dd26-0497-b9e1-550dec74352d** — 2/4 constraints PASS; failed: AS9100: Supplier does not hold AS9100 or any directly equivalent certification.; OHSAS 18001: Supplier does not hold OHSAS 18001 or any related certification.
-- **dbd90ecb-c6b0-a217-b8b1-166e00f4dde2** — 1/4 constraints PASS; failed: ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001; AS9100: Supplier does not hold AS9100 or any equivalent certification.
-- **6e96c57c-493a-e137-ee93-5ad336f58528** — 1/4 constraints PASS; failed: ISO 14001: ISO 9001 is explicitly not equivalent to ISO 14001; AS9100: Supplier does not hold AS9100 or any related certification.
-- **Düsseldorf Metals GmbH & Co. KG** — 0/4 constraints PASS; failed: ISO 9001: Supplier lists no certifications; ISO 9001 required; ISO 14001: Supplier lists no certifications; ISO 14001 required
-
-**Observation:** P1 produced five plausible real-world companies (Thyssenkrupp,
-Salzgitter…) — none exist in the corpus; the names come from parametric memory,
-not the data. P2 scores a perfect CSR here because the query has only two
-trivial constraints (category + country) that retrieval satisfies by
-construction. P3's verdicts reveal a parser defect worth noting: the query asks
-only for "metal suppliers in Germany", yet the agent checked four certification
-constraints (ISO 9001/14001, AS9100, OHSAS 18001) it extracted from nowhere —
-over-extraction that drives the simple-tier CSR penalty and the over-filtering
-seen across the simple tier.
+**Observation:** P1 produced parametric supplier names but no corpus-resolved IDs; P2 returned 5 suppliers (P@5=0.80); P3 returned no suppliers before compliance evidence, consistent with clarification or early-stop behavior.
 
 ---
 
@@ -82,7 +58,7 @@ Ground truth: 1 matching supplier(s) in the corpus.
 
 ### P1 — Single prompt (parametric memory)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.00 · 9.1s · $0.0002*
+*P@5 0.00 · MRR 0.00 · CSR 0.00 · 4.4s · $0.0002*
 
 **Returned:**
 - RS Components *(not in corpus)*
@@ -93,52 +69,44 @@ Ground truth: 1 matching supplier(s) in the corpus.
 
 **Model reasoning:**
 
-> RS Components is a well-known electronics supplier in Germany that offers a wide range of electronic components and has ISO 9001 certification. They also comply with RoHS regulations and typically have lead times under 30 days.; Farnell is a reputable distributor of electronic components in Germany, known for their quality assurance with ISO 9001 certification. They provide RoHS compliant products and generally maintain a lead time of less than 30 days.; Digi-Key is a global supplier with a strong presence in Germany, offering a vast selection of electronic components. They are ISO 9001 certif…
+> RS Components is a well-known electronics supplier in Germany that offers a wide range of electronic components and has ISO 9001 certification. They also comply with RoHS regulations and typically have a lead time under 30 days.; Farnell is a reputable distributor of electronic components in Germany, known for their quality assurance with ISO 9001 certification. They provide RoHS compliant products and have efficient logistics to ensure lead times are generally under 30 days.; Digi-Key is a global supplier with a strong presence in Europe, including Germany. They are ISO 9001 certified and off…
 
 ### P2 — RAG (retrieve top-10, one prompt)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.71 · 4.0s · $0.0002*
+*P@5 0.20 · MRR 1.00 · CSR 0.60 · 3.5s · $0.0003*
 
 **Returned:**
-- Cologne Electronics GmbH
-- Cologne Electronics GmbH & Co. KG
-- Dortmund Electronics GmbH
-- Hamburg Electronics AG
+- Bremen Electronics AG
+- Stuttgart Electronics GmbH
+- Duesseldorf Electronics AG
+- Dortmund Electronics Ltd.
+- Berlin Electronics AG
 
 **Model reasoning:**
 
-> Cologne Electronics GmbH has both ISO 9001 and RoHS certifications, and is based in Germany.; Cologne Electronics GmbH & Co. KG holds ISO 9001 and RoHS certifications, and is located in Germany.; Dortmund Electronics GmbH has ISO 9001 and RoHS certifications, and operates in Germany.; Hamburg Electronics AG holds ISO 9001 certification and is based in Germany, although it does not explicitly mention RoHS compliance.
+> Bremen Electronics AG has both ISO 9001 and RoHS certifications, making it a suitable choice for the user's requirements.; Stuttgart Electronics GmbH has ISO 9001 certification, but lacks RoHS. However, it is a strong candidate due to its capacity and location.; Duesseldorf Electronics AG has RoHS certification but lacks ISO 9001. It is included for its high capacity and relevance to the electronics market.; Dortmund Electronics Ltd. has ISO 9001 certification but lacks RoHS. It is included for its capacity and market relevance.; Berlin Electronics AG has ISO 9001 certification but lacks RoHS.…
 
 ### P3 — SupplierMind (agentic, evidence-gated)
 
-*P@5 0.20 · MRR 0.33 · CSR 1.00 · 27.0s · $0.0016*
+*P@5 0.20 · MRR 1.00 · CSR 0.79 · 24.4s · $0.0029*
 
 **Returned:**
-- Dortmund Electronics GmbH & Co. KG
-- Cologne Electronics GmbH
 - Bremen Electronics AG
-- Hamburg Circuits GmbH
-- Munich Circuits GmbH & Co. KG
+- Duesseldorf Electronics AG
 
 **Per-constraint verdicts:**
+- **Duesseldorf Electronics AG** — 3/3 constraints PASS
 - **Bremen Electronics AG** — 3/3 constraints PASS
-- **Hamburg Circuits GmbH** — 3/3 constraints PASS
-- **Munich Circuits GmbH & Co. KG** — 3/3 constraints PASS
-- **be274090-3d15-ac48-f33c-8030e772611b** — 3/3 constraints PASS
-- **Dortmund Electronics GmbH & Co. KG** — 3/3 constraints PASS
-- **Cologne Electronics GmbH** — 2/2 constraints PASS
-- **17d5b563-fa60-ede1-e5eb-772df11c0ac5** — 2/3 constraints PASS; failed: lead_time: Lead time 42d exceeds 29d limit
-- **Cologne Electronics GmbH & Co. KG** — 2/3 constraints PASS; failed: lead_time: Lead time 44d exceeds 29d limit
-- **26a5c409-aa62-6e52-35ef-4c165ca83b82** — 1/3 constraints PASS; failed: ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001; lead_time: Lead time 44d exceeds 29d limit
-- **0b79c9b7-3887-d536-677e-33954d12025f** — 1/3 constraints PASS; failed: ISO 9001: The supplier does not hold the ISO 9001 certification or any related certification.; lead_time: Lead time 48d exceeds 29d limit
+- **Stuttgart Electronics GmbH** — 2/3 constraints PASS; failed: RoHS: REACH is explicitly not equivalent to RoHS
+- **f1696ae7-2954-45a3-8cf3-0ec927a3a331** — 2/3 constraints PASS; failed: RoHS: CE is explicitly not equivalent to RoHS
+- **784e8080-5315-4006-a50d-879bb6afdfad** — 2/4 constraints PASS; failed: country: Supplier is in Czech Republic, required country is Germany; lead_time: Lead time 33d slightly exceeds 30d limit
+- **8b444bda-1e28-4c18-bc73-87dba8ff1122** — 1/3 constraints PASS; failed: RoHS: The supplier does not hold any related certification to RoHS.; lead_time: Lead time 79d exceeds 30d limit
+- **Berlin Electronics AG** — 1/3 constraints PASS; failed: RoHS: The supplier does not hold any certification equivalent or related to RoHS.; lead_time: Lead time 35d exceeds 30d limit
+- **7b497246-8067-4f34-9b8e-dc5d02575bc1** — 1/3 constraints PASS; failed: RoHS: The supplier does not hold any related certification to RoHS.; lead_time: Lead time 55d exceeds 30d limit
+- **Dortmund Electronics Ltd.** — 1/3 constraints PASS; failed: RoHS: The supplier does not hold any related certification to RoHS.; lead_time: Lead time 63d exceeds 30d limit
+- **9ac203de-545f-4704-bf79-bee914a4740d** — 1/4 constraints PASS; failed: country: Supplier is in France, required country is Germany; RoHS: The supplier does not hold any related certification to RoHS.
 
-**Observation:** This is P3's home turf — multi-constraint with real ground
-truth. P3 returned five suppliers, all verified 3/3 compliant (CSR 1.00), with
-the ground-truth supplier at rank 3 (MRR 0.33). P2 returned only four picks,
-one of which it *admits* lacks RoHS in its own reasoning yet includes anyway
-(CSR 0.71) — grounded but not gated. P1 named five real distributors
-(RS Components, Digi-Key…) that don't exist in the corpus, with confident
-fabricated compliance claims for each.
+**Observation:** P1 produced parametric supplier names but no corpus-resolved IDs; P2 returned 5 suppliers (P@5=0.20); P3 returned 2 evidence-gated supplier(s) (P@5=0.20, CSR=0.79).
 
 ---
 
@@ -148,63 +116,54 @@ Ground truth: 3 matching supplier(s) in the corpus.
 
 ### P1 — Single prompt (parametric memory)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.00 · 3.0s · $0.0001*
+*P@5 0.00 · MRR 0.00 · CSR 0.00 · 2.8s · $0.0001*
 
 **Returned:**
 - Smurfit Kappa *(not in corpus)*
 - Mondi Group *(not in corpus)*
 - VPK Packaging *(not in corpus)*
 - DS Smith *(not in corpus)*
-- Sappi Lanaken Mill *(not in corpus)*
+- Papeteries de Genval *(not in corpus)*
 
 **Model reasoning:**
 
-> A leading provider of paper-based packaging solutions with multiple facilities in the Netherlands, capable of high-volume production.; An international packaging and paper group with operations in the Netherlands, known for their large-scale manufacturing capabilities.; A prominent packaging manufacturer in Europe with a strong presence in the Netherlands, offering high-capacity production lines.; A global leader in sustainable packaging solutions, with significant manufacturing capacity in the Netherlands to meet large orders.; Part of the Sappi Group, this mill in the Netherlands specializes…
+> A leading provider of paper-based packaging solutions with multiple facilities in the Netherlands, capable of high-volume production.; An international packaging and paper group with a strong presence in the Netherlands, known for its large-scale manufacturing capabilities.; A prominent packaging manufacturer in Europe, VPK has operations in the Netherlands and can handle large production volumes.; A global leader in sustainable packaging solutions with facilities in the Netherlands, capable of producing over 50,000 units monthly.; A manufacturer specializing in paper and cardboard packaging, …
 
 ### P2 — RAG (retrieve top-10, one prompt)
 
-*P@5 0.40 · MRR 0.50 · CSR 1.00 · 3.1s · $0.0002*
+*P@5 0.60 · MRR 1.00 · CSR 1.00 · 3.8s · $0.0002*
 
 **Returned:**
-- Amsterdam Packaging N.V.
-- Amsterdam Packaging B.V.
 - Rotterdam Packaging GmbH
+- Amsterdam Packaging B.V.
+- Rotterdam Packaging B.V.
 
 **Model reasoning:**
 
-> Amsterdam Packaging N.V. has a capacity of 192770 units/month, which exceeds the required capacity and is located in the Netherlands.; Amsterdam Packaging B.V. has a capacity of 193560 units/month, which exceeds the required capacity and is located in the Netherlands.; Rotterdam Packaging GmbH has a capacity of 304433 units/month, which exceeds the required capacity and is located in the Netherlands.
+> Rotterdam Packaging GmbH has a capacity of 304,433 units/month and is located in the Netherlands, making it a strong match for the user's requirements.; Amsterdam Packaging B.V. has a capacity of 193,560 units/month and is based in the Netherlands, fulfilling the user's criteria.; Rotterdam Packaging B.V. offers a capacity of 194,037 units/month and is situated in the Netherlands, aligning well with the user's needs.
 
 ### P3 — SupplierMind (agentic, evidence-gated)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.48 · 50.3s · $0.0046*
+*P@5 0.60 · MRR 1.00 · CSR 0.87 · 41.3s · $0.0016*
 
 **Returned:**
-- Amsterdam Packaging N.V.
+- Amsterdam Packaging B.V.
+- Rotterdam Packaging GmbH
 - Rotterdam Packaging B.V.
-- Utrecht Container B.V.
-- Eindhoven Packaging B.V.
-- Utrecht Container N.V.
 
 **Per-constraint verdicts:**
-- **Amsterdam Packaging N.V.** — 3/5 constraints PASS; failed: FSC Certification: PEFC is explicitly not equivalent to FSC; BRCGS Packaging: The supplier does not hold any certification equivalent or related to BRCGS Packaging.
-- **Utrecht Container B.V.** — 2/5 constraints PASS; failed: FSC Certification: PEFC is explicitly not equivalent to FSC; BRCGS Packaging: The supplier does not hold any certification equivalent or related to BRCGS Packaging.
-- **Rotterdam Packaging B.V.** — 2/5 constraints PASS; failed: FSC Certification: PEFC is explicitly not equivalent to FSC; BRCGS Packaging: The supplier does not hold any related certification to BRCGS Packaging.
-- **Utrecht Container N.V.** — 2/5 constraints PASS; failed: FSC Certification: The supplier mentions a supply chain that is FSC-certified, indicating a related certification.; BRCGS Packaging: No related certification found for BRCGS Packaging.
-- **Eindhoven Packaging B.V.** — 2/5 constraints PASS; failed: FSC Certification: PEFC is explicitly not equivalent to FSC; BRCGS Packaging: ISO 22000 is explicitly not equivalent to BRC
-- **1664d782-b01c-31e3-f8d3-f4370b9b3bd9** — 2/6 constraints PASS; failed: country: Supplier is in Belgium, required country is Netherlands; FSC Certification: PEFC is explicitly not equivalent to FSC
-- **6f790fe1-64f5-25e2-8e0c-517c1ab17d2a** — 1/5 constraints PASS; failed: ISO 14001: ISO 9001 is explicitly not equivalent to ISO 14001; FSC Certification: The supplier holds the FSC certification, which is directly equivalent. [downgraded: quote_too_short]
-- **2f23654f-3e47-5bfa-29f1-72600eb68a13** — 1/5 constraints PASS; failed: ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001; FSC Certification: The supplier mentions a supply chain that is FSC-certified, indicating a related certification.
-- **a08d4c99-6b8e-1e76-d132-38991c08b092** — 1/5 constraints PASS; failed: ISO 14001: ISO 9001 is explicitly not equivalent to ISO 14001; FSC Certification: The supplier mentions a supply chain that is FSC-certified, indicating a related certification.
-- **eac48320-48e9-8195-0984-f72b09e6d5b0** — 0/5 constraints PASS; failed: ISO 9001: Supplier lists no certifications; ISO 9001 required; FSC Certification: Supplier lists no certifications; FSC Certification required
+- **Rotterdam Packaging B.V.** — 2/2 constraints PASS
+- **Rotterdam Packaging GmbH** — 2/2 constraints PASS
+- **Amsterdam Packaging B.V.** — 2/2 constraints PASS
+- **Bremen Packaging Ltd.** — 2/3 constraints PASS; failed: country: Supplier is in Germany, required country is Netherlands
+- **5d512ab6-0fe4-4173-9fc3-e78124eb07ca** — 2/3 constraints PASS; failed: country: Supplier is in Germany, required country is Netherlands
+- **634d2152-4f52-4fac-a036-6aab159d1c8e** — 2/3 constraints PASS; failed: country: Supplier is in Germany, required country is Netherlands
+- **7b3884c1-bda9-422d-be24-6873f0d1e69c** — 2/3 constraints PASS; failed: country: Supplier is in France, required country is Netherlands
+- **Cologne Packaging GmbH** — 2/3 constraints PASS; failed: country: Supplier is in Germany, required country is Netherlands
+- **Krakow Packaging S.A.** — 2/3 constraints PASS; failed: country: Supplier is in Poland, required country is Netherlands
+- **Hannover Packaging AG** — 2/3 constraints PASS; failed: country: Supplier is in Germany, required country is Netherlands
 
-**Observation:** P2's best query — it returned exactly the right three
-suppliers (P@5 0.40 = 2 of its picks in the 3-supplier ground truth, CSR 1.00)
-by reading capacity numbers straight from retrieved profiles. P3 shows the
-same over-extraction defect as Q1: the query has two constraints (category +
-capacity + country), but the agent invented FSC and BRCGS certification
-requirements and then penalised every candidate for failing them — turning an
-easy win into CSR 0.48. The agent's strictness is only as good as its
-constraint parser.
+**Observation:** P1 produced parametric supplier names but no corpus-resolved IDs; P2 returned 3 suppliers (P@5=0.60); P3 returned 3 evidence-gated supplier(s) (P@5=0.60, CSR=0.87).
 
 ---
 
@@ -225,51 +184,42 @@ Ground truth: 0 matching supplier(s) in the corpus. **No supplier satisfies all 
 
 **Model reasoning:**
 
-> Mondi is a global leader in packaging and paper, with facilities in Europe, including near Berlin. They have ISO 9001 certification and the capacity to produce large volumes quickly.; Smurfit Kappa specializes in paper-based packaging solutions and has a strong presence in Europe. They are ISO 9001 certified and can meet high-volume demands efficiently.; DS Smith is known for sustainable packaging solutions and operates in the European market. They have ISO 9001 certification and the capability to deliver large quantities within tight timelines.; Schumacher Packaging is a prominent packaging m…
+> Mondi is a global leader in packaging and paper, with facilities in Europe, including near Berlin. They have ISO 9001 certification and the capacity to produce large volumes quickly.; Smurfit Kappa specializes in paper-based packaging solutions and has a strong presence in Europe. They are ISO 9001 certified and can meet high-volume demands.; DS Smith is known for sustainable packaging solutions and has operations in Germany. They are ISO 9001 certified and capable of producing over 100,000 units per month.; Schumacher Packaging is a German company that offers a wide range of packaging solutio…
 
 ### P2 — RAG (retrieve top-10, one prompt)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.27 · 3.0s · $0.0003*
+*P@5 0.00 · MRR 0.00 · CSR 0.62 · 2.9s · $0.0003*
 
 **Returned:**
-- Berlin Packaging GmbH
-- Berlin Pack Solutions GmbH
-- Berlin Pack Solutions AG
-- Berlin Packaging GmbH & Co. KG
-- Berlin Pack Solutions GmbH & Co. KG
+- Bremen Packaging Ltd.
+- Cologne Packaging GmbH
+- Hannover Packaging AG
+- Krakow Packaging S.A.
 
 **Model reasoning:**
 
-> Berlin Packaging has a capacity of 117586 units/month, holds ISO 14001 certification, and is located in Berlin, making it a strong candidate for high-volume packaging needs.; Berlin Pack Solutions GmbH has ISO 9001 certification and a capacity of 2322 units/month, which is relevant but does not meet the volume requirement.; Berlin Pack Solutions AG holds ISO 9001 certification and is located in Berlin, but its capacity of 1383 units/month is below the required threshold.; Berlin Packaging GmbH & Co. KG has ISO 9001 certification and a capacity of 582 units/month, which is insufficient for the …
+> Bremen Packaging Ltd. is located within 40km of Berlin, has ISO 9001 certification, a capacity of 454228 units/month, and can meet the requirement of under 10 days.; Cologne Packaging GmbH is within 40km of Berlin, holds ISO 9001 certification, has a capacity of 92527 units/month, and can deliver within the required timeframe.; Hannover Packaging AG is located within 40km of Berlin, certified with ISO 9001, has a capacity of 357046 units/month, and can fulfill the order in under 10 days.; Krakow Packaging S.A. is within 40km of Berlin, has ISO 9001 certification, a capacity of 323205 units/mon…
 
 ### P3 — SupplierMind (agentic, evidence-gated)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.40 · 40.2s · $0.0021*
+*P@5 0.00 · MRR 0.00 · CSR 0.46 · 45.0s · $0.0021*
 
 **Returned:**
 - *(no suppliers returned)*
 
 **Per-constraint verdicts:**
-- **60aa90aa-2a65-4958-b19a-71c1d3f72643** — 1/3 constraints PASS; failed: country: Supplier is in Global, required country is Berlin; capacity: Capacity data not available in supplier profile
-- **c7fdc27a-4af2-4ba5-9701-4aad5be7037d** — 1/3 constraints PASS; failed: country: Supplier is in USA, required country is Berlin; capacity: Capacity data not available in supplier profile
-- **Berlin Packaging GmbH** — 1/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001
-- **Berlin Packaging GmbH & Co. KG** — 1/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity 582 units/month is below minimum 100,000
-- **Berlin Pack Solutions AG** — 1/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity 1,383 units/month is below minimum 100,000
-- **Berlin Pack Solutions GmbH** — 1/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity 2,322 units/month is below minimum 100,000
-- **67f632d1-c873-4280-906d-52f22b9b60cf** — 0/3 constraints PASS; failed: country: Supplier is in Global, required country is Berlin; ISO 9001: Supplier lists no certifications; ISO 9001 required
-- **2cca6c97-ff93-4399-b4fc-df1a81c4f5e5** — 0/3 constraints PASS; failed: country: Supplier is in USA, required country is Berlin; ISO 9001: CE is explicitly not equivalent to ISO 9001
-- **a1aec478-6f9f-4c5a-b14e-7cf90308cdae** — 0/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; ISO 9001: Supplier lists no certifications; ISO 9001 required
-- **Berlin Pack Solutions GmbH & Co. KG** — 0/3 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001
+- **Bremen Packaging Ltd.** — 2/4 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; lead_time: Lead time 58d exceeds 10d limit
+- **Rotterdam Packaging GmbH** — 2/4 constraints PASS; failed: country: Supplier is in Netherlands, required country is Berlin; lead_time: Lead time 78d exceeds 10d limit
+- **Hannover Packaging AG** — 2/4 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; lead_time: Lead time 61d exceeds 10d limit
+- **3dbd0b9e-a251-41ea-b45c-857c7b548925** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity 69 units/month is below minimum 100,000
+- **634d2152-4f52-4fac-a036-6aab159d1c8e** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001
+- **7b0fb172-c804-4515-9065-44068ab5f43c** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity unit mismatch: supplier has projects/month, required units/month
+- **dd59e57d-0ec7-43b3-8b36-42baa6402357** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity unit mismatch: supplier has projects/month, required units/month
+- **3b50815b-9357-4950-bbb6-bbcd85aa0d9d** — 1/4 constraints PASS; failed: country: Supplier is in Poland, required country is Berlin; capacity: Capacity unit mismatch: supplier has shipments/day, required units/month
+- **f3e175a3-1215-4b50-aee0-f93bbd3360d7** — 1/4 constraints PASS; failed: country: Supplier is in Czech Republic, required country is Berlin; capacity: Capacity unit mismatch: supplier has shipments/day, required units/month
+- **Cologne Packaging GmbH** — 1/4 constraints PASS; failed: country: Supplier is in Germany, required country is Berlin; capacity: Capacity 92,527 is slightly below minimum 100,000 units/month
 
-**Observation:** The headline behaviour of the whole gallery. No supplier in
-the corpus satisfies all constraints — the correct answer is the empty set.
-**P3 is the only paradigm that returned nothing**, with per-candidate verdicts
-documenting exactly why each of ten candidates fails (capacity 582 vs 100,000
-minimum, ISO 14001 ≠ ISO 9001, …). P1 confidently named five real companies.
-P2 returned five Berlin suppliers, four of which its own reasoning admits fail
-the volume requirement. Caveat: P3's location verdict ("required country is
-Berlin") shows the parser mapped the 40 km radius onto the *country* field —
-right refusal, partly for a malformed reason.
+**Observation:** P1 produced parametric supplier names but no corpus-resolved IDs; P2 returned 4 suppliers (P@5=0.00); P3 gathered compliance evidence but ranked no supplier (CSR=0.46).
 
 ---
 
@@ -279,61 +229,52 @@ Ground truth: 0 matching supplier(s) in the corpus. **No supplier satisfies all 
 
 ### P1 — Single prompt (parametric memory)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.00 · 3.8s · $0.0002*
+*P@5 0.00 · MRR 0.00 · CSR 0.00 · 3.7s · $0.0002*
 
 **Returned:**
-- Bronze Alloys GmbH *(not in corpus)*
-- Metallwerk Bremen AG *(not in corpus)*
-- Bremen Bronze Foundry *(not in corpus)*
-- Hermann Müller GmbH *(not in corpus)*
+- Bronze GmbH *(not in corpus)*
+- Metallwerk Bremen *(not in corpus)*
+- Bremen Bronze Solutions *(not in corpus)*
 - Norddeutsche Metallwerke *(not in corpus)*
+- Hannover Bronze Co. *(not in corpus)*
 
 **Model reasoning:**
 
-> Located near Bremen, this supplier specializes in bronze alloys and is ISO 9001 certified, capable of meeting high volume demands.; This company is known for its metal production and processing, including bronze, and holds ISO 9001 certification, with a strong local presence.; A local foundry that produces bronze components and is ISO 9001 certified, they can handle large orders with quick lead times.; This supplier offers a range of metal products, including bronze, and is ISO 9001 certified, with the capacity to fulfill large monthly orders.; Located within the Bremen area, they specialize i…
+> Located within 30km of Bremen, Bronze GmbH specializes in high-quality bronze products and is ISO 9001 certified. They have the capacity to meet the monthly demand and maintain a lead time of under 21 days.; This supplier is based in Bremen and offers a range of bronze materials. They are ISO 9001 certified and can supply over 3000 kg per month with a reliable lead time.; A local supplier known for their bronze manufacturing, Bremen Bronze Solutions is ISO 9001 certified and has the capability to fulfill large orders within the specified lead time.; Located just outside Bremen, this company sp…
 
 ### P2 — RAG (retrieve top-10, one prompt)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.83 · 2.0s · $0.0002*
+*P@5 0.00 · MRR 0.00 · CSR 0.63 · 2.9s · $0.0003*
 
 **Returned:**
-- Bremen Forge AG
-- Bremen Forge GmbH & Co. KG
+- Bremen Textiles S.A.
+- Bremen Packaging Ltd.
+- Bremen Electronics AG
+- Dortmund Metals AG
+- Duesseldorf Metals AG
 
 **Model reasoning:**
 
-> Bremen Forge AG is ISO 9001 certified, has a capacity of 9399.0 kg/month, and is located in Bremen, meeting all the user's requirements.; Bremen Forge GmbH & Co. KG is ISO 9001 certified, has a capacity of 60460.0 kg/month, and is located in Bremen, fulfilling the user's criteria.
+> Bremen Textiles S.A. is ISO 9001 certified, located in Bremen, and has a capacity of 42251.0 meters/month, which exceeds the required 3000+ kg/month.; Bremen Packaging Ltd. is ISO 9001 certified, located in Bremen, and has a capacity of 454228.0 units/month, which exceeds the required 3000+ kg/month.; Bremen Electronics AG is ISO 9001 certified, located in Bremen, and has a capacity of 38353.0 units/month, which exceeds the required 3000+ kg/month.; Dortmund Metals AG is ISO 9001 certified, located within 50km of Bremen, and has a capacity of 5664.0 kg/month, meeting the requirement.; Duesseld…
 
 ### P3 — SupplierMind (agentic, evidence-gated)
 
-*P@5 0.00 · MRR 0.00 · CSR 0.62 · 30.9s · $0.0016*
+*P@5 0.00 · MRR 0.00 · CSR 0.77 · 14.6s · $0.0018*
 
 **Returned:**
-- Bremen Forge GmbH & Co. KG
-- Bremen Forge AG
-- Bremen Metals GmbH
-- Bremen Steel GmbH
-- Bremen Alloys GmbH
+- Stuttgart Metals GmbH
 
 **Per-constraint verdicts:**
-- **Bremen Forge AG** — 3/4 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen
-- **Bremen Forge GmbH & Co. KG** — 3/4 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen
-- **Bremen Steel GmbH** — 2/4 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; capacity: Capacity data not available in supplier profile
-- **45f363f4-a981-12a3-94e1-90ac0a1e9f2c** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; capacity: Capacity data not available in supplier profile
-- **ca3a9d86-1293-78ad-1dfe-cb1f0c202f49** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; ISO 9001: ISO 45001 is explicitly not equivalent to ISO 9001
-- **Bremen Alloys GmbH** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; ISO 9001: Supplier lists no certifications; ISO 9001 required
-- **750cc421-ab19-154a-1faf-f912803f5ca4** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; ISO 9001: Supplier lists no certifications; ISO 9001 required
-- **Bremen Metals GmbH** — 2/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; capacity: Capacity 1,739 kg/month is below minimum 3,000
-- **cf8a0484-53bc-5eb5-95eb-8bf65fd779ae** — 1/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001
-- **6f1d6ebe-96ea-aabf-78d4-f7d0995635dc** — 1/5 constraints PASS; failed: country: Supplier is in Germany, required country is Bremen; ISO 9001: ISO 14001 is explicitly not equivalent to ISO 9001
+- **Stuttgart Metals GmbH** — 3/4 constraints PASS; failed: lead_time: Lead time 23d slightly exceeds 21d limit
+- **5c5c0820-ebd9-4f16-af85-279282909442** — 3/4 constraints PASS; failed: lead_time: Lead time 41d exceeds 21d limit
+- **Duesseldorf Metals AG** — 3/4 constraints PASS; failed: lead_time: Lead time 66d exceeds 21d limit
+- **Dortmund Metals AG** — 3/4 constraints PASS; failed: lead_time: Lead time 77d exceeds 21d limit
+- **Bremen Textiles S.A.** — 3/5 constraints PASS; failed: product_fit: Supplier category 'textiles' and description do not match requested product 'bronze supplier'; capacity: Capacity unit mismatch: supplier has meters/month, required kg/month
+- **62b4ccc4-e934-4f85-a7b2-22b1483d40f3** — 2/4 constraints PASS; failed: capacity: Capacity 1,878 kg/month is below minimum 3,000; lead_time: Lead time 82d exceeds 21d limit
+- **Berlin Metals Ltd.** — 2/4 constraints PASS; failed: ISO 9001: ISO 27001 is explicitly not equivalent to ISO 9001; lead_time: Lead time 82d exceeds 21d limit
+- **Munich Metals Ltd.** — 2/4 constraints PASS; failed: capacity: Capacity 2,603 is slightly below minimum 3,000 kg/month; lead_time: Lead time 47d exceeds 21d limit
+- **Bremen Electronics AG** — 2/5 constraints PASS; failed: product_fit: Supplier category 'electronics' and description do not match requested product 'bronze supplier'; capacity: Capacity unit mismatch: supplier has units/month, required kg/month
+- **Bremen Packaging Ltd.** — 2/5 constraints PASS; failed: product_fit: Supplier category 'packaging' and description do not match requested product 'bronze supplier'; capacity: Capacity unit mismatch: supplier has units/month, required kg/month
 
-**Observation:** The other impossible query, and here P3 did *not* refuse — it
-returned five Bremen suppliers, unlike its correct empty set on Q23. The same
-city-as-country parser artifact ("Supplier is in Germany, required country is
-Bremen") fails every candidate's location check, yet the agent still ranked
-and returned them. Refusal behaviour on impossible queries is inconsistent
-(1 of 2 in this gallery). P1 fabricated five plausible German foundries,
-including a fictitious "Bremen Bronze Foundry". P2 returned two real Bremen
-forges that pass everything except the unstatable 50 km radius — defensible
-picks, no refusal capability at all.
+**Observation:** P1 produced parametric supplier names but no corpus-resolved IDs; P2 returned 5 suppliers (P@5=0.00); P3 returned 1 evidence-gated supplier(s) (P@5=0.00, CSR=0.77).
 

@@ -80,7 +80,7 @@ class WebSearchService:
             return []
         result = self._client.search(
             query=query,
-            search_depth="advanced",
+            search_depth="basic",
             max_results=max_results,
             include_answer=False,
             include_raw_content=False,
@@ -107,7 +107,7 @@ class WebSearchService:
             logger.warning("[web_search] Tavily unavailable — skipping web discovery")
             return []
 
-        target_results = max(max_results, 10)
+        target_results = max(1, max_results)
         queries = self._build_supplier_queries(
             category=category,
             country=country,
@@ -180,12 +180,14 @@ class WebSearchService:
                 "site:.de",
                 product_text,
                 category_text,
+                location,
                 "manufacturer supplier GmbH",
             ])
             query_parts.append([
                 product_text,
                 "German",
                 category_text,
+                location,
                 "manufacturer official website GmbH",
             ])
 

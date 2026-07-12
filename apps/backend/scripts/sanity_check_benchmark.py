@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
-ROOT = BACKEND.parent
+ROOT = BACKEND.parents[1]
 REPORT = ROOT / "docs" / "verification" / "06_sanity_checks.md"
 SYSTEMS = ["p1_singleprompt", "p2_rag", "suppliermind"]
 
@@ -33,6 +33,10 @@ def _default_log() -> Path:
 def main() -> None:
     run_dir = ROOT / (sys.argv[1] if len(sys.argv) > 1 else f"results/run_{datetime.now():%Y%m%d}")
     log_path = Path(sys.argv[2]) if len(sys.argv) > 2 else _default_log()
+    if not log_path.exists() and not log_path.is_absolute():
+        repo_relative = ROOT / log_path
+        if repo_relative.exists():
+            log_path = repo_relative
     data = json.loads((run_dir / "evaluation_results.json").read_text(encoding="utf-8"))
     pq = data["per_query_metrics"]
     benchmark = json.loads(
@@ -60,7 +64,8 @@ def main() -> None:
     ))
     findings.append((
         "same corpus across paradigms", True,
-        "single process, single benchmark_file, one live corpus "
+        "single process, single benchmark_file, frozen curated-100 corpus "
+        "(approved + active rows only; pending-review/quarantined rows excluded) "
         f"({data.get('benchmark_file')}); run_id={data.get('run_id')}",
     ))
 
@@ -134,13 +139,21 @@ def main() -> None:
     ]
     for name, ok, detail in findings:
         lines.append(f"| {name} | {'PASS' if ok else 'FAIL'} | {detail} |")
+    empty_detail = (
+        f"{hard_empty}/{hard_n} hard queries"
+        + (
+            f" and {len(gt_empty) - hard_empty} non-hard queries"
+            if len(gt_empty) > hard_empty
+            else ""
+        )
+    )
     lines += [
         "",
         "Notes:",
         "- 'Same corpus' holds by construction: all paradigms ran in one process",
-        "  against the one live Postgres/Milvus pool in a single runner invocation.",
-        "- Ground-truth-zero affects all 7 hard queries and medium Q13; P@5 and MRR",
-        "  are 0 there by construction for every paradigm. CSR still differentiates.",
+        "  against the same approved + active curated supplier corpus in one runner invocation.",
+        f"- Ground-truth-zero affects {empty_detail}; P@5 and MRR are 0 there",
+        "  by construction for every paradigm. CSR still differentiates.",
         "- OpenAI dashboard total is a manual cross-check (no spend API).",
     ]
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")

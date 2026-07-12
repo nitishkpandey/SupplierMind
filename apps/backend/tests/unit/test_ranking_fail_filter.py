@@ -144,7 +144,7 @@ def test_high_score_eligible_suppliers_still_rank(monkeypatch):
     assert [r["supplier_id"] for r in result["ranked_suppliers"]] == supplier_ids
 
 
-def test_city_query_ranks_exact_city_above_higher_semantic_country_match(monkeypatch):
+def test_city_query_excludes_known_city_mismatch(monkeypatch):
     agent = RankingAgent.__new__(RankingAgent)
     bremen_id = "bremen-supplier"
     berlin_id = "berlin-supplier"
@@ -217,4 +217,4 @@ def test_city_query_ranks_exact_city_above_higher_semantic_country_match(monkeyp
     ranked = result["ranked_suppliers"]
     assert ranked[0]["supplier_id"] == bremen_id
     assert ranked[0]["proximity_score"] == 1.0
-    assert next(r for r in ranked if r["supplier_id"] == berlin_id)["proximity_score"] == 0.0
+    assert all(r["supplier_id"] != berlin_id for r in ranked)

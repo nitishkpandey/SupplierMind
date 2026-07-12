@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = ""
     OPENCORPORATES_API_KEY: str = ""
     ENABLE_EXTERNAL_DISCOVERY: bool = True
-    EXTERNAL_DISCOVERY_MAX_RESULTS: int = 10
+    EXTERNAL_DISCOVERY_MAX_RESULTS: int = 6
     EXTERNAL_DISCOVERY_TIMEOUT: int = 30
 
     # ── Pipeline tuning ───────────────────────────────────────────────

@@ -139,9 +139,13 @@ async def _load_supplier_name_index(db: AsyncSession) -> dict[str, str]:
 
     # Sprint A: pending_review suppliers are excluded from the P1 name index so
     # the parametric baseline can never be scored against HITL-held rows.
+    # benchmark-final-v2: is_active==True keeps the quarantined scale-set /
+    # discovered rows out of the P1 index too, so P1 is scored only against the
+    # frozen curated-100 retrieval set.
     result = await db.execute(
         select(Supplier.id, Supplier.name).where(
-            Supplier.status != SupplierStatus.pending_review
+            Supplier.status != SupplierStatus.pending_review,
+            Supplier.is_active == True,  # noqa: E712
         )
     )
     return {_normalise_name(name): str(sid) for sid, name in result.all() if name}
@@ -160,6 +164,7 @@ async def _fetch_supplier_dicts(ids: list[str], db: AsyncSession) -> list[dict]:
         select(Supplier).where(
             Supplier.id.in_(ids),
             Supplier.status != SupplierStatus.pending_review,
+            Supplier.is_active == True,  # noqa: E712
         )
     )
     rows = {str(s.id): s for s in result.scalars().all()}
@@ -198,6 +203,8 @@ async def run_paradigm_queries(
     constraints: dict,
     db: AsyncSession,
     name_index: dict[str, str],
+    run_p1: bool = True,
+    run_p2: bool = True,
 ) -> dict:
     """Run one benchmark query through the P1 and P2 baselines.
 
@@ -207,23 +214,19 @@ async def run_paradigm_queries(
     from experiments.paradigm1_singleprompt import run_paradigm1
     from experiments.paradigm2_rag import run_paradigm2
 
-    cost_before = _llm_total_cost()
-    p1 = await asyncio.to_thread(run_paradigm1, raw_query)
-    p1_cost = _llm_total_cost() - cost_before
-    p1_ids = [
-        name_index[_normalise_name(n)]
-        for n in p1.supplier_names
-        if _normalise_name(n) in name_index
-    ]
-    p1_suppliers = await _fetch_supplier_dicts(p1_ids, db)
+    results = {}
 
-    cost_before = _llm_total_cost()
-    p2 = await run_paradigm2(raw_query)
-    p2_cost = _llm_total_cost() - cost_before
-    p2_suppliers = await _fetch_supplier_dicts(p2.supplier_ids, db)
-
-    return {
-        "p1_singleprompt": {
+    if run_p1:
+        cost_before = _llm_total_cost()
+        p1 = await asyncio.to_thread(run_paradigm1, raw_query)
+        p1_cost = _llm_total_cost() - cost_before
+        p1_ids = [
+            name_index[_normalise_name(n)]
+            for n in p1.supplier_names
+            if _normalise_name(n) in name_index
+        ]
+        p1_suppliers = await _fetch_supplier_dicts(p1_ids, db)
+        results["p1_singleprompt"] = {
             "ids": p1_ids,
             "suppliers": p1_suppliers,
             "csr": constraint_satisfaction_rate_from_suppliers(p1_suppliers, constraints),
@@ -232,8 +235,14 @@ async def run_paradigm_queries(
             "reasoning": "; ".join(p1.reasoning) if p1.reasoning else None,
             "cost_usd": p1_cost,
             "error": p1.error,
-        },
-        "p2_rag": {
+        }
+
+    if run_p2:
+        cost_before = _llm_total_cost()
+        p2 = await run_paradigm2(raw_query)
+        p2_cost = _llm_total_cost() - cost_before
+        p2_suppliers = await _fetch_supplier_dicts(p2.supplier_ids, db)
+        results["p2_rag"] = {
             "ids": p2.supplier_ids,
             "suppliers": p2_suppliers,
             "csr": constraint_satisfaction_rate_from_suppliers(p2_suppliers, constraints),
@@ -242,15 +251,17 @@ async def run_paradigm_queries(
             "reasoning": "; ".join(p2.reasoning) if p2.reasoning else None,
             "cost_usd": p2_cost,
             "error": p2.error,
-        },
-    }
+        }
+
+    return results
 
 
 async def run_full_evaluation(
     run_suppliermind: bool = True,
     run_baselines: bool = True,
     query_limit: int | None = None,
-    run_paradigm_baselines: bool = False,
+    run_p1: bool = False,
+    run_p2: bool = False,
 ) -> dict:
     """
     Run the complete SupplierBench evaluation.
@@ -292,7 +303,7 @@ async def run_full_evaluation(
     p2_metrics: list[QueryMetrics] = []
 
     name_index: dict[str, str] = {}
-    if run_paradigm_baselines:
+    if run_p1:
         async with AsyncSessionLocal() as db:
             name_index = await _load_supplier_name_index(db)
         logger.info("Loaded %d supplier names for P1 matching", len(name_index))
@@ -389,15 +400,17 @@ async def run_full_evaluation(
             )
 
         # ── Run P1 / P2 paradigm baselines (Development Plan, Phase 3) ──
-        if run_paradigm_baselines:
+        if run_p1 or run_p2:
             async with AsyncSessionLocal() as db:
                 paradigm_results = await run_paradigm_queries(
-                    raw_query, constraints, db, name_index
+                    raw_query, constraints, db, name_index, run_p1=run_p1, run_p2=run_p2
                 )
             for system_name, metrics_list in (
                 ("p1_singleprompt", p1_metrics),
                 ("p2_rag", p2_metrics),
             ):
+                if system_name not in paradigm_results:
+                    continue
                 pr = paradigm_results[system_name]
                 p5 = precision_at_k(pr["ids"], ground_truth_ids, k=5)
                 rr = reciprocal_rank(pr["ids"], ground_truth_ids)

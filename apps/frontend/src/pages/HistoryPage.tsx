@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Clock, Search, ExternalLink, Trash2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Search, Eye, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function HistoryPage() {
@@ -86,7 +86,7 @@ export default function HistoryPage() {
             return (
               <Link
                 key={query.id}
-                to={`/query/${query.id}/results`}
+                to={`/query/${query.id}/results?view=history`}
                 className="block"
               >
                 <Card className="hover:shadow-sm transition-shadow cursor-pointer">
@@ -112,7 +112,10 @@ export default function HistoryPage() {
                             {query.results.length} results
                           </Badge>
                         )}
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                        <Eye
+                          className="w-4 h-4 text-muted-foreground"
+                          aria-hidden="true"
+                        />
                       </div>
                     </div>
                   </CardContent>
