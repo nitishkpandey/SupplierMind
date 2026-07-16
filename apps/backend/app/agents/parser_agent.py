@@ -1021,19 +1021,27 @@ class ParserAgent(BaseAgent):
                 turn_number=turn_number,
             )
 
-        if (
+        use_legacy_location_question = (
             finish_payload_requested_clarification
             and legacy_clarification_question
             and constraints.get("product_type")
             and not self._has_any_constraint(constraints, _LOCATION_CONSTRAINT_KEYS)
             and _question_mentions_location(legacy_clarification_question)
-        ):
+        )
+
+        if use_legacy_location_question:
             clarification_needed = True
             clarification_question = legacy_clarification_question
             composed_question = None
         elif composed_question is not None:
             clarification_needed = True
             clarification_question = composed_question
+        elif terminated_by == "finish":
+            # If deterministic post-loop rules say the query is good enough,
+            # let the pipeline run. This prevents the LLM's legacy
+            # clarification flag from causing repeated popups on resumed turns.
+            clarification_needed = False
+            clarification_question = None
         else:
             clarification_needed = legacy_clarification_needed
             clarification_question = (
