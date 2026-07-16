@@ -397,6 +397,8 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
     ])
     text_overlap = bool(required_tokens & supplier_tokens) if required_tokens else True
 
+    category_exact = bool(req_category and sup_category and req_category == sup_category)
+
     if req_category and sup_category and not category_ok and not text_overlap:
         return {
             "constraint_name": "product_fit",
@@ -408,11 +410,23 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
-    if req_category and sup_category and category_ok:
+    if category_exact:
         return {
             "constraint_name": "product_fit",
             "status": "PASS",
             "reason": f"Supplier category '{supplier.get('category')}' matches product scope",
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if req_category and sup_category and category_ok and not text_overlap and required_tokens:
+        return {
+            "constraint_name": "product_fit",
+            "status": "FAIL",
+            "reason": (
+                f"Supplier category '{supplier.get('category')}' is only broadly related "
+                "and the profile does not mention requested product "
+                f"'{constraints.get('product_type')}'"
+            ),
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 

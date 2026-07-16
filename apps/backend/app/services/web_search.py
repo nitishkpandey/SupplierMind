@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 _CATEGORY_SEARCH_TERMS = {
     "tools_hardware": "hand tools industrial tools hardware",
-    "office_supplies": "office supplies workplace equipment",
+    "office_supplies": "office furniture office supplies workplace equipment",
     "construction_materials": "construction materials building materials",
     "food_ingredients": "food ingredients",
     "software_services": "software services",

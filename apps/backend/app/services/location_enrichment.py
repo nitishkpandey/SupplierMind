@@ -2,6 +2,7 @@
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -285,6 +286,13 @@ class GeoapifyLocationService:
         )
         if requested_country and location.country.casefold() != requested_country.casefold():
             return False
+        requested_city = clean_optional_text(constraints.get("location_city"))
+        if (
+            requested_city
+            and not constraints.get("location_radius_km")
+            and _normalize_location_name(location.city) != _normalize_location_name(requested_city)
+        ):
+            return False
         return True
 
     @staticmethod
@@ -304,6 +312,12 @@ class GeoapifyLocationService:
 
 def _normalize_name(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _normalize_location_name(value: str) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return " ".join(re.findall(r"[a-z0-9]+", text.casefold()))
 
 
 def _significant_name_tokens(value: str) -> set[str]:

@@ -4,7 +4,6 @@ app/core/config.py — All application settings in one place.
 USAGE anywhere in the codebase:
     from app.core.config import settings
     print(settings.DATABASE_URL)
-    print(settings.OPENAI_API_KEY)
 """
 
 import warnings
@@ -102,7 +101,7 @@ class Settings(BaseSettings):
     OPENCORPORATES_API_KEY: str = ""
     ENABLE_EXTERNAL_DISCOVERY: bool = True
     EXTERNAL_DISCOVERY_MAX_RESULTS: int = 6
-    EXTERNAL_DISCOVERY_TIMEOUT: int = 30
+    EXTERNAL_DISCOVERY_TIMEOUT: int = 90
 
     # ── Pipeline tuning ───────────────────────────────────────────────
     EVALUATOR_MAX_RETRIES: int = 1

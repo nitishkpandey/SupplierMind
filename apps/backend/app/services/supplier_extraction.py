@@ -14,6 +14,7 @@ HALLUCINATION GUARDS:
 import json
 import logging
 import re
+import time
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
@@ -218,7 +219,7 @@ class SupplierExtractionService:
         return False
 
     def stage2_extract(
-        self, url: str
+        self, url: str, deadline_at: Optional[float] = None
     ) -> Optional[dict]:
         """
         Stage 2: Rich extraction from full page content. SYNC.
@@ -253,8 +254,12 @@ class SupplierExtractionService:
         )
 
         location_evidence = {}
-        if not verified.get("city") and not verified.get("address"):
-            location_evidence = self._discover_location_from_site(url)
+        if (
+            not verified.get("city")
+            and not verified.get("address")
+            and self._has_budget(deadline_at, min_seconds=5.0)
+        ):
+            location_evidence = self._discover_location_from_site(url, deadline_at=deadline_at)
             if location_evidence:
                 verified["city"] = verified.get("city") or location_evidence.get("city")
                 verified["country"] = verified.get("country") or location_evidence.get("country")
@@ -270,7 +275,11 @@ class SupplierExtractionService:
             verified.get("certifications") or None,
         )
         if not verified.get("certifications"):
-            cert_evidence = self._discover_certifications_from_site(url, full_content)
+            cert_evidence = self._discover_certifications_from_site(
+                url,
+                full_content,
+                deadline_at=deadline_at,
+            )
             verified["certifications"] = list(cert_evidence.keys())
 
         # Build source_citations dict
@@ -413,12 +422,16 @@ class SupplierExtractionService:
         self,
         source_url: str,
         source_text: str,
+        deadline_at: Optional[float] = None,
     ) -> dict[str, dict]:
         evidence = self._find_certification_mentions(source_text, source_url)
         if evidence:
             return evidence
 
         for url in self._quality_page_candidates(source_url)[:_CERT_PAGE_FETCH_LIMIT]:
+            if not self._has_budget(deadline_at, min_seconds=4.0):
+                logger.info("[extraction] Skipping optional cert page probes: deadline near")
+                break
             page_text = fetch_page_content(url)
             if not page_text:
                 continue
@@ -518,9 +531,16 @@ class SupplierExtractionService:
             candidates.append(candidate)
         return candidates
 
-    def _discover_location_from_site(self, source_url: str) -> dict:
+    def _discover_location_from_site(
+        self,
+        source_url: str,
+        deadline_at: Optional[float] = None,
+    ) -> dict:
         candidates = self._site_page_candidates(source_url, _LOCATION_PAGE_PATHS)
         for url in candidates[:_LOCATION_PAGE_FETCH_LIMIT]:
+            if not self._has_budget(deadline_at, min_seconds=4.0):
+                logger.info("[extraction] Skipping optional location page probes: deadline near")
+                break
             page_text = fetch_page_content(url)
             if not page_text:
                 continue
@@ -641,6 +661,10 @@ class SupplierExtractionService:
             "food_ingredients": ["food", "ingredient", "additive"],
             "software_services": ["software", "saas", "platform", "cloud"],
             "construction_materials": ["concrete", "insulation", "building material"],
+            "office_supplies": [
+                "office furniture", "office chair", "desk", "workstation",
+                "workplace furniture", "office storage",
+            ],
         }
 
         for category, keywords in category_keywords.items():
@@ -648,6 +672,12 @@ class SupplierExtractionService:
                 return category
 
         return None
+
+    @staticmethod
+    def _has_budget(deadline_at: Optional[float], min_seconds: float) -> bool:
+        if deadline_at is None:
+            return True
+        return time.time() + min_seconds < deadline_at
 
     # Keep the old method name for backward compatibility
     def extract_from_web_result(

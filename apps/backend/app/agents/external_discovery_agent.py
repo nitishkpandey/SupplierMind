@@ -20,6 +20,7 @@ from app.utils.text_normalization import normalise_supplier_name_for_dedupe
 logger = logging.getLogger(__name__)
 
 _WEB_RESULT_CEILING = 6
+_EXTRACTION_DEADLINE_MARGIN_SECONDS = 3.0
 
 
 class ExternalDiscoveryAgent(BaseAgent):
@@ -40,6 +41,8 @@ class ExternalDiscoveryAgent(BaseAgent):
 
     def execute(self, state: AgentState) -> AgentState:
         start = time.time()
+        deadline_at = start + max(1, settings.EXTERNAL_DISCOVERY_TIMEOUT)
+        deadline_exceeded = False
 
         state.setdefault("newly_discovered_supplier_ids", [])
         state.setdefault("external_discovery_stats", {})
@@ -103,6 +106,13 @@ class ExternalDiscoveryAgent(BaseAgent):
         extracted: list[dict] = []
 
         for result in web_results:
+            if self._deadline_exceeded(deadline_at, _EXTRACTION_DEADLINE_MARGIN_SECONDS):
+                deadline_exceeded = True
+                logger.warning(
+                    "[external_discovery] Deadline reached before extracting all web candidates"
+                )
+                break
+
             # Stage 1: Cheap classification
             classification = self.extractor.stage1_classify(
                 title=result.title,
@@ -121,7 +131,10 @@ class ExternalDiscoveryAgent(BaseAgent):
             stage1_passed += 1
 
             # Stage 2: Rich extraction from full page
-            data = self.extractor.stage2_extract(url=result.url)
+            data = self.extractor.stage2_extract(
+                url=result.url,
+                deadline_at=deadline_at,
+            )
             if data:
                 extracted.append(data)
                 logger.debug("[external_discovery] Extracted: %r", data["name"])
@@ -140,6 +153,14 @@ class ExternalDiscoveryAgent(BaseAgent):
 
         with SyncSessionLocal() as db:
             for s in extracted:
+                if self._deadline_exceeded(deadline_at, _EXTRACTION_DEADLINE_MARGIN_SECONDS):
+                    deadline_exceeded = True
+                    logger.warning(
+                        "[external_discovery] Deadline reached before validating "
+                        "all extracted suppliers"
+                    )
+                    break
+
                 location = self.location_enricher.enrich(s, constraints)
                 if location is None:
                     logger.info(
@@ -200,6 +221,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             "pending_sanctions": pending_sanctions,
             "rejected_duplicates": rejected_duplicate,
             "rejected_missing_location": rejected_missing_location,
+            "deadline_exceeded": deadline_exceeded,
             "ingested": len(newly_added_ids),
         }
 
@@ -216,7 +238,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                 f"extracted={len(extracted)}, validated={len(validated)}, "
                 f"ingested={len(newly_added_ids)}, "
                 f"rejected_sanctions={rejected_sanctions}, pending_sanctions={pending_sanctions}, "
-                f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}"
+                f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}, "
+                f"deadline_exceeded={deadline_exceeded}"
             ),
             duration_ms=duration_ms,
             reasoning=(
@@ -226,6 +249,10 @@ class ExternalDiscoveryAgent(BaseAgent):
         )
 
         return state
+
+    @staticmethod
+    def _deadline_exceeded(deadline_at: float, margin_seconds: float = 0.0) -> bool:
+        return time.time() + margin_seconds >= deadline_at
 
     @staticmethod
     def _apply_verified_location(supplier: dict, location: VerifiedLocation) -> None:
