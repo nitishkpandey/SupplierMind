@@ -615,6 +615,83 @@ def _raw_query_mentions_any(raw_query: str, values: list[object]) -> bool:
     return False
 
 
+def _same_place_text(left: object, right: object) -> bool:
+    left_text = _clean_optional_text(left)
+    right_text = _clean_optional_text(right)
+    return bool(left_text and right_text and left_text.casefold() == right_text.casefold())
+
+
+def _geocode_step_applies(
+    *,
+    step: dict,
+    raw_query: str,
+    prior_partial: Optional[dict],
+) -> bool:
+    obs = step.get("observation") or {}
+    if step.get("action") != "geocode_location" or not obs.get("found"):
+        return False
+    action_name = (step.get("action_input") or {}).get("location_name")
+    if _raw_query_mentions_any(
+        raw_query,
+        [obs.get("city"), obs.get("country"), obs.get("region"), action_name],
+    ):
+        return True
+    return any(
+        (prior_partial or {}).get(k)
+        for k in ("location_city", "location_country", "location_region")
+    )
+
+
+def _merge_geocode_location_observations(
+    raw: dict,
+    trace: list[dict],
+    raw_query: str,
+    prior_partial: Optional[dict],
+) -> None:
+    """Use geocode observations to correct city/country fields before search.
+
+    The LLM can misbucket one-word city names as countries. The geocoder is a
+    stronger source for address parts, so normalized constraints should follow
+    its city/country split whenever the observation belongs to this query.
+    """
+    for step in trace:
+        if not _geocode_step_applies(
+            step=step,
+            raw_query=raw_query,
+            prior_partial=prior_partial,
+        ):
+            continue
+        obs = step.get("observation") or {}
+        action_name = (step.get("action_input") or {}).get("location_name")
+        obs_city = _clean_optional_text(obs.get("city"))
+        obs_country = _clean_optional_text(obs.get("country"))
+        obs_region = _clean_optional_text(obs.get("region"))
+        raw_city = _clean_optional_text(raw.get("location_city"))
+        raw_country = _clean_optional_text(raw.get("location_country"))
+
+        if obs_city and obs_country:
+            if not raw_city or _same_place_text(raw_country, obs_city):
+                raw["location_city"] = obs_city
+            if (
+                not raw_country
+                or _same_place_text(raw_country, obs_city)
+                or _same_place_text(raw_country, action_name)
+            ):
+                raw["location_country"] = obs_country
+        elif obs_region and obs_country:
+            if not raw.get("location_region"):
+                raw["location_region"] = obs_region
+            if (
+                not raw_country
+                or _same_place_text(raw_country, obs_region)
+                or _same_place_text(raw_country, action_name)
+            ):
+                raw["location_country"] = obs_country
+
+        if obs_region and not raw.get("location_region"):
+            raw["location_region"] = obs_region
+
+
 def _clean_optional_text(value: object) -> Optional[str]:
     """Convert common LLM null sentinels into real None values."""
     if not isinstance(value, str):
@@ -1789,19 +1866,10 @@ class ParserAgent(BaseAgent):
             for step in trace:
                 if step.get("action") == "geocode_location":
                     obs = step.get("observation") or {}
-                    if obs.get("found") and (
-                        _raw_query_mentions_any(
-                            raw_query,
-                            [
-                                obs.get("city"),
-                                obs.get("country"),
-                                (step.get("action_input") or {}).get("location_name"),
-                            ],
-                        )
-                        or any(
-                            (prior_partial or {}).get(k)
-                            for k in ("location_city", "location_country", "location_region")
-                        )
+                    if _geocode_step_applies(
+                        step=step,
+                        raw_query=raw_query,
+                        prior_partial=prior_partial,
                     ):
                         raw.setdefault("location_lat", obs.get("lat"))
                         raw.setdefault("location_lng", obs.get("lng"))
@@ -1809,6 +1877,9 @@ class ParserAgent(BaseAgent):
                         raw.setdefault(
                             "location_country", raw.get("location_country") or obs.get("country")
                         )
+                        raw.setdefault("location_region", raw.get("location_region") or obs.get("region"))
+
+        _merge_geocode_location_observations(raw, trace, raw_query, prior_partial)
 
         # Same trick for canonicalize_certification: if the LLM kept the raw
         # cert name but the canonical key is known, swap to canonical.

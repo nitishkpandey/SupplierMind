@@ -14,9 +14,11 @@ Usage:
     # Optional: --force-pg to re-check/insert missing Postgres rows even if a checkpoint exists
     # Optional: --skip-pg if Postgres rows already inserted
     # Optional: --resume to continue from checkpoint
+    # Optional: --reset-milvus to drop/rebuild the Milvus supplier index
     # Optional: --input <path> to use a different JSON file
 
-Idempotency: rows already in Postgres (matched by id) are skipped.
+Idempotency: rows already in Postgres (matched by id) are repaired if a
+             previous seed run left them inactive or misclassified.
              Milvus phase processes only ids that are not yet indexed
              (according to the checkpoint).
 """
@@ -34,14 +36,15 @@ from pathlib import Path
 # Make ``app`` importable when invoked from /backend.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import or_, select, update  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.vector_store import (  # noqa: E402
+    COLLECTION_NAME,
     create_vector_store,
     set_vector_store_instance,
 )
-from app.db.models import Supplier  # noqa: E402
+from app.db.models import Supplier, SupplierStatus  # noqa: E402
 from app.db.session import SyncSessionLocal  # noqa: E402
 
 logging.basicConfig(
@@ -92,6 +95,31 @@ def _save_checkpoint(cp: dict) -> None:
         json.dump(cp, f, indent=2)
 
 
+def _milvus_entity_count() -> int:
+    """Return current supplier-vector count, or -1 if Milvus is unavailable."""
+    try:
+        return create_vector_store().count()
+    except Exception as e:
+        logger.error("Could not query Milvus: %s", e)
+        return -1
+
+
+def _drop_milvus_collection() -> None:
+    """Drop only the supplier vector collection; Postgres data is untouched."""
+    from pymilvus import connections, utility
+
+    connections.connect(
+        alias="default",
+        host=settings.MILVUS_HOST,
+        port=settings.MILVUS_PORT,
+    )
+    if utility.has_collection(COLLECTION_NAME):
+        utility.drop_collection(COLLECTION_NAME)
+        logger.warning("Dropped Milvus collection %r for a clean rebuild", COLLECTION_NAME)
+    else:
+        logger.info("Milvus collection %r did not exist; rebuild will create it", COLLECTION_NAME)
+
+
 def _supplier_from_raw(raw: dict) -> Supplier:
     """Build a Supplier ORM row from the synthetic JSON record."""
     return Supplier(
@@ -122,11 +150,12 @@ def _supplier_from_raw(raw: dict) -> Supplier:
 def phase_postgres(records: list[dict]) -> int:
     """Insert records into Postgres in batches of PG_BATCH.
 
-    Idempotent: rows whose id already exists are skipped.
+    Idempotent: rows whose id already exists are repaired and skipped.
     Returns the count of newly inserted rows.
     """
     inserted = 0
     skipped = 0
+    repaired = 0
     failed = 0
     start = time.time()
 
@@ -142,6 +171,25 @@ def phase_postgres(records: list[dict]) -> int:
 
             to_insert = [r for r in batch if uuid.UUID(r["id"]) not in existing_ids]
             skipped += len(batch) - len(to_insert)
+            if existing_ids:
+                repair_result = db.execute(
+                    update(Supplier)
+                    .where(Supplier.id.in_(existing_ids))
+                    .where(Supplier.status != SupplierStatus.rejected)
+                    .where(
+                        or_(
+                            Supplier.is_active.is_(False),
+                            Supplier.source != "synthetic_10k",
+                            Supplier.status != SupplierStatus.approved,
+                        )
+                    )
+                    .values(
+                        is_active=True,
+                        source="synthetic_10k",
+                        status=SupplierStatus.approved,
+                    )
+                )
+                repaired += repair_result.rowcount or 0
 
             for raw in to_insert:
                 try:
@@ -160,14 +208,14 @@ def phase_postgres(records: list[dict]) -> int:
 
         if (batch_start // PG_BATCH) % 5 == 0:
             logger.info(
-                "Postgres progress: %d/%d (inserted=%d, skipped=%d, failed=%d)",
-                batch_start + len(batch), len(records), inserted, skipped, failed,
+                "Postgres progress: %d/%d (inserted=%d, skipped=%d, repaired=%d, failed=%d)",
+                batch_start + len(batch), len(records), inserted, skipped, repaired, failed,
             )
 
     elapsed = time.time() - start
     logger.info(
-        "Postgres phase complete: inserted=%d skipped=%d failed=%d (%.1fs)",
-        inserted, skipped, failed, elapsed,
+        "Postgres phase complete: inserted=%d skipped=%d repaired=%d failed=%d (%.1fs)",
+        inserted, skipped, repaired, failed, elapsed,
     )
     return inserted
 
@@ -242,10 +290,21 @@ def verify(records: list[dict]) -> None:
     with SyncSessionLocal() as db:
         from sqlalchemy import func
         pg_total = db.execute(select(func.count()).select_from(Supplier)).scalar_one()
+        pg_active = db.execute(
+            select(func.count())
+            .select_from(Supplier)
+            .where(Supplier.is_active.is_(True))
+        ).scalar_one()
         pg_approved = db.execute(
             select(func.count())
             .select_from(Supplier)
             .where(Supplier.status == "approved")
+        ).scalar_one()
+        pg_synthetic_active = db.execute(
+            select(func.count())
+            .select_from(Supplier)
+            .where(Supplier.source == "synthetic_10k")
+            .where(Supplier.is_active.is_(True))
         ).scalar_one()
         pg_by_category = db.execute(
             select(Supplier.category, func.count())
@@ -263,9 +322,11 @@ def verify(records: list[dict]) -> None:
     print("\n========== VERIFICATION ==========")
     print(f"Records in JSON   : {len(records)}")
     print(f"Postgres total    : {pg_total}")
+    print(f"Postgres active   : {pg_active}")
     print(f"Postgres approved : {pg_approved}")
+    print(f"Synthetic active  : {pg_synthetic_active}")
     print(f"Milvus entities   : {milvus_count}")
-    print(f"\nNew synthetic rows by category:")
+    print("\nNew synthetic rows by category:")
     for cat, n in sorted(pg_by_category, key=lambda x: -x[1]):
         print(f"  {cat:<28} {n:>6}")
     print("==================================\n")
@@ -298,6 +359,14 @@ def main() -> None:
         help="Resume Milvus phase from checkpoint instead of starting from 0.",
     )
     parser.add_argument(
+        "--reset-milvus",
+        action="store_true",
+        help=(
+            "Drop and rebuild the Milvus supplier index from row 0. "
+            "Postgres rows are not modified."
+        ),
+    )
+    parser.add_argument(
         "--verify-only",
         action="store_true",
         help="Print PG + Milvus counts and exit.",
@@ -326,9 +395,26 @@ def main() -> None:
     if args.skip_milvus:
         logger.info("Skipping Milvus phase (--skip-milvus).")
     else:
+        if args.reset_milvus:
+            _drop_milvus_collection()
+            checkpoint["milvus_next_index"] = 0
+            _save_checkpoint(checkpoint)
+
         start_index = checkpoint.get("milvus_next_index", 0) if args.resume else 0
         if start_index >= len(records):
-            logger.info("Milvus phase already complete (checkpoint at end).")
+            indexed_count = _milvus_entity_count()
+            if indexed_count < len(records):
+                raise SystemExit(
+                    "Milvus checkpoint says indexing is complete, but the live "
+                    f"collection has only {indexed_count}/{len(records)} entities. "
+                    "Run with --skip-pg --reset-milvus to rebuild the semantic index."
+                )
+            logger.info("Milvus phase already complete (checkpoint and collection agree).")
+        elif args.resume and _milvus_entity_count() < start_index:
+            raise SystemExit(
+                "Milvus checkpoint is ahead of the live collection. "
+                "Run with --skip-pg --reset-milvus to rebuild the semantic index."
+            )
         else:
             if start_index > 0:
                 logger.info("Resuming Milvus phase from index %d", start_index)

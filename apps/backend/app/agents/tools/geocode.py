@@ -31,6 +31,21 @@ def _run(location_name: str, *, _geocoder: GeocodingService | None = None) -> di
         return {"found": False, "reason": "empty location_name"}
 
     geocoder = _geocoder or GeocodingService()
+    geocode_details = getattr(geocoder, "geocode_details", None)
+    if callable(geocode_details):
+        result = geocode_details(name)
+        if not result:
+            return {"found": False, "reason": f"no geocode result for {name!r}"}
+        return {
+            "found": True,
+            "lat": result.lat,
+            "lng": result.lng,
+            "city": result.city,
+            "country": result.country,
+            "region": result.region,
+            "display_name": result.display_name,
+        }
+
     coords = geocoder.geocode(name)
     if not coords:
         return {"found": False, "reason": f"no geocode result for {name!r}"}

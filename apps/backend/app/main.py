@@ -180,8 +180,9 @@ def _log_supplier_index_health(indexed_count: int) -> None:
     if active_count and indexed_count < active_count:
         logger.warning(
             "Supplier vector index is incomplete: %d indexed vs %d active in Postgres. "
-            "Run `uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume` "
-            "from apps/backend to continue indexing.",
+            "From apps/backend, run `uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume` "
+            "when the checkpoint is valid, or `uv run python scripts/bulk_ingest_synthetic.py "
+            "--skip-pg --reset-milvus` if the importer reports a stale checkpoint.",
             indexed_count,
             active_count,
         )

@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 MIN_RESULTS = 5
 MAX_RETRIES = 3
 RRF_K = 60
+CANDIDATE_HANDOFF_LIMIT = 25
+PROTECTED_CHANNEL_LIMIT = 10
 
 # Parser categories that are valid procurement concepts but absent from the
 # current synthetic SupplierBench corpus. Expand them to nearby corpus
@@ -153,34 +155,53 @@ class DiscoveryAgent(BaseAgent):
                 category = constraints.get("category_hint")
                 category_values = self._category_filter_values(category)
                 country = self._extract_country_from_constraints(constraints)
+                city = self._extract_city_from_constraints(constraints)
                 certs = constraints.get("certifications")
                 product_terms = self._product_keyword_terms(constraints)
 
-                has_structured_filters = bool(category_values or country or certs or product_terms)
+                has_structured_filters = bool(category_values or country or city or certs or product_terms)
                 structured = []
                 if has_structured_filters:
-                    query = self._build_structured_query(
-                        scope_filter=scope_filter,
-                        category_values=category_values,
-                        country=country,
-                        certs=certs,
-                        product_terms=product_terms,
+                    def fetch_structured(
+                        *,
+                        city_filter: str | None,
+                        keyword_terms: list[str],
+                    ) -> list[Supplier]:
+                        query = self._build_structured_query(
+                            scope_filter=scope_filter,
+                            category_values=category_values,
+                            country=country,
+                            city=city_filter,
+                            certs=certs,
+                            product_terms=keyword_terms,
+                        )
+                        return list(db.execute(query.limit(20)).scalars().all())
+
+                    structured = fetch_structured(
+                        city_filter=city,
+                        keyword_terms=product_terms,
                     )
-                    structured = db.execute(query.limit(20)).scalars().all()
+
+                    if not structured and city:
+                        structured = fetch_structured(
+                            city_filter=None,
+                            keyword_terms=product_terms,
+                        )
 
                     if (
                         not structured
                         and len(category_values) > 1
                         and product_terms
                     ):
-                        query = self._build_structured_query(
-                            scope_filter=scope_filter,
-                            category_values=category_values,
-                            country=country,
-                            certs=certs,
-                            product_terms=[],
+                        structured = fetch_structured(
+                            city_filter=city,
+                            keyword_terms=[],
                         )
-                        structured = db.execute(query.limit(20)).scalars().all()
+                        if not structured and city:
+                            structured = fetch_structured(
+                                city_filter=None,
+                                keyword_terms=[],
+                            )
                 structured_ranked = {str(s.id): i + 1 for i, s in enumerate(structured)}
                 logger.debug("[discovery] Structured filter: %d results", len(structured))
 
@@ -307,9 +328,16 @@ class DiscoveryAgent(BaseAgent):
                 )
 
         # ── Final state ───────────────────────────────────────────────
-        state["candidate_supplier_ids"] = candidate_ids[:10]
-        state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in candidate_ids}
-        state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in candidate_ids}
+        selected_candidate_ids = self._candidate_handoff_ids(
+            rrf_sorted_ids=candidate_ids,
+            structured_ranked=structured_ranked,
+            fresh_ranked=fresh_ranked,
+            geo_ranked=geo_ranked,
+            semantic_ranked=semantic_ranked,
+        )
+        state["candidate_supplier_ids"] = selected_candidate_ids
+        state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in selected_candidate_ids}
+        state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in selected_candidate_ids}
         state["tier_assignments"] = tier_assignments
         state["retry_count"] = retry_count
 
@@ -347,6 +375,40 @@ class DiscoveryAgent(BaseAgent):
 
         valid = self._filter_ids_by_scope(db, ordered, scope, user_id, exclude_pending)
         return [sid for sid in ordered if sid in valid]
+
+    @staticmethod
+    def _candidate_handoff_ids(
+        *,
+        rrf_sorted_ids: list[str],
+        structured_ranked: dict[str, int],
+        fresh_ranked: dict[str, int],
+        geo_ranked: dict[str, int],
+        semantic_ranked: dict[str, int],
+    ) -> list[str]:
+        """Return a balanced downstream candidate pool.
+
+        A partial vector index can produce stale semantic matches. Protecting
+        high-intent channels prevents exact SQL, geo, and fresh web candidates
+        from being crowded out before compliance/ranking can score them.
+        """
+        selected: list[str] = []
+        seen: set[str] = set()
+
+        def add(ids: list[str], limit: int | None = None) -> None:
+            for sid in ids[:limit]:
+                if len(selected) >= CANDIDATE_HANDOFF_LIMIT:
+                    return
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                selected.append(sid)
+
+        add(list(fresh_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(geo_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(structured_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(semantic_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(rrf_sorted_ids)
+        return selected[:CANDIDATE_HANDOFF_LIMIT]
 
     def _filter_ids_by_scope(
         self, db, sids: list[str], scope: str, user_id: str, exclude_pending: bool = False
@@ -418,6 +480,7 @@ class DiscoveryAgent(BaseAgent):
         scope_filter,
         category_values: list[str],
         country: str | None,
+        city: str | None,
         certs: list[str] | None,
         product_terms: list[str],
     ):
@@ -427,6 +490,8 @@ class DiscoveryAgent(BaseAgent):
             query = query.where(Supplier.category.in_(category_values))
         if country:
             query = query.where(Supplier.country == country)
+        if city:
+            query = query.where(Supplier.city.ilike(city))
         if certs:
             for c in certs:
                 cert_filters = [
@@ -499,6 +564,18 @@ class DiscoveryAgent(BaseAgent):
             seen.add(key)
             output.append(value)
         return output
+
+    @staticmethod
+    def _extract_city_from_constraints(constraints: dict) -> str | None:
+        if constraints.get("location_radius_km"):
+            return None
+        city = constraints.get("location_city")
+        if not isinstance(city, str) or not city.strip():
+            return None
+        country = constraints.get("location_country")
+        if isinstance(country, str) and city.strip().casefold() == country.strip().casefold():
+            return None
+        return city.strip()
 
     def _decide_relaxation(
         self,

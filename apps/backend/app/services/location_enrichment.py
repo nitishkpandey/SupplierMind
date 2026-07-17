@@ -290,6 +290,7 @@ class GeoapifyLocationService:
         if (
             requested_city
             and not constraints.get("location_radius_km")
+            and not _is_region_filter(requested_city)
             and _normalize_location_name(location.city) != _normalize_location_name(requested_city)
         ):
             return False
@@ -318,6 +319,10 @@ def _normalize_location_name(value: str) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return " ".join(re.findall(r"[a-z0-9]+", text.casefold()))
+
+
+def _is_region_filter(value: str) -> bool:
+    return bool(clean_optional_text(value)) and value.casefold() in _LOCATION_RECTS
 
 
 def _significant_name_tokens(value: str) -> set[str]:
