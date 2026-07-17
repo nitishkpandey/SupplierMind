@@ -1,6 +1,6 @@
 # SupplierMind Supplier Discovery System
 
-Last updated: 2026-07-08
+Last updated: 2026-07-17
 
 This document explains the current SupplierMind supplier discovery system as implemented in this repository. It is written for thesis, product, and engineering use. All implementation details here are grounded in the current codebase. When a behavior is not implemented yet, it is marked explicitly.
 
@@ -861,7 +861,11 @@ Signals:
 - Fresh external rank.
 - Geospatial rank.
 
-The top 10 candidate IDs are passed to compliance.
+The discovery agent now uses a balanced handoff instead of a pure top-10 RRF
+cut. Fresh web, geospatial, structured SQL, and semantic candidates each get
+protected slots before the remaining RRF ordering fills the downstream pool.
+This prevents a stale or partial vector index from crowding exact SQL or fresh
+web matches out before compliance and ranking can score them.
 
 ### Discovery Retry And Relaxation
 
@@ -1590,6 +1594,20 @@ Many real variants are supported, but unknown or niche certifications may need t
 ### 7. Corpus Gaps Still Matter
 
 Internal search quality depends on supplier data quality, category coverage, structured fields, and Milvus index freshness.
+
+If PostgreSQL has more active suppliers than Milvus has supplier vectors,
+the dashboard shows `reindex needed`, backend startup logs the mismatch, and
+semantic retrieval is degraded. Structured SQL and fresh web carry-forward
+still work, but the full semantic path should be rebuilt with:
+
+```bash
+cd apps/backend
+uv run python scripts/bulk_ingest_synthetic.py --skip-pg --reset-milvus
+```
+
+That command drops and rebuilds only the supplier vector collection. It does
+not delete PostgreSQL suppliers, but it does call the embedding provider for
+the full synthetic corpus.
 
 ### 8. History Shows Final Results, Not Full Candidate Funnel
 

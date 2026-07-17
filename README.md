@@ -108,6 +108,9 @@ uv run python scripts/bulk_ingest_synthetic.py --force-pg --skip-milvus
 # Optional: build/rebuild the full semantic Milvus index.
 # This calls the embedding provider and can take a long time on free tiers.
 uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume
+# If the checkpoint says complete but Milvus has fewer entities than Postgres,
+# rebuild the supplier collection from scratch:
+uv run python scripts/bulk_ingest_synthetic.py --skip-pg --reset-milvus
 uv run uvicorn app.main:app --reload --port 8000
 
 # 5. Frontend (separate terminal)
@@ -191,5 +194,6 @@ Link to the thesis document: _placeholder — added on submission._
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the five agents, data flow, three-tier governance, audit log
 - [BENCHMARK.md](BENCHMARK.md) — SupplierBench-25, metrics, end-to-end reproduction
+- [docs/agentic-e2e-test-plan.md](docs/agentic-e2e-test-plan.md) — 25-query acceptance matrix for agentic behavior, retrieval, web discovery, compliance, and known index health checks
 - [CONTRIBUTING.md](CONTRIBUTING.md) — code style, tests, commit conventions
 - [LICENSE](LICENSE) — MIT
