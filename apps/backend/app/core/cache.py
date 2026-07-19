@@ -1,9 +1,8 @@
-"""
-app/core/cache.py — Redis cache with in-memory fallback.
+"""Redis-compatible async cache abstraction with in-memory fallback.
 
 USAGE:
     from app.core.cache import get_cache
-    cache = await get_cache()
+    cache = get_cache()
 
     await cache.set("my_key", "my_value", ttl=3600)  # expires in 1 hour
     value = await cache.get("my_key")                # returns "my_value" or None
@@ -14,7 +13,6 @@ import json
 import logging
 import time
 from abc import ABC, abstractmethod
-from functools import lru_cache
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -45,13 +43,7 @@ class BaseCache(ABC):
 
 
 class InMemoryCache(BaseCache):
-    """
-    Simple in-memory cache with TTL support.
-    Used as fallback when Redis is unavailable or in LITE_MODE.
-
-    NOT suitable for production (no persistence, no shared state
-    across multiple server instances). Fine for thesis prototype.
-    """
+    """Process-local cache used when Redis is unavailable or LITE_MODE is on."""
 
     def __init__(self) -> None:
         # {key: (value, expiry_timestamp)}
@@ -82,10 +74,7 @@ class InMemoryCache(BaseCache):
 
 
 class RedisCache(BaseCache):
-    """
-    Redis-backed cache. Survives server restarts and is
-    shared across multiple processes.
-    """
+    """Redis-backed cache shared across backend processes."""
 
     def __init__(self, redis_client: Any) -> None:
         self._redis = redis_client
@@ -118,16 +107,6 @@ class RedisCache(BaseCache):
             return bool(await self._redis.exists(key))
         except Exception:
             return False
-
-
-# TTL constants — all in seconds
-class TTL:
-    """Centralised TTL values. Change once, applies everywhere."""
-    LLM_RESPONSE = 3600        # 1 hour — LLM responses for same input
-    EMBEDDING = 604800         # 7 days — embeddings rarely change
-    GEOCODE = 2592000          # 30 days — city coordinates don't change
-    AUTH_REFRESH_TOKEN = 604800  # 7 days — matches JWT refresh expiry
-    QUERY_RESULT = 1800        # 30 minutes — cached query results
 
 
 # Module-level cache instance (initialized in main.py lifespan)

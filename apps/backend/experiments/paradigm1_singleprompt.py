@@ -1,4 +1,4 @@
-"""Paradigm 1 — single-prompt LLM baseline (Development Plan, Phase 2).
+"""Paradigm 1 — single-prompt LLM baseline.
 
 ONE prompt, NO corpus access, NO tools, NO retrieval. The model answers the
 procurement query from parametric knowledge alone. This is the deliberate

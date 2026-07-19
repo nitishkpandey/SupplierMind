@@ -1,12 +1,4 @@
-"""
-app/main.py — FastAPI application factory. (Phase 1 update)
-
-Changes from Phase 0:
-- Added vector store initialization at startup
-- Added Redis cache initialization
-- Added auth router
-- Replaced print() with proper logging (fixes Windows cp1252 encoding)
-"""
+"""FastAPI application factory and service startup wiring."""
 
 import logging
 import sys
@@ -61,7 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
     logger.info("LLM model   : %s (pinned snapshot, cost-table OK)", _model)
 
-    # Initialize cache
+    # Initialize the shared async cache abstraction used by runtime utilities.
     from app.core.cache import InMemoryCache, RedisCache, set_cache_instance
     if settings.LITE_MODE:
         set_cache_instance(InMemoryCache())
@@ -86,7 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         _log_supplier_index_health(indexed_count)
     except Exception as e:
         logger.warning("Vector store unavailable at startup: %s", e)
-        logger.warning("Run ingestion after starting: python scripts/ingest_suppliers.py")
+        logger.warning("Run ingestion after starting: uv run python scripts/ingest_suppliers.py")
 
     logger.info("API docs available at: http://localhost:8000/docs")
 

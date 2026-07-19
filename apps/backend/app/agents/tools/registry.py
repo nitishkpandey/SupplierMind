@@ -1,4 +1,4 @@
-"""Tool registry pattern for the ReAct Parser (Task 3.1).
+"""Tool registry pattern for the ReAct Parser.
 
 A Tool is a side-effect-free callable plus its self-description for the LLM
 (name, prose description, JSON-schema for arguments). The ToolRegistry holds
@@ -71,21 +71,21 @@ class ToolRegistry:
 
 
 def build_default_registry() -> ToolRegistry:
-    """Wire the five standard Parser tools — no user context (stub memory).
+    """Wire the five standard Parser tools without user-specific memory.
 
     Kept here (not in __init__) so callers that need an empty registry for
     tests can construct one without triggering the imports of every tool
     module (some pull in services that touch the network on import).
 
-    The `lookup_past_query` tool wired in here is the no-op stub. Production
+    The `lookup_past_query` tool wired here is the no-op fallback. Production
     paths route through `build_user_registry()` which binds a real memory
-    service to the request's `user_id` (Task 3.2 / Component C).
+    service to the request's `user_id`.
     """
-    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.industry_context import infer_industry_context_tool
-    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.agents.tools.past_query_stub import lookup_past_query_tool
+    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
 
     reg = ToolRegistry()
     reg.register(geocode_location_tool())
@@ -104,7 +104,7 @@ def build_user_registry(
 ) -> ToolRegistry:
     """Wire the five Parser tools with a real, per-user `lookup_past_query`.
 
-    Task 3.2: the Parser is user-scoped at construction. `current_user_id` is
+    The Parser is user-scoped at construction. `current_user_id` is
     closure-bound on the lookup tool so the LLM cannot search another user's
     memory regardless of the Action Input it emits.
 
@@ -113,14 +113,14 @@ def build_user_registry(
     conservative; the live demo uses a lower value while the threshold is
     being tuned against real query distributions.
     """
-    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.industry_context import infer_industry_context_tool
-    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.agents.tools.past_query import (
         _DEFAULT_MIN_SIMILARITY,
         make_lookup_past_query_tool,
     )
+    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.services.query_memory import get_memory_service
 
     svc = memory_service if memory_service is not None else get_memory_service()

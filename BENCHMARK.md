@@ -16,6 +16,10 @@ reproduce it end-to-end from a clean checkout.
 - **Cert prevalence** differs between corpora by design — measured in
   `results/diagnostics/cert_prevalence.csv` — the 10K corpus is cert-sparser, i.e.
   the harder one.
+- **Evaluation corpus guard**: runtime benchmark code filters P1/P2/P3 and SQL
+  baselines to the curated 100 supplier IDs from
+  `apps/backend/data/suppliers_synthetic.json`. This protects thesis metrics
+  when the product database also contains the 10k scale set.
 
 ## Systems under test
 
@@ -30,7 +34,7 @@ reproduce it end-to-end from a clean checkout.
 All LLM-bearing systems run on the same provider (OpenAI
 `gpt-4o-mini-2024-07-18`, pinned — see `apps/backend/app/core/llm.py`). The
 `benchmark-final-v1` run was executed with a Groq fallback armed; Groq was
-removed afterwards in Phase C (ADR-002), which does not change the locked
+removed afterwards (ADR-002), which does not change the locked
 numbers.
 
 ## Metrics
@@ -48,7 +52,7 @@ numbers.
 | Component | Model | Notes |
 |---|---|---|
 | Primary LLM | `gpt-4o-mini-2024-07-18` (OpenAI) | pinned snapshot for reproducibility (see `docs/adr/ADR-001-model-pinning.md`) |
-| Fallback LLM (historical) | `llama-3.1-8b-instant` (Groq) | armed during the `benchmark-final-v1` run; **removed afterwards in Phase C (ADR-002)** — no fallback now. Groq-era archive in `results/groq_baseline_v0/` |
+| Fallback LLM (historical) | `llama-3.1-8b-instant` (Groq) | armed during the `benchmark-final-v1` run; **removed afterwards (ADR-002)** — no fallback now. Groq-era archive in `results/groq_baseline_v0/` |
 | Embeddings | `voyage-3-lite` (512-dim) | both retrieval and query memory |
 
 All prompts are versioned in the repository (no out-of-band prompt edits):

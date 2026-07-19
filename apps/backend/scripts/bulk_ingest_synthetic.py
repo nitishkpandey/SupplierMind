@@ -4,7 +4,7 @@ Bulk-load `suppliers_synthetic_10k.json` into Postgres + Milvus.
 
 Two-phase ingestion (separate so embedding failure doesn't lose PG data):
   Phase 1  Insert all rows into Postgres (sync, batches of 500).
-  Phase 2  Embed via Voyage (batches of 128, 20s sleep ≥ 3 RPM) and
+  Phase 2  Embed via Voyage (batches of 80, 55s sleep for free-tier safety) and
            insert vectors into Milvus. Checkpointed to a JSON file so
            interruptions resume cleanly.
 

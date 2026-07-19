@@ -110,9 +110,9 @@ class Supplier(Base):
     contact_email: Mapped[Optional[str]] = mapped_column(String(255))
     embedding_id: Mapped[Optional[str]] = mapped_column(String(255))
     source: Mapped[Optional[str]] = mapped_column(String(50), default="manual")
-    # source values: "manual" | "web_discovery" | "imported"
+    # Typical provenance values: manual, web_discovery, imported, synthetic_10k.
 
-    # ── Production v2: tier classification ─────────────────────────
+    # ── Supplier governance status ─────────────────────────────────
     status: Mapped[SupplierStatus] = mapped_column(
         SAEnum(SupplierStatus, name="supplierstatus"),
         default=SupplierStatus.approved,
@@ -135,7 +135,7 @@ class Supplier(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # HITL approval rationale (Task 2.4). Captured every time an admin
+    # HITL approval rationale. Captured every time an admin
     # promotes (approves) or removes (rejects) a supplier — the *why*
     # behind the human decision, persisted next to who+when.
     approval_justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -352,7 +352,7 @@ class AuditLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    # Nullable because human-admin entries (Task 2.4) are not query-scoped.
+    # Nullable because human-admin entries are not query-scoped.
     # Agent rows still set query_id; human_admin rows leave it NULL.
     query_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=True
@@ -378,7 +378,7 @@ class AuditLog(Base):
 # ── PendingClarification ──────────────────────────────────────────────
 class PendingClarification(Base):
     """
-    Task 3.3 — Pause-and-resume state for multi-turn clarification dialogues.
+    Pause-and-resume state for multi-turn clarification dialogues.
 
     One row per open clarification (resolved_at IS NULL). When the Parser
     decides a query is too ambiguous to proceed, the orchestrator persists

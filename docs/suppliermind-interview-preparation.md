@@ -170,12 +170,12 @@ flowchart LR
     subgraph Stores
         PG["PostgreSQL"]
         MV["Milvus"]
-        REDIS["Redis"]
+        REDIS["Redis-compatible cache"]
     end
 
     D --> PG
     D --> MV
-    Q --> REDIS
+    API["Backend runtime"] --> REDIS
 ```
 
 ---
@@ -256,7 +256,7 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Alembic | Database migrations. |
 | PostgreSQL | Relational source of truth. |
 | PostGIS | Geospatial/radius search support. |
-| Redis | Cache and lightweight runtime support. |
+| Redis | Shared async cache abstraction and lightweight runtime support. |
 | LangGraph | Stateful multi-agent orchestration. |
 | OpenAI GPT-4o-mini pinned snapshot | LLM reasoning, extraction, and evaluation. |
 | Voyage AI embeddings | Semantic embeddings. |
@@ -295,6 +295,18 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Bootstrap CIs | Gives uncertainty ranges for benchmark metrics. |
 | Output gallery | Side-by-side qualitative comparison. |
 
+### Product And Thesis Branch Intent
+
+SupplierMind is maintained for two related use cases:
+
+| Use Case | What It Optimizes For | Data Mode |
+|---|---|---|
+| Production/product branch | Product-quality supplier discovery, human review, approval workflow, and 10k+ supplier search | Full active supplier database plus eligible pending-review web discoveries |
+| Master's thesis branch | Reproducible P1/P2/P3 evaluation and reporting | Frozen curated SupplierBench supplier IDs |
+
+The evaluation code now explicitly filters benchmark retrieval to the curated
+SupplierBench IDs, so product-scale data does not contaminate thesis metrics.
+
 ---
 
 ## 4. Data Engineering, Software Engineering, And AI/ML Concepts Used
@@ -312,7 +324,7 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Data quality gates | Reject web suppliers without verified city/country/coordinates | Prevents dirty supplier records from polluting search results. | Allow all extracted suppliers and mark confidence later. |
 | Data lineage and audit logs | Every agent stores reasoning, input/output snapshots, duration | Procurement decisions need explainability and traceability. | Application logs only, no structured audit table. |
 | Human-in-the-loop curation | Pending-review suppliers need approval/rejection | Prevents unverified web data from becoming company-approved supplier data. | Fully automatic ingestion, admin-only manual CSV import. |
-| Benchmark data control | Curated-100 corpus, inactive quarantine of 10k scale data | Makes thesis evaluation reproducible and avoids contamination. | Evaluate on full dynamic production data, but less reproducible. |
+| Benchmark data control | Curated-100 allowlist for thesis evaluation; 10k scale set for product search | Makes thesis evaluation reproducible while preserving product-scale discovery. | Evaluate on full dynamic production data, but less reproducible. |
 | Soft delete / active flag | `is_active` controls benchmark and search eligibility | Keeps data reversible and auditable. | Hard delete rows, separate archive database. |
 
 ### Software Engineering Concepts
@@ -549,7 +561,7 @@ SupplierMind is not trying to beat enterprise platforms on proprietary data size
 
 4. **Location validation was necessary**
    - Without validation, suppliers could appear with missing or wrong locations.
-   - Geoapify/Nominatim style geocoding introduced latency and failure cases.
+   - Geoapify geocoding and places validation introduced latency and failure cases.
 
 5. **Compliance evidence was difficult**
    - It is easy for an LLM to say a supplier matches.

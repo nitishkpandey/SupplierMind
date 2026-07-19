@@ -75,8 +75,8 @@ def create_access_token(
 def create_refresh_token(subject: str) -> str:
     """
     Create a refresh token.
-    Contains only the user ID — minimal data for security.
-    Stored in Redis server-side (can be invalidated on logout).
+    Contains only the user ID and expiry; the current implementation validates
+    it statelessly as a signed JWT.
     """
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)

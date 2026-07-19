@@ -1,8 +1,7 @@
 # Three-Paradigm Benchmark Experiments
 
-Phase 2 of the Development Plan (10 June 2026). Three paradigms answer the
-same SupplierBench-25 queries; the comparison is the core empirical
-contribution of the thesis.
+Three paradigms answer the same SupplierBench-25 queries; the comparison is
+the core empirical contribution of the thesis.
 
 | Paradigm | What it is | Code |
 |---|---|---|
@@ -11,7 +10,7 @@ contribution of the thesis.
 | P3 | SupplierMind multi-agent system | the application (`app/`) |
 
 All three run on OpenAI gpt-4o-mini-2024-07-18 via `app/core/llm.py`
-and emit the same output shape
+and are scored against the curated SupplierBench supplier IDs. They emit the same output shape
 (`ParadigmResult`): top-5 supplier names + ids + per-pick reasoning + latency.
 
 ## Design decisions (deliberate, documented for the thesis)

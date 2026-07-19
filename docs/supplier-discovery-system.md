@@ -284,16 +284,16 @@ Technologies:
 - SQLAlchemy.
 - PostgreSQL.
 - Milvus vector database.
-- Redis for cache/session-related services.
+- Redis-compatible cache abstraction for runtime support, with in-memory fallback.
 - LangGraph for the agent state machine.
 - OpenAI for LLM reasoning.
-- Voyage AI or OpenAI embeddings depending on settings.
+- Voyage AI for supplier/query embeddings.
 
 ### Data Stores
 
 - PostgreSQL stores suppliers, users, queries, results, audit logs, clarifications, saves, geocode cache.
 - Milvus stores supplier embeddings for semantic search.
-- Redis is configured for caching.
+- Redis is configured as the shared async cache backend when available.
 
 ### External Services
 
@@ -323,7 +323,7 @@ Key fields:
 - `capacity_value`, `capacity_unit`: structured capacity.
 - `lead_time_days`: structured lead-time signal.
 - `website`, `contact_email`: supplier contact/profile fields.
-- `source`: `manual`, `web_discovery`, or `imported`.
+- `source`: supplier provenance such as `manual`, `web_discovery`, `imported`, or `synthetic_10k`.
 - `status`: approved/saved/discovered/pending_review/rejected.
 - `source_url`: provenance URL.
 - `source_citations`: per-field citation metadata.

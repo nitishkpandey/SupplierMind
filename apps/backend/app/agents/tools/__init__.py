@@ -1,4 +1,4 @@
-"""Tool registry and individual tools for the ReAct-based Parser agent (Task 3.1).
+"""Tool registry and individual tools for the ReAct-based Parser agent.
 
 Each tool is registered with a name, an LLM-readable description, a JSON-schema
 for its arguments, and a side-effect-free callable. The Parser's ReAct loop

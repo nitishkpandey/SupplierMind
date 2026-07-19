@@ -36,8 +36,8 @@ from app.schemas.query import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory store for SSE progress updates {query_id: list of events}
-# In production this would be Redis pub/sub
+# Process-local SSE event buffer {query_id: list of events}. A multi-instance
+# deployment should replace this with Redis pub/sub or a worker/event bus.
 _sse_events: dict[str, list[dict]] = {}
 
 

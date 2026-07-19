@@ -22,6 +22,10 @@ user query ──> Voyage embed ──> Milvus top-10 ──> one LLM prompt ─
 Same embedding model and vector index as P3, nothing else.
 `apps/backend/experiments/paradigm2_rag.py`.
 
+During thesis evaluation, P2 retrieval is filtered at the vector-store layer
+to the frozen SupplierBench curated supplier IDs. Normal product searches leave
+that allowlist unset and can use the full active supplier database.
+
 ### P3 — SupplierMind (the system)
 
 ```
@@ -54,11 +58,11 @@ finalize (write accepted query to per-user semantic memory in Milvus)
 | Ranking | Deterministic weighted scoring + human-readable explanations | template only |
 | Evaluator | Judges result quality; can send the pipeline back to discovery with feedback (bounded retries) | yes |
 
-### Parser tool registry (Task 3.1)
+### Parser tool registry
 
-`apps/backend/app/agents/tools/`: `geocode_location` (Nominatim), `canonicalize_certification`
+`apps/backend/app/agents/tools/`: `geocode_location`, `canonicalize_certification`
 (taxonomy), `infer_industry_context` (small LLM call), `parse_quantity_unit`
-(deterministic regex), `lookup_past_query` (per-user Milvus memory, Task 3.2).
+(deterministic regex), `lookup_past_query` (per-user Milvus memory).
 
 Loop hygiene, each added after a failure observed in live smoke runs:
 stop-sequences against hallucinated Observations; same-args dedup; per-tool
@@ -66,7 +70,7 @@ budget (2 executions); force-finish instruction on the final iteration;
 trace-aware fallback extraction; pre-loop gate that raises a clarification
 for contentless queries instead of spending the ReAct budget.
 
-### Semantic memory (Task 3.2)
+### Semantic memory
 
 Separate Milvus collection `query_memory` (512-dim Voyage embeddings, cosine,
 scalar-indexed by user). Written only for evaluator-accepted runs at
@@ -74,7 +78,7 @@ scalar-indexed by user). Written only for evaluator-accepted runs at
 LLM physically cannot query another user's history. Right-to-be-forgotten:
 `DELETE /api/v1/users/me/memory`.
 
-### Multi-turn clarification (Task 3.3)
+### Multi-turn clarification
 
 System-level pause/resume — not chat history. A raised clarification is a
 `pending_clarifications` row (max 3 turns, DB CHECK enforced); the pipeline
@@ -102,6 +106,19 @@ suppliers without a verified city, country, and coordinates are rejected before
 ingestion so the UI does not show `null` locations.
 
 Cross-user access is answered with 404 (not 403) so existence cannot be probed.
+
+## Production vs thesis corpus control
+
+The product application can search every active supplier row: approved
+database suppliers, the 10k synthetic scale set, personal saves, and eligible
+pending-review web discoveries when the user chooses web discovery.
+
+The thesis evaluator intentionally does not use that dynamic corpus. It loads
+the frozen IDs from `apps/backend/data/suppliers_synthetic.json` through
+`app.evaluation.corpus.benchmark_supplier_ids()` and passes them into P1/P2/P3
+retrieval. SQL baselines use `Supplier.id IN (...)`; Milvus/Chroma searches use
+the same optional allowlist before candidate ranking. This keeps SupplierBench
+metrics reproducible even after product-scale data is loaded.
 
 ## Audit log
 

@@ -1,4 +1,4 @@
-"""Semantic long-term memory for past procurement queries (Task 3.2).
+"""Semantic long-term memory for past procurement queries.
 
 Each successful query (Evaluator verdict == accepted/auto_accept) is embedded
 with Voyage and persisted to a Milvus collection alongside its parsed
@@ -139,7 +139,7 @@ def ensure_collection_exists(name: str = COLLECTION_NAME):
     ]
     schema = CollectionSchema(
         fields=fields,
-        description="Per-user query memory for semantic recall (Task 3.2)",
+        description="Per-user query memory for semantic recall",
     )
     collection = Collection(name=name, schema=schema)
 

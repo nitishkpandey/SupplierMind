@@ -47,8 +47,8 @@ React Frontend (TypeScript + Tailwind)
          │
     ┌────┼──────────────────────────┐
     │    │                          │
- PostgreSQL  Milvus Vector DB   Redis Cache
- (supplier   (semantic search)  (LLM resp.)
+ PostgreSQL  Milvus Vector DB   Redis-compatible cache
+ (supplier   (semantic search)  (runtime support)
   data)
 ```
 
@@ -61,7 +61,7 @@ React Frontend (TypeScript + Tailwind)
 | Vector DB | Milvus 2.4 | Semantic similarity search |
 | Database | PostgreSQL 16 + PostGIS | Supplier data, queries, audit logs |
 | Location | Geoapify Geocoding + Places | Mandatory city/country validation for web suppliers |
-| Cache | Redis 7 | LLM response cache, sessions |
+| Cache | Redis 7 with in-memory fallback | Shared async cache abstraction and runtime support |
 | Agents | LangGraph 0.2 | Stateful agent graph with cycles |
 | Backend | FastAPI + Python 3.11 | REST API + SSE streaming |
 | Frontend | React 19 + TypeScript + Vite | Production UI |
@@ -154,6 +154,18 @@ Design decisions and the shared output contract are documented in
 `apps/backend/experiments/README.md`. Architecture detail per paradigm:
 [ARCHITECTURE.md](ARCHITECTURE.md). Benchmark protocol and reproduction:
 [BENCHMARK.md](BENCHMARK.md).
+
+## Production vs Thesis Data Modes
+
+SupplierMind is maintained for two related but separate goals:
+
+| Mode | Branch intent | Supplier corpus |
+|---|---|---|
+| Product / production | Active product UX and company-ready discovery workflow | All active suppliers in PostgreSQL, including the 10k synthetic scale set and eligible web-discovered pending-review rows |
+| Master's thesis | Reproducible P1/P2/P3 evaluation | Frozen curated SupplierBench supplier IDs from `apps/backend/data/suppliers_synthetic.json` |
+
+The evaluation runner enforces the curated thesis corpus explicitly, so loading
+the 10k product corpus does not silently contaminate benchmark metrics.
 
 ## Repository Map
 
