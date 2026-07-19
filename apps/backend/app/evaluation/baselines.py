@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Iterable
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,6 +116,7 @@ async def keyword_baseline_search(
     raw_query: str,
     db: AsyncSession,
     top_k: int = 5,
+    allowed_supplier_ids: Iterable[str] | None = None,
 ) -> tuple[list[dict], int]:
     """
     Baseline A: Pure SQL keyword search.
@@ -151,17 +153,18 @@ async def keyword_baseline_search(
         conditions.append(Supplier.category.ilike(f"%{word}%"))
         conditions.append(Supplier.country.ilike(f"%{word}%"))
 
+    filters = [
+        Supplier.is_active == True,  # noqa: E712
+        Supplier.status != SupplierStatus.pending_review,
+        or_(*conditions),
+    ]
+    allowed_ids = _normalise_allowed_supplier_ids(allowed_supplier_ids)
+    if allowed_ids is not None:
+        filters.append(Supplier.id.in_(allowed_ids))
+
     result = await db.execute(
         select(Supplier)
-        .where(
-            and_(
-                Supplier.is_active == True,  # noqa: E712
-                # Sprint A: pending_review suppliers are HITL-held and must be
-                # excluded from baselines so SupplierBench-25 stays reproducible.
-                Supplier.status != SupplierStatus.pending_review,
-                or_(*conditions),
-            )
-        )
+        .where(and_(*filters))
         .order_by(Supplier.name)   # Alphabetical — simulates "list all matches"
         .limit(top_k)
     )
@@ -224,6 +227,7 @@ async def manual_baseline_search(
     raw_query: str,
     db: AsyncSession,
     top_k: int = 5,
+    allowed_supplier_ids: Iterable[str] | None = None,
 ) -> tuple[list[dict], int]:
     """
     Baseline B: Manual discovery simulation.
@@ -268,10 +272,11 @@ async def manual_baseline_search(
     # Step 4: Build query
     conditions = [
         Supplier.is_active == True,  # noqa: E712
-        # Sprint A: exclude HITL-held pending_review suppliers from the
-        # benchmark baseline to keep SupplierBench-25 reproducible.
         Supplier.status != SupplierStatus.pending_review,
     ]
+    allowed_ids = _normalise_allowed_supplier_ids(allowed_supplier_ids)
+    if allowed_ids is not None:
+        conditions.append(Supplier.id.in_(allowed_ids))
 
     if category:
         conditions.append(Supplier.category == category)
@@ -321,3 +326,11 @@ def _supplier_to_dict(supplier: Supplier) -> dict:
         "capacity_unit": supplier.capacity_unit,
         "lead_time_days": supplier.lead_time_days,
     }
+
+
+def _normalise_allowed_supplier_ids(
+    allowed_supplier_ids: Iterable[str] | None,
+) -> list[str] | None:
+    if allowed_supplier_ids is None:
+        return None
+    return list(dict.fromkeys(str(sid) for sid in allowed_supplier_ids if sid))

@@ -19,8 +19,8 @@ from typing_extensions import TypedDict
 
 
 class ParsedConstraints(TypedDict, total=False):
-    """Production v2: rich product intent representation."""
-    # Product intent (replaces category as primary key)
+    """Structured procurement intent extracted from a natural-language query."""
+    # Product intent
     product_type: Optional[str]
     product_keywords: Optional[list[str]]
     industry_context: Optional[str]
@@ -57,8 +57,8 @@ class ComplianceResult(TypedDict, total=False):
     status: str               # "PASS", "FAIL", "PARTIAL"
     reason: str               # Human-readable explanation
     confidence: float         # 0.0 to 1.0
-    evidence_quote: str       # Task 1.4: verbatim phrase the LLM cited (LLM path only)
-    quote_flag: str           # Task 1.4: downgrade reason, e.g. "quote_not_in_source"
+    evidence_quote: str       # Verbatim phrase cited by the LLM path
+    quote_flag: str           # Downgrade reason, e.g. "quote_not_in_source"
 
 
 class SupplierComplianceResult(TypedDict):
@@ -89,9 +89,8 @@ class AuditEntry(TypedDict, total=False):
     """One entry in the agent audit trail.
 
     `input_snapshot` / `output_snapshot` are optional structured payloads
-    introduced for Task 3.1's ReAct trace. When present they override the
-    plain-string summaries at the API flush stage so the full trace lands
-    in audit_logs.{input,output}_snapshot as JSON.
+    used for ReAct traces and richer agent diagnostics. When present they
+    override the plain-string summaries at the API flush stage.
     """
     agent_name: str
     action: str
@@ -130,7 +129,7 @@ class AgentState(TypedDict):
     needs_clarification: bool
     clarification_question: Optional[str]
 
-    # ── Task 3.3 — Multi-turn clarification dialogue ──────────────────
+    # ── Multi-turn clarification dialogue ─────────────────────────────
     # Populated by parser_node when the Parser raises a clarification: the
     # DB row id under which the partial state has been persisted, so the
     # API layer can hand it back to the user. `turn_number` is 1 on first
@@ -157,19 +156,20 @@ class AgentState(TypedDict):
     # ── Ranking Agent output ──────────────────────────────────────────
     ranked_suppliers: list[RankedSupplier]
 
-    # ── Production v2 additions ───────────────────────────────────────
+    # ── Governance and evaluation controls ────────────────────────────
     search_scope: str
-    # Sprint A (HITL): pending_review suppliers are in-scope for normal search
-    # (the UI shows them with a badge). The eval/benchmark path sets this True
-    # so evaluation never sees pending suppliers, keeping SupplierBench-25
-    # reproducible — independent of scope.
+    # pending_review suppliers are visible in normal discover-new searches,
+    # but excluded from thesis evaluation.
     exclude_pending: bool
+    # Fixed supplier corpus used by thesis evaluation. Normal product searches
+    # leave this empty so the full active database remains searchable.
+    benchmark_supplier_ids: list[str]
     tier_assignments: dict[str, str]
     evaluator_retries: int
     evaluator_verdict: Optional[str]
     evaluator_should_retry: bool
 
-    # ── Task 3.1 — ReAct trace + termination reason ─────────────────
+    # ── ReAct trace + termination reason ──────────────────────────────
     react_trace: list[dict]
     react_terminated_by: Optional[str]   # "finish" | "max_iterations" | "parse_failed"
 

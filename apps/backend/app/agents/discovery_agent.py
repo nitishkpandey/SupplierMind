@@ -1,16 +1,8 @@
-"""
-app/agents/discovery_agent.py — Hybrid supplier retrieval with tier awareness.
-
-PRODUCTION V2 CHANGES:
-- Retrieval respects search_scope ("approved_only" vs "both")
-- Queries Tier 2 (user-saved) suppliers automatically
-- Records tier_assignments in state for downstream ranking boosts
-"""
+"""Hybrid supplier retrieval with tier and benchmark-corpus awareness."""
 
 import json
 import logging
 import time
-from typing import Optional
 
 from sqlalchemy import Text, func, or_, select
 
@@ -76,23 +68,29 @@ class DiscoveryAgent(BaseAgent):
         state.setdefault("relaxed_constraints", [])
         state.setdefault("tier_assignments", {})
         state.setdefault("retry_count", 0)
+        state.setdefault("benchmark_supplier_ids", [])
 
         constraints = state.get("parsed_constraints") or {}
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
         user_id = state.get("user_id")
-        # HITL: pending_review suppliers are in-scope only for "both"
-        # (Discover New Suppliers). Approved-only stays approved/saved DB rows.
-        # The eval path also sets exclude_pending=True for reproducibility.
         exclude_pending = state.get("exclude_pending", False)
+        allowed_supplier_ids = set(state.get("benchmark_supplier_ids") or [])
 
         return self._run_search(
-            state, constraints, retry_count, search_scope, user_id, exclude_pending
+            state,
+            constraints,
+            retry_count,
+            search_scope,
+            user_id,
+            exclude_pending,
+            allowed_supplier_ids=allowed_supplier_ids or None,
         )
 
     def _run_search(
         self, state: AgentState, constraints: dict, retry_count: int, search_scope: str,
         user_id: str, exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> AgentState:
         start = time.time()
 
@@ -104,11 +102,20 @@ class DiscoveryAgent(BaseAgent):
             from app.core.vector_store import get_vector_store
             vs = get_vector_store()
             query_text = self._build_query_text(constraints, state["raw_query"])
-            sem_results = vs.search(query_text, top_k=20) # Get more to filter locally
+            search_kwargs = {}
+            if allowed_supplier_ids is not None:
+                search_kwargs["allowed_supplier_ids"] = allowed_supplier_ids
+            sem_results = vs.search(query_text, top_k=20, **search_kwargs)
 
-            # Filter vector results by scope (Milvus doesn't currently index status in this prototype)
             with SyncSessionLocal() as db:
-                valid_ids = self._filter_ids_by_scope(db, [r.supplier_id for r in sem_results], search_scope, user_id, exclude_pending)
+                valid_ids = self._filter_ids_by_scope(
+                    db,
+                    [r.supplier_id for r in sem_results],
+                    search_scope,
+                    user_id,
+                    exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
+                )
                 filtered_results = [r for r in sem_results if r.supplier_id in valid_ids]
 
                 semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(filtered_results[:10])}
@@ -174,6 +181,7 @@ class DiscoveryAgent(BaseAgent):
                             city=city_filter,
                             certs=certs,
                             product_terms=keyword_terms,
+                            allowed_supplier_ids=allowed_supplier_ids,
                         )
                         return list(db.execute(query.limit(20)).scalars().all())
 
@@ -211,6 +219,7 @@ class DiscoveryAgent(BaseAgent):
                     scope=search_scope,
                     user_id=user_id,
                     exclude_pending=exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
                 )
                 fresh_ranked = {sid: i + 1 for i, sid in enumerate(fresh_ids)}
                 if fresh_ranked:
@@ -218,37 +227,6 @@ class DiscoveryAgent(BaseAgent):
                         "[discovery] Fresh external candidates carried forward: %d",
                         len(fresh_ranked),
                     )
-
-                # Build tier assignments for ALL found suppliers
-                all_found_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked)
-                if all_found_ids:
-                    # Determine tiers
-                    suppliers_info = db.execute(
-                        select(Supplier.id, Supplier.status).where(Supplier.id.in_(all_found_ids))
-                    ).all()
-
-                    # Find which ones are saved by user
-                    saved_ids = set()
-                    if user_id:
-                        saved_ids = set(db.execute(
-                            select(UserSupplierSave.supplier_id)
-                            .where(UserSupplierSave.supplier_id.in_(all_found_ids))
-                            .where(UserSupplierSave.user_id == user_id)
-                        ).scalars().all())
-
-                    for sid, status in suppliers_info:
-                        sid_str = str(sid)
-                        # Tier 2 overrides Tier 3, Tier 1 is top
-                        if status == SupplierStatus.approved:
-                            tier_assignments[sid_str] = "approved"
-                        elif sid in saved_ids:
-                            tier_assignments[sid_str] = "saved"
-                        elif status == SupplierStatus.pending_review:
-                            # Sprint A: label honestly so the UI badge is correct;
-                            # no tier boost — pending suppliers rank on merit.
-                            tier_assignments[sid_str] = "pending_review"
-                        else:
-                            tier_assignments[sid_str] = "discovered"
 
                 # Strategy 3: Geospatial radius
                 if (constraints.get("location_lat") and
@@ -260,11 +238,44 @@ class DiscoveryAgent(BaseAgent):
                         center_lng=constraints["location_lng"],
                         radius_km=constraints["location_radius_km"],
                     )
-                    # Filter geo results by scope locally
-                    valid_geo = [(s, d) for s, d in geo_with_dist if str(s.id) in tier_assignments]
+                    geo_ids = [str(s.id) for s, _ in geo_with_dist]
+                    valid_geo_ids = self._filter_ids_by_scope(
+                        db,
+                        geo_ids,
+                        search_scope,
+                        user_id,
+                        exclude_pending,
+                        allowed_supplier_ids=allowed_supplier_ids,
+                    )
+                    valid_geo = [(s, d) for s, d in geo_with_dist if str(s.id) in valid_geo_ids]
                     geo_ranked = {str(s.id): i + 1 for i, (s, _) in enumerate(valid_geo)}
                     geo_distances = {str(s.id): dist for s, dist in valid_geo}
                     logger.debug("[discovery] Geospatial: %d results", len(valid_geo))
+
+                all_found_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked) | set(geo_ranked)
+                if all_found_ids:
+                    suppliers_info = db.execute(
+                        select(Supplier.id, Supplier.status).where(Supplier.id.in_(all_found_ids))
+                    ).all()
+
+                    saved_ids = set()
+                    if user_id:
+                        saved_ids = set(db.execute(
+                            select(UserSupplierSave.supplier_id)
+                            .where(UserSupplierSave.supplier_id.in_(all_found_ids))
+                            .where(UserSupplierSave.user_id == user_id)
+                        ).scalars().all())
+
+                    for sid, status in suppliers_info:
+                        sid_str = str(sid)
+                        if status == SupplierStatus.approved:
+                            tier_assignments[sid_str] = "approved"
+                        elif sid in saved_ids:
+                            tier_assignments[sid_str] = "saved"
+                        elif status == SupplierStatus.pending_review:
+                            tier_assignments[sid_str] = "pending_review"
+                        else:
+                            tier_assignments[sid_str] = "discovered"
 
         except Exception as e:
             logger.error("[discovery] DB search failed: %s", e)
@@ -324,7 +335,13 @@ class DiscoveryAgent(BaseAgent):
                 state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
                 logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
                 return self._run_search(
-                    state, relaxed, retry_count + 1, search_scope, user_id, exclude_pending
+                    state,
+                    relaxed,
+                    retry_count + 1,
+                    search_scope,
+                    user_id,
+                    exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
                 )
 
         # ── Final state ───────────────────────────────────────────────
@@ -361,6 +378,7 @@ class DiscoveryAgent(BaseAgent):
         scope: str,
         user_id: str,
         exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> list[str]:
         """Return freshly ingested web supplier IDs that belong in this run.
 
@@ -373,7 +391,14 @@ class DiscoveryAgent(BaseAgent):
         if not ordered or scope == "approved_only":
             return []
 
-        valid = self._filter_ids_by_scope(db, ordered, scope, user_id, exclude_pending)
+        valid = self._filter_ids_by_scope(
+            db,
+            ordered,
+            scope,
+            user_id,
+            exclude_pending,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
         return [sid for sid in ordered if sid in valid]
 
     @staticmethod
@@ -411,7 +436,13 @@ class DiscoveryAgent(BaseAgent):
         return selected[:CANDIDATE_HANDOFF_LIMIT]
 
     def _filter_ids_by_scope(
-        self, db, sids: list[str], scope: str, user_id: str, exclude_pending: bool = False
+        self,
+        db,
+        sids: list[str],
+        scope: str,
+        user_id: str,
+        exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> set[str]:
         """Returns subset of IDs that are allowed by the current search scope.
 
@@ -421,6 +452,11 @@ class DiscoveryAgent(BaseAgent):
         """
         if not sids:
             return set()
+
+        if allowed_supplier_ids is not None:
+            sids = [sid for sid in sids if sid in allowed_supplier_ids]
+            if not sids:
+                return set()
 
         base_conds = []
         if scope == "approved_only":
@@ -483,8 +519,11 @@ class DiscoveryAgent(BaseAgent):
         city: str | None,
         certs: list[str] | None,
         product_terms: list[str],
+        allowed_supplier_ids: set[str] | None = None,
     ):
         query = select(Supplier).where(Supplier.is_active.is_(True)).where(scope_filter)
+        if allowed_supplier_ids is not None:
+            query = query.where(Supplier.id.in_(allowed_supplier_ids))
 
         if category_values:
             query = query.where(Supplier.category.in_(category_values))
@@ -582,7 +621,7 @@ class DiscoveryAgent(BaseAgent):
         constraints: dict,
         result_count: int,
         previous: list[str],
-    ) -> tuple[Optional[dict], str]:
+    ) -> tuple[dict | None, str]:
         available = [
             k for k in ["location_radius_km", "lead_time_max_days", "capacity_min"]
             if k in constraints and k not in previous

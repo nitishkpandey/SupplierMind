@@ -26,8 +26,8 @@ HOW SEARCH WORKS:
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
 from app.core.config import settings
@@ -63,13 +63,22 @@ class BaseVectorStore(ABC):
         ...
 
     @abstractmethod
-    def search(self, query_text: str, top_k: int = 20) -> list[SearchResult]:
+    def search(
+        self,
+        query_text: str,
+        top_k: int = 20,
+        *,
+        allowed_supplier_ids: Iterable[str] | None = None,
+    ) -> list[SearchResult]:
         """
         Search for suppliers semantically similar to query_text.
 
         Args:
             query_text: The procurement query or description to search for
             top_k: Number of results to return
+            allowed_supplier_ids: Optional corpus allowlist. Normal product
+                searches leave this unset; thesis evaluation uses it to keep
+                retrieval bound to the frozen benchmark corpus.
 
         Returns:
             List of SearchResult ordered by similarity (highest first)
@@ -96,9 +105,7 @@ class MilvusVectorStore(BaseVectorStore):
     def __init__(self) -> None:
         from pymilvus import (
             Collection,
-            CollectionSchema,
             DataType,
-            FieldSchema,
             connections,
             utility,
         )
@@ -198,8 +205,18 @@ class MilvusVectorStore(BaseVectorStore):
         # Return supplier_ids as embedding IDs (we'll store these in PostgreSQL)
         return supplier_ids
 
-    def search(self, query_text: str, top_k: int = 20) -> list[SearchResult]:
+    def search(
+        self,
+        query_text: str,
+        top_k: int = 20,
+        *,
+        allowed_supplier_ids: Iterable[str] | None = None,
+    ) -> list[SearchResult]:
         """Search for semantically similar suppliers."""
+        allowed_ids = _normalise_allowed_supplier_ids(allowed_supplier_ids)
+        if allowed_ids is not None and not allowed_ids:
+            return []
+
         embed_client = get_embedding_client()
 
         # Use "query" input type for search (different from "document")
@@ -210,13 +227,17 @@ class MilvusVectorStore(BaseVectorStore):
             "params": {"ef": 128},  # ef > top_k for better recall
         }
 
-        results = self._collection.search(
-            data=[query_vector],
-            anns_field="embedding",
-            param=search_params,
-            limit=top_k,
-            output_fields=["supplier_id"],
-        )
+        search_kwargs: dict[str, Any] = {
+            "data": [query_vector],
+            "anns_field": "embedding",
+            "param": search_params,
+            "limit": top_k,
+            "output_fields": ["supplier_id"],
+        }
+        if allowed_ids is not None:
+            search_kwargs["expr"] = _milvus_supplier_expr(allowed_ids)
+
+        results = self._collection.search(**search_kwargs)
 
         search_results = []
         for hit in results[0]:
@@ -277,16 +298,36 @@ class ChromaVectorStore(BaseVectorStore):
         logger.info("Indexed %d suppliers in ChromaDB", len(suppliers))
         return supplier_ids
 
-    def search(self, query_text: str, top_k: int = 20) -> list[SearchResult]:
+    def search(
+        self,
+        query_text: str,
+        top_k: int = 20,
+        *,
+        allowed_supplier_ids: Iterable[str] | None = None,
+    ) -> list[SearchResult]:
         """Search ChromaDB by vector similarity."""
+        allowed_ids = _normalise_allowed_supplier_ids(allowed_supplier_ids)
+        if allowed_ids is not None and not allowed_ids:
+            return []
+
         embed_client = get_embedding_client()
         query_vector = embed_client.embed_one(query_text, input_type="query")
 
-        results = self._collection.query(
-            query_embeddings=[query_vector],
-            n_results=min(top_k, self._collection.count()),
-            include=["distances", "metadatas"],
-        )
+        n_results = top_k
+        where = None
+        if allowed_ids is not None:
+            n_results = max(top_k, len(allowed_ids))
+            where = {"supplier_id": {"$in": allowed_ids}}
+
+        query_kwargs: dict[str, Any] = {
+            "query_embeddings": [query_vector],
+            "n_results": min(n_results, self._collection.count()),
+            "include": ["distances", "metadatas"],
+        }
+        if where is not None:
+            query_kwargs["where"] = where
+
+        results = self._collection.query(**query_kwargs)
 
         search_results = []
         if results["ids"] and results["ids"][0]:
@@ -295,6 +336,8 @@ class ChromaVectorStore(BaseVectorStore):
                 # ChromaDB returns cosine distance (0=identical, 2=opposite)
                 # Convert to similarity score (1=identical, 0=unrelated)
                 similarity = 1.0 - (distance / 2.0)
+                if allowed_ids is not None and supplier_id not in allowed_ids:
+                    continue
                 search_results.append(
                     SearchResult(
                         supplier_id=supplier_id,
@@ -303,7 +346,7 @@ class ChromaVectorStore(BaseVectorStore):
                     )
                 )
 
-        return search_results
+        return search_results[:top_k]
 
     def delete_supplier(self, supplier_id: str) -> None:
         self._collection.delete(ids=[supplier_id])
@@ -338,3 +381,28 @@ def create_vector_store() -> BaseVectorStore:
         return MilvusVectorStore()
     else:
         return ChromaVectorStore()
+
+
+def _normalise_allowed_supplier_ids(
+    allowed_supplier_ids: Iterable[str] | None,
+) -> list[str] | None:
+    """Normalize optional supplier allowlists without changing caller order."""
+    if allowed_supplier_ids is None:
+        return None
+
+    seen: set[str] = set()
+    allowed: list[str] = []
+    for sid in allowed_supplier_ids:
+        value = str(sid).strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        allowed.append(value)
+    return allowed
+
+
+def _milvus_supplier_expr(supplier_ids: list[str]) -> str:
+    """Build a Milvus boolean expression for an exact supplier-id allowlist."""
+    safe_ids = [sid.replace('"', "") for sid in supplier_ids]
+    quoted = ", ".join(f'"{sid}"' for sid in safe_ids)
+    return f"supplier_id in [{quoted}]"

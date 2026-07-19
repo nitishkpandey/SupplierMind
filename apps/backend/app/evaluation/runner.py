@@ -24,6 +24,7 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
 from app.evaluation.baselines import keyword_baseline_search, manual_baseline_search
+from app.evaluation.corpus import benchmark_supplier_ids
 from app.evaluation.metrics import (
     QueryMetrics,
     SystemMetrics,
@@ -59,6 +61,8 @@ async def run_suppliermind_query(
     raw_query: str,
     constraints: dict,
     query_id: str,
+    *,
+    allowed_supplier_ids: Iterable[str] | None = None,
 ) -> tuple[list[str], list[dict], int]:
     """
     Run one query through the full SupplierMind pipeline.
@@ -69,11 +73,17 @@ async def run_suppliermind_query(
     from app.agents.orchestrator import run_pipeline
 
     start = time.time()
-    # Sprint A (HITL): the UI flow includes pending_review suppliers, but the
-    # benchmark must not — exclude_pending=True keeps SupplierBench-25
-    # reproducible regardless of any pending rows in the DB.
+    benchmark_ids = (
+        list(allowed_supplier_ids)
+        if allowed_supplier_ids is not None
+        else list(benchmark_supplier_ids())
+    )
     state = await run_pipeline(
-        raw_query, query_id, user_id=EVAL_USER_ID, exclude_pending=True
+        raw_query,
+        query_id,
+        user_id=EVAL_USER_ID,
+        exclude_pending=True,
+        benchmark_supplier_ids=benchmark_ids,
     )
     exec_ms = int((time.time() - start) * 1000)
 
@@ -88,6 +98,8 @@ async def run_baseline_queries(
     raw_query: str,
     constraints: dict,
     db: AsyncSession,
+    *,
+    allowed_supplier_ids: Iterable[str] | None = None,
 ) -> dict:
     """
     Run one query through both baselines.
@@ -95,8 +107,23 @@ async def run_baseline_queries(
     Returns:
         Dict with keyword and manual results
     """
-    kw_suppliers, kw_ms = await keyword_baseline_search(raw_query, db, top_k=5)
-    manual_suppliers, manual_ms = await manual_baseline_search(raw_query, db, top_k=5)
+    benchmark_ids = (
+        list(allowed_supplier_ids)
+        if allowed_supplier_ids is not None
+        else list(benchmark_supplier_ids())
+    )
+    kw_suppliers, kw_ms = await keyword_baseline_search(
+        raw_query,
+        db,
+        top_k=5,
+        allowed_supplier_ids=benchmark_ids,
+    )
+    manual_suppliers, manual_ms = await manual_baseline_search(
+        raw_query,
+        db,
+        top_k=5,
+        allowed_supplier_ids=benchmark_ids,
+    )
 
     # Calculate CSR for baselines using direct field comparison
     kw_csr = constraint_satisfaction_rate_from_suppliers(kw_suppliers, constraints)
@@ -118,14 +145,18 @@ async def run_baseline_queries(
     }
 
 
-# ── Phase-2 paradigm baselines (Development Plan) ─────────────────────
+# ── P1/P2 paradigm baselines ──────────────────────────────────────────
 
 
 def _normalise_name(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
-async def _load_supplier_name_index(db: AsyncSession) -> dict[str, str]:
+async def _load_supplier_name_index(
+    db: AsyncSession,
+    *,
+    allowed_supplier_ids: Iterable[str] | None = None,
+) -> dict[str, str]:
     """Map normalised supplier name -> supplier id, for P1 name matching.
 
     P1 never sees the corpus, so it can only be scored by matching the names
@@ -137,39 +168,49 @@ async def _load_supplier_name_index(db: AsyncSession) -> dict[str, str]:
 
     from app.db.models import Supplier, SupplierStatus
 
-    # Sprint A: pending_review suppliers are excluded from the P1 name index so
-    # the parametric baseline can never be scored against HITL-held rows.
-    # benchmark-final-v2: is_active==True keeps the quarantined scale-set /
-    # discovered rows out of the P1 index too, so P1 is scored only against the
-    # frozen curated-100 retrieval set.
+    filters = [
+        Supplier.status != SupplierStatus.pending_review,
+        Supplier.is_active == True,  # noqa: E712
+    ]
+    if allowed_supplier_ids is not None:
+        filters.append(Supplier.id.in_(list(allowed_supplier_ids)))
+
     result = await db.execute(
-        select(Supplier.id, Supplier.name).where(
-            Supplier.status != SupplierStatus.pending_review,
-            Supplier.is_active == True,  # noqa: E712
-        )
+        select(Supplier.id, Supplier.name).where(*filters)
     )
     return {_normalise_name(name): str(sid) for sid, name in result.all() if name}
 
 
-async def _fetch_supplier_dicts(ids: list[str], db: AsyncSession) -> list[dict]:
+async def _fetch_supplier_dicts(
+    ids: list[str],
+    db: AsyncSession,
+    *,
+    allowed_supplier_ids: Iterable[str] | None = None,
+) -> list[dict]:
     from sqlalchemy import select
 
     from app.db.models import Supplier, SupplierStatus
 
     if not ids:
         return []
-    # Sprint A: never materialise pending_review suppliers into the P2 corpus,
-    # so benchmark scoring stays reproducible even if pending rows exist.
+    if allowed_supplier_ids is None:
+        filtered_ids = ids
+    else:
+        allowed_ids = {str(sid) for sid in allowed_supplier_ids if sid}
+        filtered_ids = [sid for sid in ids if sid in allowed_ids]
+    if not filtered_ids:
+        return []
+
     result = await db.execute(
         select(Supplier).where(
-            Supplier.id.in_(ids),
+            Supplier.id.in_(filtered_ids),
             Supplier.status != SupplierStatus.pending_review,
             Supplier.is_active == True,  # noqa: E712
         )
     )
     rows = {str(s.id): s for s in result.scalars().all()}
     out = []
-    for sid in ids:
+    for sid in filtered_ids:
         s = rows.get(sid)
         if s is None:
             continue
@@ -203,6 +244,7 @@ async def run_paradigm_queries(
     constraints: dict,
     db: AsyncSession,
     name_index: dict[str, str],
+    allowed_supplier_ids: Iterable[str],
     run_p1: bool = True,
     run_p2: bool = True,
 ) -> dict:
@@ -225,7 +267,11 @@ async def run_paradigm_queries(
             for n in p1.supplier_names
             if _normalise_name(n) in name_index
         ]
-        p1_suppliers = await _fetch_supplier_dicts(p1_ids, db)
+        p1_suppliers = await _fetch_supplier_dicts(
+            p1_ids,
+            db,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
         results["p1_singleprompt"] = {
             "ids": p1_ids,
             "suppliers": p1_suppliers,
@@ -239,9 +285,16 @@ async def run_paradigm_queries(
 
     if run_p2:
         cost_before = _llm_total_cost()
-        p2 = await run_paradigm2(raw_query)
+        p2 = await run_paradigm2(
+            raw_query,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
         p2_cost = _llm_total_cost() - cost_before
-        p2_suppliers = await _fetch_supplier_dicts(p2.supplier_ids, db)
+        p2_suppliers = await _fetch_supplier_dicts(
+            p2.supplier_ids,
+            db,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
         results["p2_rag"] = {
             "ids": p2.supplier_ids,
             "suppliers": p2_suppliers,
@@ -282,6 +335,7 @@ async def run_full_evaluation(
 
     with open(BENCHMARK_FILE, encoding="utf-8") as f:
         benchmark_queries = json.load(f)
+    benchmark_ids = benchmark_supplier_ids()
 
     if query_limit:
         benchmark_queries = benchmark_queries[:query_limit]
@@ -290,6 +344,7 @@ async def run_full_evaluation(
     logger.info("=" * 60)
     logger.info("SUPPLIERBENCH EVALUATION")
     logger.info("Queries to evaluate: %d", total)
+    logger.info("Supplier corpus: curated SupplierBench set (%d ids)", len(benchmark_ids))
     logger.info("Systems: %s%s",
                 "SupplierMind " if run_suppliermind else "",
                 "Keyword Manual" if run_baselines else "")
@@ -305,7 +360,10 @@ async def run_full_evaluation(
     name_index: dict[str, str] = {}
     if run_p1:
         async with AsyncSessionLocal() as db:
-            name_index = await _load_supplier_name_index(db)
+            name_index = await _load_supplier_name_index(
+                db,
+                allowed_supplier_ids=benchmark_ids,
+            )
         logger.info("Loaded %d supplier names for P1 matching", len(name_index))
 
     for i, query in enumerate(benchmark_queries, 1):
@@ -326,7 +384,10 @@ async def run_full_evaluation(
             try:
                 sm_cost_before = _llm_total_cost()
                 sm_ids, sm_compliance, sm_ms = await run_suppliermind_query(
-                    raw_query, constraints, f"eval-{q_id}"
+                    raw_query,
+                    constraints,
+                    f"eval-{q_id}",
+                    allowed_supplier_ids=benchmark_ids,
                 )
                 sm_cost = _llm_total_cost() - sm_cost_before
                 sm_p5 = precision_at_k(sm_ids, ground_truth_ids, k=5)
@@ -364,7 +425,12 @@ async def run_full_evaluation(
         # ── Run Baselines ─────────────────────────────────────────────
         if run_baselines:
             async with AsyncSessionLocal() as db:
-                baseline_results = await run_baseline_queries(raw_query, constraints, db)
+                baseline_results = await run_baseline_queries(
+                    raw_query,
+                    constraints,
+                    db,
+                    allowed_supplier_ids=benchmark_ids,
+                )
 
             kw_ids = baseline_results["keyword"]["ids"]
             kw_csr = baseline_results["keyword"]["csr"]
@@ -399,11 +465,17 @@ async def run_full_evaluation(
                 kw_p5, manual_p5
             )
 
-        # ── Run P1 / P2 paradigm baselines (Development Plan, Phase 3) ──
+        # ── Run P1 / P2 paradigm baselines ────────────────────────────
         if run_p1 or run_p2:
             async with AsyncSessionLocal() as db:
                 paradigm_results = await run_paradigm_queries(
-                    raw_query, constraints, db, name_index, run_p1=run_p1, run_p2=run_p2
+                    raw_query,
+                    constraints,
+                    db,
+                    name_index,
+                    benchmark_ids,
+                    run_p1=run_p1,
+                    run_p2=run_p2,
                 )
             for system_name, metrics_list in (
                 ("p1_singleprompt", p1_metrics),
