@@ -9,7 +9,8 @@ same keys, same order, snapshots appended only when provided.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from copy import deepcopy
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -40,12 +41,12 @@ def append_audit_entry(
         "input_summary": input_summary,
         "output_summary": output_summary,
         "duration_ms": duration_ms,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     if input_snapshot is not None:
-        entry["input_snapshot"] = input_snapshot
+        entry["input_snapshot"] = deepcopy(input_snapshot)
     if output_snapshot is not None:
-        entry["output_snapshot"] = output_snapshot
+        entry["output_snapshot"] = deepcopy(output_snapshot)
 
     if "audit_log" not in state or state["audit_log"] is None:
         state["audit_log"] = []

@@ -7,8 +7,9 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -157,13 +158,13 @@ async def stream_query_progress(
         from app.core.security import decode_access_token
         payload = decode_access_token(token)
         user_id = uuid.UUID(payload["sub"])
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token") from e
 
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     query_repo = QueryRepository(db)
     query = await query_repo.get_by_id(qid)
@@ -307,8 +308,8 @@ async def get_query(
     """Get the current status and results of a query."""
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     query_repo = QueryRepository(db)
     query = await query_repo.get_with_results(qid)
@@ -412,8 +413,8 @@ async def get_audit_trail(
     """Returns the complete agent decision log for transparency."""
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID") from e
 
     from sqlalchemy import case, select
     query_repo = QueryRepository(db)
@@ -484,8 +485,8 @@ async def get_pending_clarification(
     """
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     repo = ClarificationRepository(db)
     pc = await repo.get_open_for_query(qid)
@@ -531,8 +532,8 @@ async def submit_clarification_answer(
     """
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     repo = ClarificationRepository(db)
     pc = await repo.get_open_for_query(qid)
@@ -607,7 +608,7 @@ async def _resume_pipeline_background(
                 .values(
                     status=QueryStatus.failed,
                     error_message="Max clarification turns reached.",
-                    completed_at=datetime.now(timezone.utc),
+                    completed_at=datetime.now(UTC),
                 )
             )
             await db.commit()
@@ -618,7 +619,9 @@ async def _resume_pipeline_background(
         return
     except Exception as e:  # noqa: BLE001
         logger.exception("[resume] pipeline failed for query=%s", query_id)
-        _push("error", {"message": f"Resume error: {str(e)[:200]}"})
+        message = f"Resume error: {str(e)[:200]}"
+        _push("error", {"message": message})
+        await _mark_query_failed(query_id, message)
         return
 
     execution_time_ms = int((time.time() - start_time) * 1000)
@@ -666,7 +669,7 @@ async def _resume_pipeline_background(
                 detected_language=final_state.get("detected_language", "en"),
                 parsed_constraints=final_state.get("parsed_constraints"),
                 execution_time_ms=execution_time_ms,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
                 error_message=final_state.get("error"),
             )
         )
@@ -841,7 +844,7 @@ async def _run_pipeline_background(
                     evaluator_retries=final_state.get("evaluator_retries", 0),
                     evaluator_verdict=final_state.get("evaluator_verdict"),
                     execution_time_ms=execution_time_ms,
-                    completed_at=datetime.now(timezone.utc),
+                    completed_at=datetime.now(UTC),
                     error_message=final_state.get("error"),
                 )
             )
@@ -896,21 +899,29 @@ async def _run_pipeline_background(
 
     except Exception as e:
         logger.exception("[background] Pipeline failed for query_id=%s", query_id)
-        _push("error", {"message": f"Pipeline error: {str(e)[:200]}"})
-
-        async with AsyncSessionLocal() as db:
-            from sqlalchemy import update
-            await db.execute(
-                update(Query)
-                .where(Query.id == uuid.UUID(query_id))
-                .values(
-                    status=QueryStatus.failed,
-                    error_message=str(e)[:500],
-                    completed_at=datetime.now(timezone.utc),
-                )
-            )
-            await db.commit()
+        message = f"Pipeline error: {str(e)[:200]}"
+        _push("error", {"message": message})
+        await _mark_query_failed(query_id, message)
 
     finally:
         await asyncio.sleep(settings.SSE_CLEANUP_DELAY_SECONDS)
         _sse_events.pop(query_id, None)
+
+
+async def _mark_query_failed(query_id: str, message: str) -> None:
+    """Move a query to a terminal failed state from any background path."""
+    from sqlalchemy import update
+
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(Query)
+            .where(Query.id == uuid.UUID(query_id))
+            .values(
+                status=QueryStatus.failed,
+                error_message=message[:500],
+                completed_at=datetime.now(UTC),
+            )
+        )
+        await db.commit()

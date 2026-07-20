@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 HIGH_QUALITY_THRESHOLD = 0.6
 SEMANTIC_QUALITY_THRESHOLD = 0.5
+NON_RELAXABLE_CONSTRAINTS = (
+    "product_type",
+    "location_city",
+    "location_country",
+    "location_region",
+    "location_radius_km",
+    "certifications",
+    "capacity_min",
+    "lead_time_max_days",
+)
 
 
 def _is_high_quality_result(result: dict, constraints: dict) -> bool:
@@ -28,6 +38,16 @@ def _is_high_quality_result(result: dict, constraints: dict) -> bool:
     if constraints.get("product_type") and result.get("semantic_score", 0.5) < SEMANTIC_QUALITY_THRESHOLD:
         return False
     return True
+
+
+def _present_non_relaxable_constraints(parsed_constraints: dict) -> list[str]:
+    """User-stated procurement requirements that cannot be silently dropped."""
+    present: list[str] = []
+    for key in NON_RELAXABLE_CONSTRAINTS:
+        value = parsed_constraints.get(key)
+        if value not in (None, "", [], {}):
+            present.append(key)
+    return present
 
 EVALUATOR_PROMPT = """You are the final quality control agent in a supplier discovery pipeline.
 
@@ -119,6 +139,27 @@ class EvaluatorAgent(BaseAgent):
         high_quality_count = sum(
             1 for r in ranked if _is_high_quality_result(r, constraints)
         )
+        hard_constraints = _present_non_relaxable_constraints(constraints)
+
+        if not ranked and search_scope == "both" and hard_constraints:
+            state.setdefault("relaxed_constraints", [])
+            state["evaluator_verdict"] = "fail"
+            state["evaluator_should_retry"] = False
+            state["pipeline_status"] = "completed"
+
+            self._log_audit(
+                state,
+                action="evaluation_bypassed",
+                input_summary=f"0 results, hard constraints: {', '.join(hard_constraints)}",
+                output_summary="accepted_no_relaxation",
+                duration_ms=int((time.time() - start) * 1000),
+                reasoning=(
+                    "No compliant suppliers remained after approved and web search. "
+                    "Hard constraints were preserved instead of being silently relaxed."
+                ),
+            )
+            return state
+
         if high_quality_count >= 3 or retries >= settings.EVALUATOR_MAX_RETRIES:
             state["evaluator_verdict"] = "auto_accept"
             state["evaluator_should_retry"] = False
@@ -158,13 +199,14 @@ class EvaluatorAgent(BaseAgent):
             raw = self.llm.complete_json(
                 [{"role": "user", "content": prompt}],
                 temperature=0.0,
+                timeout=settings.EVALUATOR_LLM_TIMEOUT_SECONDS,
             )
             eval_result = json.loads(raw)
             verdict = eval_result.get("verdict", "accept")
             strategy = eval_result.get("retry_strategy", "none")
             reasoning = eval_result.get("reasoning", "")
         except Exception as e:
-            logger.warning("[evaluator] LLM failed: %s. Defaulting to accept.", e)
+            logger.warning("[evaluator] LLM failed or timed out: %s. Defaulting to accept.", e)
             verdict = "accept"
             strategy = "none"
             reasoning = "LLM evaluation failed."
@@ -183,18 +225,23 @@ class EvaluatorAgent(BaseAgent):
             if strategy == "expand_scope" and search_scope == "approved_only":
                 state["search_scope"] = "both"
             elif strategy == "broaden_location" and parsed.get("location_radius_km"):
-                parsed["location_radius_km"] *= 2
-                state["parsed_constraints"] = parsed
-                state["relaxed_constraints"].append("location_radius_km (evaluator expanded)")
+                hard_constraints = _present_non_relaxable_constraints(parsed)
+                should_retry = False
+                verdict = "fail"
+                action_taken = "accepted_no_relaxation"
+                reasoning = (
+                    f"{reasoning} Hard constraints preserved; evaluator cannot "
+                    f"silently broaden {', '.join(hard_constraints)}."
+                ).strip()
             elif strategy == "relax_constraints":
-                if parsed.get("certifications"):
-                    parsed["certifications"] = []
-                    state["parsed_constraints"] = parsed
-                    state["relaxed_constraints"].append("certifications (evaluator dropped)")
-                elif parsed.get("lead_time_max_days"):
-                    parsed["lead_time_max_days"] = None
-                    state["parsed_constraints"] = parsed
-                    state["relaxed_constraints"].append("lead_time_max_days (evaluator dropped)")
+                hard_constraints = _present_non_relaxable_constraints(parsed)
+                should_retry = False
+                verdict = "fail"
+                action_taken = "accepted_no_relaxation"
+                reasoning = (
+                    f"{reasoning} Hard constraints preserved; evaluator cannot "
+                    f"silently drop {', '.join(hard_constraints)}."
+                ).strip()
 
         state["evaluator_verdict"] = verdict
         state["evaluator_should_retry"] = should_retry

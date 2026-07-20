@@ -14,6 +14,7 @@ guardrails:
 
 from __future__ import annotations
 
+from datetime import UTC
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -57,14 +58,14 @@ def _reset_overrides():
 
 def _fake_pc(user_id, *, turn: int = 1, qid=None) -> SimpleNamespace:
     """Stand-in for a PendingClarification row."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     return SimpleNamespace(
         id=uuid4(),
         user_id=user_id,
         query_id=qid or uuid4(),
         turn_number=turn,
         clarification_question="What product are you sourcing?",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         partial_constraints={"product_type": None},
         react_trace=[],
         raw_query="find me suppliers for our project",
@@ -270,9 +271,8 @@ async def test_resume_pipeline_raises_when_next_turn_exceeds_cap():
     ), patch(
         "app.db.repositories.clarification_repo.get_pending_clarification_sync",
         return_value=pc,
-    ):
-        with pytest.raises(MaxTurnsReached):
-            await resume_pipeline(str(pc.id), "any answer")
+    ), pytest.raises(MaxTurnsReached):
+        await resume_pipeline(str(pc.id), "any answer")
 
 
 # ── 5. resume_pipeline — already-resolved guardrail ──────────────────
@@ -280,13 +280,13 @@ async def test_resume_pipeline_raises_when_next_turn_exceeds_cap():
 
 @pytest.mark.asyncio
 async def test_resume_pipeline_raises_when_already_resolved():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.agents.orchestrator import resume_pipeline
     from app.db.repositories.clarification_repo import ClarificationAlreadyResolved
 
     pc = _fake_pc(user_id=uuid4(), turn=1)
-    pc.resolved_at = datetime.now(timezone.utc)
+    pc.resolved_at = datetime.now(UTC)
     pc.user_answer = "already answered"
 
     fake_session = MagicMock()
@@ -298,9 +298,8 @@ async def test_resume_pipeline_raises_when_already_resolved():
     ), patch(
         "app.db.repositories.clarification_repo.get_pending_clarification_sync",
         return_value=pc,
-    ):
-        with pytest.raises(ClarificationAlreadyResolved):
-            await resume_pipeline(str(pc.id), "any answer")
+    ), pytest.raises(ClarificationAlreadyResolved):
+        await resume_pipeline(str(pc.id), "any answer")
 
 
 # ── 6. degraded clarification must not strand the query ──────────────
@@ -424,3 +423,41 @@ async def test_resumed_pipeline_reclarification_emits_needs_clarification_event(
             "turn_number": 2,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_resumed_pipeline_unexpected_error_marks_query_failed():
+    """A failed resumed background task must not leave the query processing."""
+    from app.api.v1 import queries as q
+    from app.db.models import QueryStatus
+
+    query_id = str(uuid4())
+    events: list[dict] = []
+    q._sse_events[query_id] = events
+
+    fake_session = AsyncMock()
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=fake_session)
+    cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch(
+        "app.db.session.AsyncSessionLocal", MagicMock(return_value=cm)
+    ), patch.object(
+        q, "resume_pipeline", AsyncMock(side_effect=RuntimeError("resume blew up"))
+    ):
+        await q._resume_pipeline_background(
+            clarification_id=str(uuid4()),
+            user_answer="Germany, office furniture",
+            query_id=query_id,
+        )
+
+    event_types = [event.get("type") for event in events]
+    assert "error" in event_types
+
+    update_params = [
+        stmt.compile().params
+        for (stmt,), _ in fake_session.execute.call_args_list
+        if hasattr(stmt, "compile")
+    ]
+    statuses = [p.get("status") for p in update_params if "status" in p]
+    assert QueryStatus.failed in statuses, f"expected failed status update, got: {statuses}"

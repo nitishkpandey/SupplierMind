@@ -130,6 +130,7 @@ class LLMProvider(Protocol):
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.1,
         stop: list[str] | None = None,
+        timeout: float | None = None,
     ) -> str: ...
 
     def complete_json(
@@ -139,6 +140,7 @@ class LLMProvider(Protocol):
         model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.0,
+        timeout: float | None = None,
     ) -> str: ...
 
 
@@ -179,7 +181,7 @@ def _is_retryable_openai_error(exc: BaseException) -> bool:
         return getattr(exc, "code", None) != "insufficient_quota"
     if isinstance(exc, openai.APIStatusError):
         return exc.status_code >= 500
-    if isinstance(exc, (openai.APIConnectionError, openai.APITimeoutError)):
+    if isinstance(exc, openai.APIConnectionError | openai.APITimeoutError):
         return True
     return False
 
@@ -217,6 +219,7 @@ class OpenAIProvider(_UsageTracking):
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.1,
         stop: list[str] | None = None,
+        timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
         ts = self._rate_limiter.acquire(
@@ -228,6 +231,7 @@ class OpenAIProvider(_UsageTracking):
             max_tokens=max_tokens,
             temperature=temperature,
             stop=stop,
+            timeout=timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or ""
@@ -246,6 +250,7 @@ class OpenAIProvider(_UsageTracking):
         model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.0,
+        timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
         ts = self._rate_limiter.acquire(
@@ -257,6 +262,7 @@ class OpenAIProvider(_UsageTracking):
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={"type": "json_object"},
+            timeout=timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or "{}"

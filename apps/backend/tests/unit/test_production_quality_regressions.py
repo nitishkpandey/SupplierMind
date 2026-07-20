@@ -7,6 +7,7 @@ fixes to the benchmark query numbers.
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
@@ -22,6 +23,156 @@ from app.core.config import settings
 from app.services import supplier_extraction
 from app.services.supplier_extraction import SupplierExtractionService
 from app.services.web_search import WebSearchService
+
+
+def test_parser_preserves_certification_explicitly_named_in_query_when_finish_loses_it():
+    raw_query = (
+        "Find ISO 9001 certified office furniture manufacturers in Germany "
+        "that can deliver within 30 days"
+    )
+    llm_payload = {
+        "product_type": "office furniture",
+        "product_keywords": ["office furniture"],
+        "category_hint": "office_supplies",
+        "location_country": "Germany",
+        "certifications": [],
+        "lead_time_max_days": 30,
+    }
+    trace = [
+        {
+            "action": "canonicalize_certification",
+            "observation": {
+                "resolved": True,
+                "input": "ISO 9001",
+                "canonical": "ISO 9001",
+            },
+        }
+    ]
+
+    constraints = ParserAgent.__new__(ParserAgent)._normalise_constraints(
+        llm_payload,
+        trace=trace,
+        raw_query=raw_query,
+    )
+
+    assert constraints["certifications"] == ["ISO 9001"]
+
+
+def test_evaluator_never_drops_explicit_hard_constraints_on_retry():
+    class FakeLLM:
+        def complete_json(self, messages, **kwargs):
+            return json.dumps(
+                {
+                    "verdict": "retry",
+                    "reasoning": "No exact result yet.",
+                    "retry_strategy": "relax_constraints",
+                }
+            )
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = FakeLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": (
+            "Find ISO 9001 certified office furniture manufacturers in Germany "
+            "that can deliver within 30 days"
+        ),
+        "parsed_constraints": {
+            "product_type": "office furniture",
+            "location_country": "Germany",
+            "certifications": ["ISO 9001"],
+            "lead_time_max_days": 30,
+            "query_type": "compliance_critical",
+        },
+        "search_scope": "both",
+        "ranked_suppliers": [],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    out = agent.execute(state)
+
+    assert out["evaluator_should_retry"] is False
+    assert out["pipeline_status"] == "completed"
+    assert out["parsed_constraints"]["certifications"] == ["ISO 9001"]
+    assert out["parsed_constraints"]["lead_time_max_days"] == 30
+    assert out["relaxed_constraints"] == []
+
+
+def test_evaluator_zero_results_with_hard_constraints_does_not_wait_for_llm():
+    class ExplodingLLM:
+        def complete_json(self, messages, **kwargs):
+            raise AssertionError("strict zero-result searches should finish deterministically")
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = ExplodingLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": (
+            "Find ISO 9001 certified office furniture manufacturers in Germany "
+            "that can deliver within 30 days"
+        ),
+        "parsed_constraints": {
+            "product_type": "office furniture",
+            "location_country": "Germany",
+            "certifications": ["ISO 9001"],
+            "lead_time_max_days": 30,
+        },
+        "search_scope": "both",
+        "ranked_suppliers": [],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    out = agent.execute(state)
+
+    assert out["evaluator_should_retry"] is False
+    assert out["evaluator_verdict"] == "fail"
+    assert out["pipeline_status"] == "completed"
+    assert out["parsed_constraints"]["certifications"] == ["ISO 9001"]
+    assert out["parsed_constraints"]["lead_time_max_days"] == 30
+
+
+def test_evaluator_llm_timeout_fails_closed_without_blocking(monkeypatch):
+    monkeypatch.setattr(settings, "EVALUATOR_LLM_TIMEOUT_SECONDS", 0.01, raising=False)
+    seen_timeouts: list[float | None] = []
+
+    class TimeoutAwareLLM:
+        def complete_json(self, messages, **kwargs):
+            timeout = kwargs.get("timeout")
+            seen_timeouts.append(timeout)
+            if timeout == 0.01:
+                raise TimeoutError("evaluator LLM call timed out")
+            time.sleep(0.05)
+            return json.dumps(
+                {
+                    "verdict": "retry",
+                    "reasoning": "Too slow to be user-critical.",
+                    "retry_strategy": "expand_scope",
+                }
+            )
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = TimeoutAwareLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": "Find suppliers for industrial packaging",
+        "parsed_constraints": {"product_type": "industrial packaging"},
+        "search_scope": "approved_only",
+        "ranked_suppliers": [{"total_score": 0.2, "semantic_score": 0.2, "supplier_id": "s1", "tier": "approved", "explanation": "weak"}],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    start = time.monotonic()
+    out = agent.execute(state)
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 0.04
+    assert seen_timeouts == [0.01]
+    assert out["evaluator_should_retry"] is False
+    assert out["evaluator_verdict"] == "accept"
+    assert out["pipeline_status"] == "completed"
 
 
 def test_parser_recovers_office_furniture_from_constraint_soup_product():
@@ -393,7 +544,15 @@ def test_evaluator_prompt_does_not_claim_approved_only_when_scope_is_both():
         "raw_query": "office furniture suppliers in Berlin",
         "parsed_constraints": {"product_type": "office furniture", "location_city": "Berlin"},
         "search_scope": "both",
-        "ranked_suppliers": [],
+        "ranked_suppliers": [
+            {
+                "supplier_id": "supplier-1",
+                "tier": "pending_review",
+                "total_score": 0.45,
+                "semantic_score": 0.3,
+                "explanation": "Limited semantic match to office furniture.",
+            }
+        ],
         "evaluator_retries": 0,
         "audit_log": [],
     }

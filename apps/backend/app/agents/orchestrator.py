@@ -42,6 +42,8 @@ import asyncio
 import logging
 import time
 import uuid as _uuid
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any, Literal
 
 from langgraph.graph import END, StateGraph
@@ -55,8 +57,13 @@ from app.agents.parser_agent import ParserAgent
 from app.agents.ranking_agent import RankingAgent
 from app.agents.state import AgentState
 from app.agents.tools import build_user_registry
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+_query_memory_executor = ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="suppliermind-query-memory",
+)
 
 
 def _create_initial_state(
@@ -233,12 +240,14 @@ def finalize_node(state: AgentState) -> AgentState:
 
     start = time.time()
     try:
-        from app.services.query_memory import get_memory_service
-
-        memory_id = get_memory_service().write(
-            user_id=str(user_id),
-            query_text=raw_query,
-            parsed_constraints=dict(constraints),
+        future = _query_memory_executor.submit(
+            _write_query_memory,
+            str(user_id),
+            raw_query,
+            dict(constraints),
+        )
+        memory_id = future.result(
+            timeout=max(0.0, settings.QUERY_MEMORY_WRITE_TIMEOUT_SECONDS)
         )
         duration_ms = int((time.time() - start) * 1000)
         logger.info(
@@ -257,6 +266,27 @@ def finalize_node(state: AgentState) -> AgentState:
             ),
             output_summary=f"memory_id={memory_id}",
         )
+    except FutureTimeoutError:
+        future.cancel()
+        duration_ms = int((time.time() - start) * 1000)
+        logger.warning(
+            "[finalize] query memory write timed out after %dms; response continues",
+            duration_ms,
+        )
+        _append_audit(
+            state,
+            agent_name="memory_service",
+            action="memory_write_timeout",
+            duration_ms=duration_ms,
+            reasoning=(
+                "Query memory write exceeded the non-critical timeout; "
+                "results were returned without waiting for semantic memory."
+            ),
+            output_summary=(
+                f"TIMEOUT after {duration_ms}ms "
+                f"(budget={settings.QUERY_MEMORY_WRITE_TIMEOUT_SECONDS}s)"
+            ),
+        )
     except Exception as e:  # noqa: BLE001 — memory write must be failsafe
         duration_ms = int((time.time() - start) * 1000)
         logger.warning("[finalize] memory_write_failed: %s", e)
@@ -269,6 +299,20 @@ def finalize_node(state: AgentState) -> AgentState:
             output_summary=f"FAILED: {type(e).__name__}",
         )
     return state
+
+
+def _write_query_memory(
+    user_id: str,
+    raw_query: str,
+    constraints: dict,
+) -> str:
+    from app.services.query_memory import get_memory_service
+
+    return get_memory_service().write(
+        user_id=user_id,
+        query_text=raw_query,
+        parsed_constraints=constraints,
+    )
 
 
 def _append_audit(

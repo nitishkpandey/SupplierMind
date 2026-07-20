@@ -17,6 +17,7 @@
 import axios from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
+import type { User } from "@/types";
 
 const BASE_URL = "/api/v1";
 
@@ -57,7 +58,13 @@ api.interceptors.response.use(
             refresh_token: refreshToken,
           });
           const newToken = res.data.access_token;
-          useAuthStore.getState().setAuth(newToken, res.data);
+          const user: User = {
+            id: res.data.user_id,
+            email: res.data.email,
+            name: res.data.name,
+            role: res.data.role,
+          };
+          useAuthStore.getState().setAuth(newToken, user);
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } catch {
