@@ -98,6 +98,7 @@ class Settings(BaseSettings):
 
     # ── External Discovery ─────────────────────────────────────────────
     TAVILY_API_KEY: str = ""
+    TAVILY_API_BASE_URL: str = "https://api.tavily.com/search"
     OPENCORPORATES_API_KEY: str = ""
     ENABLE_EXTERNAL_DISCOVERY: bool = True
     EXTERNAL_DISCOVERY_MAX_RESULTS: int = 6
@@ -111,6 +112,7 @@ class Settings(BaseSettings):
     # production so the discovery agent keeps its graceful-degradation path.
     EMBED_FAIL_FAST: bool = False
     QUERY_MEMORY_WRITE_TIMEOUT_SECONDS: float = 5.0
+    QUERY_EXECUTION_TIMEOUT_SECONDS: float = 145.0
     SSE_TIMEOUT_SECONDS: int = 300
     SSE_CLEANUP_DELAY_SECONDS: int = 300
     QUERY_MIN_LENGTH: int = 10

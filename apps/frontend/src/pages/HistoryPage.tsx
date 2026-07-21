@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { QueryWithResults } from "@/types";
+import type { QueryHistoryItem } from "@/types";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryService } from "@/services/api";
@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Clock, Search, Eye, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle, XCircle, Clock, Search, Eye, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function HistoryPage() {
@@ -40,6 +40,7 @@ export default function HistoryPage() {
     failed: { icon: XCircle, color: "text-red-500", label: t("history.status_failed") },
     pending: { icon: Clock, color: "text-yellow-500", label: t("history.status_pending") },
     processing: { icon: Clock, color: "text-blue-500", label: "Processing" },
+    needs_clarification: { icon: AlertCircle, color: "text-amber-500", label: "Needs clarification" },
   } as const;
 
   return (
@@ -78,7 +79,7 @@ export default function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {queries.map((query: QueryWithResults) => {
+          {queries.map((query: QueryHistoryItem) => {
             const status = statusConfig[query.status as keyof typeof statusConfig]
               ?? statusConfig.pending;
             const Icon = status.icon;
@@ -107,6 +108,7 @@ export default function HistoryPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline">{status.label}</Badge>
                         {query.results?.length > 0 && (
                           <Badge variant="secondary">
                             {query.results.length} results

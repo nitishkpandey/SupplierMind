@@ -60,6 +60,54 @@ class DiscoveryAgent(BaseAgent):
 
     agent_name = "discovery"
 
+    @staticmethod
+    def _filter_candidate_rows_by_geography(
+        *,
+        rows: list[tuple[str, float | None, float | None]],
+        constraints: dict,
+    ) -> tuple[list[str], dict[str, float], str | None]:
+        """Apply requested radius/region constraints as fail-closed hard filters."""
+        radius = constraints.get("location_radius_km")
+        region = constraints.get("location_region")
+        bounds = constraints.get("location_bounds")
+        center_lat = constraints.get("location_lat")
+        center_lng = constraints.get("location_lng")
+
+        if region and (
+            not isinstance(bounds, (list, tuple))
+            or len(bounds) != 4
+        ):
+            return [], {}, "region_bounds_unverified"
+        if radius is not None and (center_lat is None or center_lng is None):
+            return [], {}, "radius_center_unverified"
+
+        retained: list[str] = []
+        distances: dict[str, float] = {}
+        for raw_id, lat, lng in rows:
+            sid = str(raw_id)
+            if lat is None or lng is None:
+                continue
+
+            if region:
+                south, west, north, east = (float(value) for value in bounds)
+                if not (south <= float(lat) <= north and west <= float(lng) <= east):
+                    continue
+
+            if radius is not None:
+                distance = SupplierRepository._haversine(
+                    float(center_lat),
+                    float(center_lng),
+                    float(lat),
+                    float(lng),
+                )
+                if distance > float(radius):
+                    continue
+                distances[sid] = distance
+
+            retained.append(sid)
+
+        return retained, distances, None
+
     def execute(self, state: AgentState) -> AgentState:
         # Ensure defaults
         state.setdefault("candidate_supplier_ids", [])
@@ -229,9 +277,9 @@ class DiscoveryAgent(BaseAgent):
                     )
 
                 # Strategy 3: Geospatial radius
-                if (constraints.get("location_lat") and
-                    constraints.get("location_lng") and
-                    constraints.get("location_radius_km")):
+                if (constraints.get("location_lat") is not None and
+                    constraints.get("location_lng") is not None and
+                    constraints.get("location_radius_km") is not None):
                     geo_with_dist = SupplierRepository.filter_by_radius_sync(
                         db=db,
                         center_lat=constraints["location_lat"],
@@ -296,6 +344,43 @@ class DiscoveryAgent(BaseAgent):
             rrf_scores[sid] = score
 
         candidate_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)
+
+        # Semantic and structured retrieval may contribute geographically
+        # irrelevant candidates. Enforce requested radius/region constraints
+        # once, after all channels have merged, and fail closed when supplier
+        # coordinates or verified region bounds are unavailable.
+        geography_requested = (
+            constraints.get("location_radius_km") is not None
+            or bool(constraints.get("location_region"))
+        )
+        geography_diagnostic: str | None = None
+        if geography_requested and candidate_ids:
+            try:
+                with SyncSessionLocal() as db:
+                    coordinate_rows = db.execute(
+                        select(Supplier.id, Supplier.latitude, Supplier.longitude).where(
+                            Supplier.id.in_(candidate_ids)
+                        )
+                    ).all()
+                retained, hard_distances, geography_diagnostic = (
+                    self._filter_candidate_rows_by_geography(
+                        rows=[(str(sid), lat, lng) for sid, lat, lng in coordinate_rows],
+                        constraints=constraints,
+                    )
+                )
+                retained_set = set(retained)
+                candidate_ids = [sid for sid in candidate_ids if sid in retained_set]
+                geo_distances.update(hard_distances)
+            except Exception as exc:
+                logger.error("[discovery] Hard geographic filter failed: %s", exc)
+                candidate_ids = []
+                geography_diagnostic = "geography_coordinates_unavailable"
+        elif geography_requested:
+            _, _, geography_diagnostic = self._filter_candidate_rows_by_geography(
+                rows=[],
+                constraints=constraints,
+            )
+        state["geography_diagnostic"] = geography_diagnostic
         duration_ms = int((time.time() - start) * 1000)
 
         logger.info(
@@ -623,7 +708,7 @@ class DiscoveryAgent(BaseAgent):
         previous: list[str],
     ) -> tuple[dict | None, str]:
         available = [
-            k for k in ["location_radius_km", "lead_time_max_days", "capacity_min"]
+            k for k in ["lead_time_max_days", "capacity_min"]
             if k in constraints and k not in previous
         ]
 

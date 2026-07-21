@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authService } from "@/services/api";
+import { useAuthStore } from "@/store/authStore";
 
 // Github icon as SVG (lucide version workaround)
 function GithubIcon() {
@@ -26,6 +30,10 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const [devLoginPending, setDevLoginPending] = useState(false);
+  const [devLoginError, setDevLoginError] = useState<string | null>(null);
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   const handleGoogleLogin = () => {
@@ -36,8 +44,24 @@ export default function LoginPage() {
     window.location.href = `${apiBaseUrl}/api/v1/auth/github/authorize`;
   };
 
-  const handleDevLogin = () => {
-    window.location.href = `${apiBaseUrl}/api/v1/auth/dev-login?email=dev@suppliermind.local`;
+  const handleDevLogin = async () => {
+    setDevLoginPending(true);
+    setDevLoginError(null);
+    try {
+      const { data } = await authService.devLogin();
+      sessionStorage.setItem("sm_refresh_token", data.refresh_token);
+      setAuth(data.access_token, {
+        id: data.user_id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+      });
+      navigate("/dashboard", { replace: true });
+    } catch {
+      setDevLoginError("Development login failed. Check that the backend is running in development mode.");
+    } finally {
+      setDevLoginPending(false);
+    }
   };
 
   return (
@@ -105,11 +129,15 @@ export default function LoginPage() {
                 </div>
                 <Button
                   onClick={handleDevLogin}
+                  disabled={devLoginPending}
                   variant="outline"
                   className="w-full h-11 gap-3 bg-slate-700/50 hover:bg-slate-700 text-slate-400 border-slate-700 border-dashed"
                 >
-                  Dev Login (no OAuth)
+                  {devLoginPending ? "Signing in…" : "Dev Login (no OAuth)"}
                 </Button>
+                {devLoginError && (
+                  <p className="text-xs text-red-400" role="alert">{devLoginError}</p>
+                )}
               </>
             )}
           </CardContent>

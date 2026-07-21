@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { QueryWithResults } from "@/types";
+import type { QueryHistoryItem } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -126,7 +126,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {recentQueries.map((query: QueryWithResults) => (
+              {recentQueries.map((query: QueryHistoryItem) => (
                 <Link
                   key={query.id}
                   to={`/query/${query.id}/results?view=history`}

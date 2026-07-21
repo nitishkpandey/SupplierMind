@@ -14,15 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Map, ListTree, Download, AlertCircle, Brain } from "lucide-react";
 import type { QueryWithResults } from "@/types";
-
-// Agent step display config
-const AGENT_STEPS = [
-  { id: "parser", label: "Parser Agent", desc: "Extracting constraints" },
-  { id: "external_discovery", label: "External Discovery", desc: "Searching the web for new suppliers" },
-  { id: "discovery", label: "Internal Search", desc: "Matching from database" },
-  { id: "compliance", label: "Compliance Agent", desc: "Validating suppliers" },
-  { id: "ranking", label: "Ranking Agent", desc: "Scoring results" },
-];
+import {
+  agentStepsForScope,
+  buildResultsCsv,
+  zeroResultMessage,
+} from "@/features/queries/resultPresentation";
 
 export default function ResultsPage() {
   const { queryId } = useParams<{ queryId: string }>();
@@ -84,6 +80,7 @@ export default function ResultsPage() {
       .map((e) => e.agent as string);
     return Array.from(new Set(agents));
   }, [events]);
+  const agentSteps = agentStepsForScope(queryData?.search_scope ?? "approved_only");
 
   const { data: auditData } = useQuery({
     queryKey: ["auditTrail", queryId],
@@ -96,21 +93,14 @@ export default function ResultsPage() {
 
   const handleExportCSV = () => {
     if (!queryData?.results) return;
-    const headers = ["Rank", "Supplier ID", "Score", "CSR Score", "Explanation"];
-    const rows = queryData.results.map((r) => [
-      r.rank,
-      r.supplier_id,
-      r.total_score.toFixed(3),
-      r.constraint_score.toFixed(3),
-      `"${r.explanation.replace(/"/g, "'")}"`,
-    ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const csv = buildResultsCsv(queryData.results);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `suppliermind_${queryId?.slice(0, 8)}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   // ── Clarification state (Task 3.3) ───────────────────────────────
@@ -141,7 +131,7 @@ export default function ResultsPage() {
 
   // ── Processing state ─────────────────────────────────────────────
   if (shouldStream && !isComplete) {
-    const progress = (completedAgents.length / AGENT_STEPS.length) * 100;
+    const progress = (completedAgents.length / agentSteps.length) * 100;
 
     return (
       <div className="p-8 max-w-2xl mx-auto">
@@ -165,11 +155,11 @@ export default function ResultsPage() {
 
           {/* Agent steps */}
           <div className="space-y-2 text-left">
-            {AGENT_STEPS.map((step) => {
+            {agentSteps.map((step) => {
               const isDone = completedAgents.includes(step.id);
               const isActive =
                 !isDone &&
-                completedAgents.length === AGENT_STEPS.findIndex((s) => s.id === step.id);
+                completedAgents.length === agentSteps.findIndex((s) => s.id === step.id);
 
               return (
                 <div
@@ -189,7 +179,7 @@ export default function ResultsPage() {
                           : "bg-muted"
                       }`}
                   >
-                    {isDone ? "✓" : AGENT_STEPS.findIndex((s) => s.id === step.id) + 1}
+                    {isDone ? "✓" : agentSteps.findIndex((s) => s.id === step.id) + 1}
                   </div>
                   <div>
                     <p className="text-sm font-medium">{step.label}</p>
@@ -208,7 +198,7 @@ export default function ResultsPage() {
   }
 
   // ── Error state ──────────────────────────────────────────────────
-  if (sseError || queryData?.status === "failed") {
+  if (sseError || (queryData?.status === "failed" && !queryData.diagnostics?.code)) {
     return (
       <div className="p-8 max-w-2xl mx-auto text-center space-y-4">
         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
@@ -264,6 +254,14 @@ export default function ResultsPage() {
                 {queryData.detected_language.toUpperCase()} query
               </Badge>
             )}
+            <Badge variant="outline">
+              {queryData.search_scope === "both" ? "Approved + web" : "Approved only"}
+            </Badge>
+            {queryData.evaluator_verdict && (
+              <Badge variant="outline">
+                Evaluator: {queryData.evaluator_verdict}
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -308,7 +306,12 @@ export default function ResultsPage() {
         <div className="text-center py-16 text-muted-foreground space-y-2">
           <AlertCircle className="w-10 h-10 mx-auto opacity-50" />
           <p className="font-medium">{t("results.no_results")}</p>
-          <p className="text-sm">{t("results.try_relaxing")}</p>
+          <p className="text-sm">{zeroResultMessage(queryData)}</p>
+          {queryData.diagnostics?.hard_constraints?.length ? (
+            <p className="text-xs">
+              Checked: {queryData.diagnostics.hard_constraints.join(" · ")}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">

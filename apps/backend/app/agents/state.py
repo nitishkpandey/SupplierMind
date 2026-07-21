@@ -35,6 +35,7 @@ class ParsedConstraints(TypedDict, total=False):
     location_lat: Optional[float]
     location_lng: Optional[float]
     location_radius_km: Optional[float]
+    location_bounds: Optional[list[float]]  # south, west, north, east
 
     # Constraints
     certifications: Optional[list[str]]            # HARD gate — user-stated certs only
@@ -122,6 +123,7 @@ class AgentState(TypedDict):
     raw_query: str
     query_id: str
     user_id: str
+    deadline_at: float  # monotonic timestamp shared by the full pipeline
 
     # ── Parser Agent output ───────────────────────────────────────────
     parsed_constraints: Optional[ParsedConstraints]
@@ -147,6 +149,7 @@ class AgentState(TypedDict):
     candidate_supplier_ids: list[str]
     semantic_scores: dict[str, float]   # {supplier_id: similarity_score}
     geo_distances: dict[str, float]     # {supplier_id: distance_km}
+    geography_diagnostic: Optional[str]
     retry_count: int
     relaxed_constraints: list[str]      # Which constraints were relaxed on retry
 

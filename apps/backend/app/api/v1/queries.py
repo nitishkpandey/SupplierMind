@@ -42,6 +42,70 @@ router = APIRouter()
 _sse_events: dict[str, list[dict]] = {}
 
 
+def _hard_constraint_labels(constraints: dict | None) -> list[str]:
+    constraints = constraints or {}
+    labels: list[str] = []
+    labels.extend(str(cert) for cert in constraints.get("certifications") or [])
+    if constraints.get("location_radius_km") is not None:
+        centre = constraints.get("location_city") or constraints.get("location_name") or "centre"
+        labels.append(f"within {constraints['location_radius_km']} km of {centre}")
+    elif constraints.get("location_region"):
+        labels.append(str(constraints["location_region"]))
+    elif constraints.get("location_city"):
+        labels.append(str(constraints["location_city"]))
+    elif constraints.get("location_country"):
+        labels.append(str(constraints["location_country"]))
+    if constraints.get("lead_time_max_days") is not None:
+        labels.append(f"delivery within {constraints['lead_time_max_days']} days")
+    if constraints.get("capacity_min") is not None:
+        capacity = f"capacity >= {constraints['capacity_min']}"
+        if constraints.get("capacity_unit"):
+            capacity += f" {constraints['capacity_unit']}"
+        labels.append(capacity)
+    return labels
+
+
+def _build_query_diagnostics(query: Query) -> dict:
+    """Derive a stable, credential-free explanation for the result state."""
+    constraints = getattr(query, "parsed_constraints", None) or {}
+    results = list(getattr(query, "results", None) or [])
+    error = str(getattr(query, "error_message", None) or "")
+    audit_logs = list(getattr(query, "audit_logs", None) or [])
+    external_ran = any(
+        getattr(log, "agent_name", None) == "external_discovery"
+        and not str(getattr(log, "action", "")).startswith("skipped")
+        for log in audit_logs
+    )
+
+    code = None
+    message = None
+    partial = False
+    if not results:
+        lower_error = error.casefold()
+        if "deadline" in lower_error or "timeout" in lower_error:
+            code = "deadline_exceeded"
+            message = "The search reached its execution deadline; completed checks were preserved."
+            partial = True
+        elif constraints.get("location_region") and not constraints.get("location_bounds"):
+            code = "region_bounds_unverified"
+            message = "The requested region could not be verified with geographic bounds."
+        elif any(token in lower_error for token in ("unavailable", "connection", "infrastructure")):
+            code = "infrastructure_failure"
+            message = "A required search dependency was unavailable during this run."
+            partial = True
+        else:
+            code = "strict_constraints_no_match"
+            message = "No verified suppliers satisfied all hard constraints."
+
+    return {
+        "hard_constraints": _hard_constraint_labels(constraints),
+        "external_discovery_ran": external_ran,
+        "partial": partial,
+        "code": code,
+        "message": message,
+    }
+
+
 @router.post(
     "",
     response_model=QueryResponse,
@@ -244,6 +308,14 @@ async def list_queries(
 
     query_repo = QueryRepository(db)
     queries = await query_repo.get_user_queries(current_user.id, offset=offset, limit=limit)
+    open_clarification_ids = (
+        await query_repo.get_open_clarification_query_ids(
+            current_user.id,
+            [q.id for q in queries],
+        )
+        if queries
+        else set()
+    )
 
     # Count total
     result = await db.execute(
@@ -256,7 +328,11 @@ async def list_queries(
             {
                 "id": str(q.id),
                 "raw_query": q.raw_query,
-                "status": q.status.value,
+                "status": (
+                    "needs_clarification"
+                    if q.status == QueryStatus.pending and q.id in open_clarification_ids
+                    else q.status.value
+                ),
                 "execution_time_ms": q.execution_time_ms,
                 "created_at": q.created_at.isoformat(),
                 "results": [{"rank": r.rank} for r in (q.results or [])],
@@ -393,6 +469,10 @@ async def get_query(
         "status": query.status.value,
         "detected_language": query.detected_language,
         "parsed_constraints": query.parsed_constraints,
+        "search_scope": getattr(query, "search_scope", "approved_only"),
+        "evaluator_retries": getattr(query, "evaluator_retries", 0),
+        "evaluator_verdict": getattr(query, "evaluator_verdict", None),
+        "diagnostics": _build_query_diagnostics(query),
         "execution_time_ms": query.execution_time_ms,
         "error_message": query.error_message,
         "created_at": query.created_at.isoformat(),

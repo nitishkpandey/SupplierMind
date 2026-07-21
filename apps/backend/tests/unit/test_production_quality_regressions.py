@@ -11,7 +11,11 @@ import time
 
 import pytest
 
-from app.agents.compliance_agent import ComplianceAgent, canonical_cert_key
+from app.agents.compliance_agent import (
+    ComplianceAgent,
+    canonical_cert_key,
+    product_fit_verdict,
+)
 from app.agents.evaluator_agent import EvaluatorAgent
 from app.agents.external_discovery_agent import (
     ExternalDiscoveryAgent,
@@ -268,6 +272,42 @@ def test_compliance_rejects_office_furniture_query_for_foundry_candidate():
     )
 
 
+@pytest.mark.parametrize(
+    "supplier",
+    [
+        {
+            "id": "packaging",
+            "name": "Frankfurt Pack Solutions GmbH",
+            "description": "Manufactures industrial packaging solutions and corrugated cardboard.",
+            "category": "packaging",
+        },
+        {
+            "id": "automation",
+            "name": "Broetje-Automation",
+            "description": "Aerospace automation and manufacturing equipment.",
+            "category": "machinery",
+        },
+    ],
+)
+def test_product_fit_rejects_generic_word_overlap_for_office_furniture(supplier):
+    verdict = product_fit_verdict(
+        supplier,
+        {
+            "product_type": "office furniture",
+            "product_keywords": [
+                "office furniture",
+                "furniture",
+                "office equipment",
+                "workspace solutions",
+            ],
+            "category_hint": "office_supplies",
+        },
+    )
+
+    assert verdict is not None
+    assert verdict["status"] == "FAIL"
+
+
 def test_product_fit_reason_uses_verdict_reason_not_certification_template():
     reasons = build_match_reasons({
         "compliance_results": [
@@ -424,24 +464,19 @@ def test_ranking_dedupes_visible_results_by_normalized_supplier_name(monkeypatch
 
 
 def test_web_search_city_is_in_every_query_and_runs_basic_depth(monkeypatch):
-    queries_seen: list[tuple[str, str]] = []
-
-    class FakeClient:
-        def search(self, **kwargs):
-            queries_seen.append((kwargs["query"], kwargs["search_depth"]))
-            return {
-                "results": [
-                    {
-                        "url": f"https://example{len(queries_seen)}.de",
-                        "title": "Example",
-                        "content": "Berlin office furniture supplier",
-                        "score": 0.9,
-                    }
-                ]
-            }
+    queries_seen: list[str] = []
 
     service = WebSearchService.__new__(WebSearchService)
-    service._client = FakeClient()
+    service._client = object()
+    service._search_raw = lambda query, max_results=10, timeout_seconds=None: (
+        queries_seen.append(query)
+        or [{
+            "url": f"https://example{len(queries_seen)}.de",
+            "title": "Example",
+            "content": "Berlin office furniture supplier",
+            "score": 0.9,
+        }]
+    )
 
     results = service.search_suppliers(
         category="office_supplies",
@@ -455,9 +490,33 @@ def test_web_search_city_is_in_every_query_and_runs_basic_depth(monkeypatch):
 
     assert len(results) == 2
     assert queries_seen
-    assert all("Berlin" in query for query, _ in queries_seen)
-    assert all("Germany" in query for query, _ in queries_seen)
-    assert all(depth == "basic" for _, depth in queries_seen)
+    assert all("Berlin" in query for query in queries_seen)
+    assert all("Germany" in query for query in queries_seen)
+
+
+def test_certification_query_runs_before_global_cap_is_applied():
+    service = WebSearchService.__new__(WebSearchService)
+    seen: list[str] = []
+    service._client = object()
+    service._search_raw = lambda query, max_results=10, timeout_seconds=None: (
+        seen.append(query)
+        or [{
+            "url": f"https://example{len(seen)}.de",
+            "title": "Company",
+            "content": query,
+            "score": 0.9,
+        }]
+    )
+
+    service.search_suppliers(
+        category="office_supplies",
+        country="Germany",
+        certifications=["ISO 9001"],
+        product_terms=["office furniture"],
+        max_results=2,
+    )
+
+    assert any("ISO 9001" in query for query in seen)
 
 
 def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch):

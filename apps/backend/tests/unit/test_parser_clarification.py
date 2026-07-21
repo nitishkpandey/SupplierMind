@@ -94,6 +94,29 @@ def _make_parser(llm: _FakeLLM, registry: ToolRegistry) -> ParserAgent:
     return parser
 
 
+def test_good_reliable_suppliers_has_no_real_product_and_clarifies():
+    """Quality adjectives describe supplier preference, not a product."""
+    parser = ParserAgent.__new__(ParserAgent)
+    parser._compose_clarification_question = (  # type: ignore[method-assign]
+        lambda *_args, **_kwargs: "What product are you sourcing?"
+    )
+
+    constraints = parser._normalise_constraints(
+        {"product_type": "good", "location_country": "Germany"},
+        trace=[],
+        raw_query="Find good reliable suppliers in Germany",
+    )
+
+    assert constraints["product_type"] is None
+    assert parser._decide_clarification(
+        constraints,
+        [],
+        "Find good reliable suppliers in Germany",
+        0.8,
+        None,
+    ) is not None
+
+
 # ── 1. Clear query → no clarification ────────────────────────────────
 
 

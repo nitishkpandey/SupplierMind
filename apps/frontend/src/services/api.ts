@@ -17,7 +17,7 @@
 import axios from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
-import type { User } from "@/types";
+import type { QueryHistoryResponse, QueryWithResults, User } from "@/types";
 
 const BASE_URL = "/api/v1";
 
@@ -89,10 +89,10 @@ export const queryService = {
     api.post<{ id: string; status: string }>("/queries", { raw_query: rawQuery, search_scope: scope }),
 
   getResult: (queryId: string) =>
-    api.get(`/queries/${queryId}`),
+    api.get<QueryWithResults>(`/queries/${queryId}`),
 
   getHistory: (page = 1) =>
-    api.get(`/queries?offset=${(page - 1) * 20}&limit=20`),
+    api.get<QueryHistoryResponse>(`/queries?offset=${(page - 1) * 20}&limit=20`),
   clearHistory: () =>
     api.delete<{ deleted: number }>("/queries/history"),
 
@@ -147,6 +147,15 @@ export const supplierWorkflowService = {
 
 // Auth service methods
 export const authService = {
+  devLogin: (email = "dev@suppliermind.local", role = "procurement_manager") =>
+    api.post<{
+      access_token: string;
+      refresh_token: string;
+      user_id: string;
+      email: string;
+      name: string;
+      role: User["role"];
+    }>("/auth/dev-login", { email, role }),
   getMe: () => api.get("/auth/me"),
   logout: () => {
     useAuthStore.getState().clearAuth();

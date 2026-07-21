@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Query
+from app.db.models import PendingClarification, Query
 from app.db.repositories.base import BaseRepository
 
 
@@ -18,7 +18,7 @@ class QueryRepository(BaseRepository[Query]):
         """Fetch query with all results eagerly loaded."""
         result = await self.db.execute(
             select(Query)
-            .options(selectinload(Query.results))
+            .options(selectinload(Query.results), selectinload(Query.audit_logs))
             .where(Query.id == query_id)
         )
         return result.scalar_one_or_none()
@@ -36,6 +36,23 @@ class QueryRepository(BaseRepository[Query]):
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_open_clarification_query_ids(
+        self,
+        user_id: uuid.UUID,
+        query_ids: list[uuid.UUID] | None = None,
+    ) -> set[uuid.UUID]:
+        """Fetch unresolved clarification query IDs in one user-scoped lookup."""
+        statement = select(PendingClarification.query_id).where(
+            PendingClarification.user_id == user_id,
+            PendingClarification.resolved_at.is_(None),
+        )
+        if query_ids is not None:
+            if not query_ids:
+                return set()
+            statement = statement.where(PendingClarification.query_id.in_(query_ids))
+        result = await self.db.execute(statement)
+        return set(result.scalars().all())
 
     async def get_user_recent_queries(
         self, user_id: uuid.UUID, limit: int = 5

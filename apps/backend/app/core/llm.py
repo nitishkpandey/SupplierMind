@@ -22,6 +22,7 @@ spend per paradigm.
 import logging
 import re
 import threading
+import time
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
@@ -222,16 +223,22 @@ class OpenAIProvider(_UsageTracking):
         timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
+        wait_started = time.monotonic()
         ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
+            resolved_model,
+            estimate_message_tokens(messages, max_tokens),
+            max_wait_seconds=timeout,
         )
+        request_timeout = timeout
+        if timeout is not None:
+            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
         response = self._client.chat.completions.create(
             model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
             stop=stop,
-            timeout=timeout,
+            timeout=request_timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or ""
@@ -253,16 +260,22 @@ class OpenAIProvider(_UsageTracking):
         timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
+        wait_started = time.monotonic()
         ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
+            resolved_model,
+            estimate_message_tokens(messages, max_tokens),
+            max_wait_seconds=timeout,
         )
+        request_timeout = timeout
+        if timeout is not None:
+            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
         response = self._client.chat.completions.create(
             model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={"type": "json_object"},
-            timeout=timeout,
+            timeout=request_timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or "{}"

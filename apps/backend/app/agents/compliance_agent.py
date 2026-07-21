@@ -28,7 +28,9 @@ from pathlib import Path
 from typing import Optional
 
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState, ComplianceResult, SupplierComplianceResult
+from app.utils.capacity_units import compare_capacity
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
@@ -325,6 +327,11 @@ _PRODUCT_TOKEN_STOPWORDS = {
     "bifma", "with", "without", "and", "or", "for", "the", "a", "an", "in",
     "near", "within", "under", "over", "above", "below", "days", "day", "km",
 }
+_GENERIC_PRODUCT_TOKENS = {
+    "equipment", "solution", "solutions", "system", "systems", "service",
+    "services", "product", "products", "part", "parts", "industrial",
+    "manufacturing", "workspace",
+}
 
 COMPLIANCE_BATCH_SYSTEM_PROMPT = """You are a procurement compliance expert. Return JSON only.
 
@@ -389,17 +396,32 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
         *(constraints.get("product_keywords") or []),
     ]
     required_tokens = _product_tokens(product_terms)
-    supplier_tokens = _product_tokens([
+    supplier_values = [
         supplier.get("name"),
         supplier.get("description"),
         supplier.get("category"),
         *(supplier.get("primary_products") or []),
-    ])
-    text_overlap = bool(required_tokens & supplier_tokens) if required_tokens else True
+    ]
+    supplier_tokens = _product_tokens(supplier_values)
+
+    required_distinctive = required_tokens - _GENERIC_PRODUCT_TOKENS
+    distinctive_overlap = required_distinctive & supplier_tokens
+    supplier_text = " ".join(str(value or "") for value in supplier_values).casefold()
+    supplier_text = " ".join(re.findall(r"[a-z0-9+.-]+", supplier_text))
+    phrase_match = False
+    for term in product_terms:
+        if not isinstance(term, str):
+            continue
+        phrase = " ".join(re.findall(r"[a-z0-9+.-]+", term.casefold()))
+        phrase_tokens = _product_tokens([phrase]) - _GENERIC_PRODUCT_TOKENS
+        if phrase and phrase_tokens and phrase in supplier_text:
+            phrase_match = True
+            break
+    strong_text_match = bool(distinctive_overlap) or phrase_match
 
     category_exact = bool(req_category and sup_category and req_category == sup_category)
 
-    if req_category and sup_category and not category_ok and not text_overlap:
+    if req_category and sup_category and not category_ok and not strong_text_match:
         return {
             "constraint_name": "product_fit",
             "status": "FAIL",
@@ -418,7 +440,7 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
-    if req_category and sup_category and category_ok and not text_overlap and required_tokens:
+    if req_category and sup_category and category_ok and not strong_text_match and required_tokens:
         return {
             "constraint_name": "product_fit",
             "status": "FAIL",
@@ -430,11 +452,22 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
-    if required_tokens and text_overlap:
+    if required_tokens and strong_text_match:
         return {
             "constraint_name": "product_fit",
             "status": "PASS",
             "reason": "Supplier text overlaps requested product terms",
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if required_tokens and supplier_tokens:
+        return {
+            "constraint_name": "product_fit",
+            "status": "FAIL",
+            "reason": (
+                "Supplier profile does not mention the requested product "
+                f"'{constraints.get('product_type')}'"
+            ),
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
@@ -463,6 +496,7 @@ class ComplianceAgent(BaseAgent):
     _short_circuit_count: int = 0
 
     def execute(self, state: AgentState) -> AgentState:
+        self._deadline_state = state
         candidate_ids = state.get("candidate_supplier_ids", [])
         constraints = state.get("parsed_constraints") or {}
 
@@ -786,12 +820,19 @@ Return JSON object:
 ]}}"""
 
         try:
+            llm_kwargs: dict = {"temperature": 0.0}
+            deadline_state = getattr(self, "_deadline_state", {})
+            if deadline_state.get("deadline_at") is not None:
+                llm_kwargs["timeout"] = remaining_seconds(
+                    deadline_state,
+                    reserve=2.0,
+                )
             raw = self.llm.complete_json(
                 [
                     {"role": "system", "content": COMPLIANCE_BATCH_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.0,
+                **llm_kwargs,
             )
             data = json.loads(raw)
             items = data.get("results", [])
@@ -879,42 +920,17 @@ Return JSON object:
     ) -> ComplianceResult:
         """Check if supplier meets minimum capacity requirement."""
         supplier_cap = supplier.get("capacity_value")
-        supplier_unit = supplier.get("capacity_unit", "")
-
-        if supplier_cap is None:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": "Capacity data not available in supplier profile",
-                "confidence": 0.5,
-            }
-
-        if supplier_unit != cap_unit:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": f"Capacity unit mismatch: supplier has {supplier_unit}, required {cap_unit}",
-                "confidence": 0.6,
-            }
-
-        if supplier_cap >= min_cap:
-            return {
-                "constraint_name": "capacity",
-                "status": "PASS",
-                "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} meets minimum {min_cap:,.0f}",
-                "confidence": 1.0,
-            }
-        elif supplier_cap >= min_cap * CAPACITY_PARTIAL_THRESHOLD:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": f"Capacity {supplier_cap:,.0f} is slightly below minimum {min_cap:,.0f} {supplier_unit}",
-                "confidence": 0.9,
-            }
-        else:
-            return {
-                "constraint_name": "capacity",
-                "status": "FAIL",
-                "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} is below minimum {min_cap:,.0f}",
-                "confidence": 1.0,
-            }
+        supplier_unit = supplier.get("capacity_unit")
+        status, reason = compare_capacity(
+            supplier_cap,
+            supplier_unit,
+            min_cap,
+            cap_unit,
+        )
+        confidence = 0.5 if supplier_cap is None else (0.6 if status == "PARTIAL" else 1.0)
+        return {
+            "constraint_name": "capacity",
+            "status": status,
+            "reason": reason,
+            "confidence": confidence,
+        }

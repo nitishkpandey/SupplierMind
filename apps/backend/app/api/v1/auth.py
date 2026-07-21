@@ -37,27 +37,34 @@ from app.core.security import (
 from app.db.models import User, UserRole
 from app.db.repositories.user_repo import UserRepository
 from app.db.session import get_db
-from app.schemas.auth import RefreshRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    DevLoginRequest,
+    DevLoginResponse,
+    RefreshRequest,
+    TokenResponse,
+    UserResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 # ── Dev Login (development only) ───────────────────────────────────────
-@router.get("/dev-login", summary="Dev-only login bypass")
+@router.post(
+    "/dev-login",
+    response_model=DevLoginResponse,
+    summary="Dev-only login bypass",
+)
 async def dev_login(
-    email: str = Query(default="dev@suppliermind.local"),
-    role: str = Query(
-        default="procurement_manager",
-        description="Role to assign in dev. Allowed: procurement_manager (default), admin. Dev-only.",
-    ),
+    body: DevLoginRequest,
     db: AsyncSession = Depends(get_db),
-) -> RedirectResponse:
+) -> DevLoginResponse:
     """
     Available in development environment only. Returns 404 elsewhere.
 
     Issues a JWT without OAuth. Only works when APP_ENV=development.
-    Redirects to /auth/callback like OAuth, so AuthCallbackPage handles it.
+    Returns tokens and user identity as JSON; it never redirects or puts
+    credentials in a URL.
 
     The `role` query parameter lets local testing exercise the admin-only
     flows (e.g. supplier approve/reject) without a manual DB role bump.
@@ -69,19 +76,19 @@ async def dev_login(
             detail="Endpoint not available in this environment",
         )
 
-    if role not in ("procurement_manager", "admin"):
+    if body.role not in ("procurement_manager", "admin"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid role. Allowed: procurement_manager, admin.",
         )
-    target_role = UserRole.admin if role == "admin" else UserRole.procurement_manager
+    target_role = UserRole.admin if body.role == "admin" else UserRole.procurement_manager
 
     user = await _get_or_create_user(
         db,
-        email=email,
-        name=email.split("@")[0].replace(".", " ").title(),
+        email=body.email,
+        name=body.email.split("@")[0].replace(".", " ").title(),
         provider="dev",
-        oauth_id=f"dev-{email}",
+        oauth_id=f"dev-{body.email}",
     )
 
     # Apply requested dev role (idempotent if already matching).
@@ -102,13 +109,14 @@ async def dev_login(
     )
     refresh = create_refresh_token(subject=str(user.id))
 
-    return RedirectResponse(
-        url=(
-            f"{settings.FRONTEND_URL}/auth/callback"
-            f"?access_token={jwt_token}"
-            f"&refresh_token={refresh}"
-            f"&role={user.role.value}"
-        )
+    return DevLoginResponse(
+        access_token=jwt_token,
+        refresh_token=refresh,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role.value,
     )
 
 

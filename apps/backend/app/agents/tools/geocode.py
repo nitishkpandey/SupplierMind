@@ -44,6 +44,7 @@ def _run(location_name: str, *, _geocoder: GeocodingService | None = None) -> di
             "country": result.country,
             "region": result.region,
             "display_name": result.display_name,
+            "bounds": list(result.bounds) if result.bounds else None,
         }
 
     coords = geocoder.geocode(name)

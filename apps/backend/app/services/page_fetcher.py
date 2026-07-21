@@ -51,11 +51,11 @@ def _cache_set(url: str, text: str) -> None:
     _PAGE_CACHE[url] = (text, time.time() + CACHE_TTL_SECONDS)
 
 
-def _fetch_raw(url: str) -> Optional[str]:
+def _fetch_raw(url: str, timeout_seconds: float | None = None) -> Optional[str]:
     """Sync HTTP GET with timeout and proper headers."""
     try:
         with httpx.Client(
-            timeout=15.0,
+            timeout=max(0.1, float(timeout_seconds or 15.0)),
             follow_redirects=True,
             headers={"User-Agent": USER_AGENT},
         ) as client:
@@ -91,7 +91,7 @@ def _extract_text(html: str) -> str:
         return ""
 
 
-def fetch_page_content(url: str) -> Optional[str]:
+def fetch_page_content(url: str, timeout_seconds: float | None = None) -> Optional[str]:
     """
     Fetch and extract clean text from a webpage.
     Synchronous — safe to call from agent nodes.
@@ -108,7 +108,7 @@ def fetch_page_content(url: str) -> Optional[str]:
         return cached
 
     # Fetch
-    html = _fetch_raw(url)
+    html = _fetch_raw(url, timeout_seconds=timeout_seconds)
     if not html:
         return None
 

@@ -20,6 +20,17 @@ class TokenResponse(BaseModel):
     role: str
 
 
+class DevLoginRequest(BaseModel):
+    """Development-only credentials for the local login shortcut."""
+    email: str = "dev@suppliermind.local"
+    role: str = "procurement_manager"
+
+
+class DevLoginResponse(TokenResponse):
+    """JSON token bundle returned only by the development login endpoint."""
+    refresh_token: str
+
+
 class RefreshRequest(BaseModel):
     """Body of the token refresh request."""
     refresh_token: str

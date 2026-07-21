@@ -25,6 +25,7 @@ from typing import Any, Optional
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState
 from app.agents.tools import ToolRegistry, build_default_registry
 from app.db.repositories.query_repo import QueryRepository
@@ -79,7 +80,27 @@ _PLACEHOLDER_PRODUCT_RE = re.compile(
 
 def _is_placeholder_product(value: object) -> bool:
     """True when a product_type value is a contentless placeholder."""
-    return isinstance(value, str) and bool(_PLACEHOLDER_PRODUCT_RE.match(value.strip()))
+    if not isinstance(value, str):
+        return False
+    cleaned = value.strip()
+    if not cleaned:
+        return True
+    if _PLACEHOLDER_PRODUCT_RE.match(cleaned):
+        return True
+
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9+.-]*", cleaned.lower())
+    procurement_nouns = {
+        "supplier", "suppliers", "vendor", "vendors", "manufacturer",
+        "manufacturers", "provider", "providers", "source", "sources",
+        "product", "products", "item", "items", "material", "materials",
+        "supply", "supplies",
+    }
+    return bool(tokens) and all(
+        token in _SUPPLIER_QUALITY_WORDS
+        or token in procurement_nouns
+        or token in _QUERY_STOPWORDS
+        for token in tokens
+    )
 
 
 # Generic procurement nouns the LLM occasionally drops into location_country
@@ -190,9 +211,9 @@ _PREFERENCE_SIGNAL_RE = re.compile(
     re.IGNORECASE,
 )
 _SUPPLIER_QUALITY_WORDS = frozenset({
-    "approved", "best", "big", "cheap", "cheapest", "genuine", "global",
+    "approved", "best", "big", "cheap", "cheapest", "genuine", "global", "good",
     "large", "leading", "local", "nearby", "qualified", "reliable",
-    "reasonable", "rating", "ratings", "review", "reviews", "small",
+    "quality", "reasonable", "rating", "ratings", "review", "reviews", "small",
     "strategic", "support", "trusted", "verified",
 })
 _RANKING_PREFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -940,6 +961,11 @@ class ParserAgent(BaseAgent):
                     # Some models hallucinate Observation inside their own
                     # completion; cut generation before it gets the chance.
                     stop=["\nObservation:", "Observation:"],
+                    timeout=(
+                        remaining_seconds(state, reserve=2.0)
+                        if state.get("deadline_at") is not None
+                        else None
+                    ),
                 )
             except Exception as e:
                 loop_error = f"llm_call_failed: {type(e).__name__}: {e}"
@@ -1803,6 +1829,7 @@ class ParserAgent(BaseAgent):
             raw.setdefault("location_country", loc.get("country"))
             raw.setdefault("location_region", loc.get("region"))
             raw.setdefault("location_radius_km", loc.get("radius_km"))
+            raw.setdefault("location_bounds", loc.get("bounds"))
         if isinstance(raw.get("capacity"), dict):
             cap = raw.pop("capacity")
             raw.setdefault("capacity_min", cap.get("min_value"))
@@ -1873,11 +1900,25 @@ class ParserAgent(BaseAgent):
                     ):
                         raw.setdefault("location_lat", obs.get("lat"))
                         raw.setdefault("location_lng", obs.get("lng"))
+                        raw.setdefault("location_bounds", obs.get("bounds"))
                         raw.setdefault("location_city", raw.get("location_city") or obs.get("city"))
                         raw.setdefault(
                             "location_country", raw.get("location_country") or obs.get("country")
                         )
                         raw.setdefault("location_region", raw.get("location_region") or obs.get("region"))
+
+        if raw.get("location_bounds") is None:
+            for step in trace:
+                if step.get("action") != "geocode_location":
+                    continue
+                obs = step.get("observation") or {}
+                if _geocode_step_applies(
+                    step=step,
+                    raw_query=raw_query,
+                    prior_partial=prior_partial,
+                ) and obs.get("bounds"):
+                    raw["location_bounds"] = list(obs["bounds"])
+                    break
 
         _merge_geocode_location_observations(raw, trace, raw_query, prior_partial)
 
@@ -2038,6 +2079,7 @@ class ParserAgent(BaseAgent):
             "location_lat": raw.get("location_lat"),
             "location_lng": raw.get("location_lng"),
             "location_radius_km": raw.get("location_radius_km"),
+            "location_bounds": raw.get("location_bounds"),
 
             "certifications": hard_certs,
             "industry_typical_certs": inferred_certs,

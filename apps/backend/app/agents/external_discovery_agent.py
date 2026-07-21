@@ -6,6 +6,7 @@ import uuid
 from typing import Optional
 
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState
 from app.core.config import settings
 from app.core.vector_store import get_vector_store
@@ -41,7 +42,10 @@ class ExternalDiscoveryAgent(BaseAgent):
 
     def execute(self, state: AgentState) -> AgentState:
         start = time.time()
-        deadline_at = start + max(1, settings.EXTERNAL_DISCOVERY_TIMEOUT)
+        deadline_at = float(
+            state.get("deadline_at")
+            or (time.monotonic() + max(1, settings.EXTERNAL_DISCOVERY_TIMEOUT))
+        )
         deadline_exceeded = False
 
         state.setdefault("newly_discovered_supplier_ids", [])
@@ -83,6 +87,9 @@ class ExternalDiscoveryAgent(BaseAgent):
             product_terms=self._product_terms_from_constraints(constraints),
             raw_query=state.get("raw_query"),
             max_results=max_web_results,
+            timeout_seconds=(
+                remaining_seconds({"deadline_at": deadline_at}, reserve=1.0)
+            ),
         )
 
         logger.info("[external_discovery] Web search: %d candidates", len(web_results))
@@ -252,7 +259,7 @@ class ExternalDiscoveryAgent(BaseAgent):
 
     @staticmethod
     def _deadline_exceeded(deadline_at: float, margin_seconds: float = 0.0) -> bool:
-        return time.time() + margin_seconds >= deadline_at
+        return time.monotonic() + margin_seconds >= deadline_at
 
     @staticmethod
     def _apply_verified_location(supplier: dict, location: VerifiedLocation) -> None:

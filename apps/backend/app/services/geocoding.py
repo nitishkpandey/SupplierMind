@@ -31,6 +31,8 @@ class GeocodeResult:
     country: str | None = None
     region: str | None = None
     display_name: str | None = None
+    # Ordered south, west, north, east. Nominatim emits south, north, west, east.
+    bounds: tuple[float, float, float, float] | None = None
 
 
 # In-memory cache for the current session (fast lookup before DB check)
@@ -114,6 +116,9 @@ class GeocodingService:
                     country=_first_text(address, "country"),
                     region=_first_text(address, "state", "region"),
                     display_name=getattr(location, "address", None),
+                    bounds=_normalise_bounding_box(
+                        (location.raw or {}).get("boundingbox")
+                    ),
                 )
                 logger.info(
                     "[geocoding] Found: %r → (%.4f, %.4f), city=%r, country=%r",
@@ -134,3 +139,16 @@ def _first_text(mapping: dict, *keys: str) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _normalise_bounding_box(value: object) -> tuple[float, float, float, float] | None:
+    """Convert Nominatim's south/north/west/east box to south/west/north/east."""
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    try:
+        south, north, west, east = (float(item) for item in value)
+    except (TypeError, ValueError):
+        return None
+    if south > north or west > east:
+        return None
+    return south, west, north, east

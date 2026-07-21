@@ -12,6 +12,7 @@ import logging
 import time
 
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState
 from app.core.config import settings
 
@@ -196,10 +197,16 @@ class EvaluatorAgent(BaseAgent):
         )
 
         try:
+            evaluator_timeout = settings.EVALUATOR_LLM_TIMEOUT_SECONDS
+            if state.get("deadline_at") is not None:
+                evaluator_timeout = min(
+                    evaluator_timeout,
+                    remaining_seconds(state, reserve=2.0),
+                )
             raw = self.llm.complete_json(
                 [{"role": "user", "content": prompt}],
                 temperature=0.0,
-                timeout=settings.EVALUATOR_LLM_TIMEOUT_SECONDS,
+                timeout=evaluator_timeout,
             )
             eval_result = json.loads(raw)
             verdict = eval_result.get("verdict", "accept")

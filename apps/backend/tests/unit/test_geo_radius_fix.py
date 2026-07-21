@@ -9,6 +9,7 @@ Two layers, tested independently (no LLM, no DB):
 """
 
 from app.agents.compliance_agent import ComplianceAgent
+from app.agents.discovery_agent import DiscoveryAgent
 from app.agents.parser_agent import ParserAgent
 
 
@@ -69,6 +70,27 @@ def test_radius_with_explicit_city_and_country_keeps_both():
     assert out["location_radius_km"] == 50
 
 
+def test_region_bounds_are_restored_from_geocode_trace():
+    parser = _parser()
+    out = parser._normalise_constraints(
+        {"product_type": "office furniture", "location_region": "Bavaria"},
+        trace=[{
+            "action": "geocode_location",
+            "action_input": {"location_name": "Bavaria"},
+            "observation": {
+                "found": True,
+                "lat": 48.79,
+                "lng": 11.50,
+                "region": "Bavaria",
+                "bounds": [47.27, 8.98, 50.57, 13.84],
+            },
+        }],
+        raw_query="Find office furniture suppliers in Bavaria",
+    )
+
+    assert out["location_bounds"] == [47.27, 8.98, 50.57, 13.84]
+
+
 # ── Compliance layer ─────────────────────────────────────────────────
 def test_radius_query_does_not_emit_spurious_country_fail():
     agent = _compliance_agent()
@@ -115,3 +137,41 @@ def test_literal_null_country_is_treated_as_missing():
     statuses = {r["constraint_name"]: r["status"] for r in result["compliance_results"]}
     assert "country" not in statuses
     assert result["overall_pass"] is True
+
+
+def test_radius_hard_filter_removes_semantic_candidate_outside_radius():
+    retained, distances, diagnostic = DiscoveryAgent._filter_candidate_rows_by_geography(
+        rows=[("near", 52.6, 13.5), ("far", 51.2, 6.8)],
+        constraints={
+            "location_lat": 52.52,
+            "location_lng": 13.40,
+            "location_radius_km": 100,
+        },
+    )
+
+    assert retained == ["near"]
+    assert "far" not in distances
+    assert diagnostic is None
+
+
+def test_bavaria_bounds_remove_non_bavarian_candidates():
+    retained, _, diagnostic = DiscoveryAgent._filter_candidate_rows_by_geography(
+        rows=[("munich", 48.137, 11.575), ("berlin", 52.52, 13.405)],
+        constraints={
+            "location_region": "Bavaria",
+            "location_bounds": [47.27, 8.98, 50.57, 13.84],
+        },
+    )
+
+    assert retained == ["munich"]
+    assert diagnostic is None
+
+
+def test_region_without_verified_bounds_returns_diagnostic_and_no_candidates():
+    retained, _, diagnostic = DiscoveryAgent._filter_candidate_rows_by_geography(
+        rows=[("munich", 48.137, 11.575)],
+        constraints={"location_region": "Bavaria"},
+    )
+
+    assert retained == []
+    assert diagnostic == "region_bounds_unverified"

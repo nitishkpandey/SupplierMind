@@ -677,7 +677,7 @@ class SupplierExtractionService:
     def _has_budget(deadline_at: Optional[float], min_seconds: float) -> bool:
         if deadline_at is None:
             return True
-        return time.time() + min_seconds < deadline_at
+        return time.monotonic() + min_seconds < deadline_at
 
     # Keep the old method name for backward compatibility
     def extract_from_web_result(

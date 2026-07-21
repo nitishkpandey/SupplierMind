@@ -18,6 +18,8 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from typing import Any
 
+from app.agents.deadline import QueryDeadlineExceeded
+
 logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 60.0
@@ -90,7 +92,12 @@ class ModelRateLimiter:
         while tlog and tlog[0][0] <= cutoff:
             tlog.popleft()
 
-    def acquire(self, model: str, estimated_tokens: int = 0) -> float:
+    def acquire(
+        self,
+        model: str,
+        estimated_tokens: int = 0,
+        max_wait_seconds: float | None = None,
+    ) -> float:
         """
         Block until issuing one request of `estimated_tokens` stays within the
         paced limits. Returns the request timestamp (pass it to
@@ -123,6 +130,11 @@ class ModelRateLimiter:
                     break
 
                 wait = max(0.0, min(waits))
+                if max_wait_seconds is not None and wait > max(0.0, max_wait_seconds):
+                    raise QueryDeadlineExceeded(
+                        f"Rate-limit wait {wait:.3f}s exceeds remaining budget "
+                        f"{max_wait_seconds:.3f}s"
+                    )
                 wait_ms = int(wait * 1000)
                 logger.info(
                     "[ratelimit] Pacing call: sleeping %dms for model %s "

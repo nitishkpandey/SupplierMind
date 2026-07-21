@@ -37,13 +37,17 @@ def test_dev_login_returns_404_in_production(monkeypatch):
     monkeypatch.setattr(auth_module.settings, "APP_ENV", "production")
 
     client = TestClient(app)
-    response = client.get(DEV_LOGIN_URL, follow_redirects=False)
+    response = client.post(
+        DEV_LOGIN_URL,
+        json={"email": "dev@suppliermind.local", "role": "procurement_manager"},
+        follow_redirects=False,
+    )
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Endpoint not available in this environment"
 
 
-def test_dev_login_works_in_development(monkeypatch):
+def test_dev_login_returns_json_without_redirect_in_development(monkeypatch):
     from app.api.v1 import auth as auth_module
 
     monkeypatch.setattr(auth_module.settings, "APP_ENV", "development")
@@ -51,6 +55,7 @@ def test_dev_login_works_in_development(monkeypatch):
     fake_user = SimpleNamespace(
         id=uuid4(),
         email="dev@suppliermind.local",
+        name="Dev",
         role=UserRole.procurement_manager,
     )
 
@@ -62,10 +67,15 @@ def test_dev_login_works_in_development(monkeypatch):
         auth_module, "create_refresh_token", return_value="fake-refresh-token"
     ):
         client = TestClient(app)
-        response = client.get(DEV_LOGIN_URL, follow_redirects=False)
+        response = client.post(
+            DEV_LOGIN_URL,
+            json={"email": "dev@suppliermind.local", "role": "procurement_manager"},
+            follow_redirects=False,
+        )
 
-    assert response.status_code in (302, 307)
-    location = response.headers["location"]
-    assert "access_token=fake-access-token" in location
-    assert "refresh_token=fake-refresh-token" in location
-    assert f"role={UserRole.procurement_manager.value}" in location
+    assert response.status_code == 200
+    assert "location" not in response.headers
+    body = response.json()
+    assert body["access_token"] == "fake-access-token"
+    assert body["refresh_token"] == "fake-refresh-token"
+    assert body["role"] == UserRole.procurement_manager.value
