@@ -66,6 +66,7 @@ apps/backend/data/bulk_ingest_checkpoint.json
 apps/backend/data/bulk_ingest.log
 
 # --- INTERNAL PLANNING / PROCESS DOCS (never commit) ---
+.worktrees/
 docs/audits/
 docs/verification/07_*
 docs/verification/08_*
