@@ -26,9 +26,14 @@ from typing import Any
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.base import BaseAgent
+from app.agents.country_scope import (
+    country_scope_question,
+    needs_country_scope_clarification,
+)
 from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState, ParsedConstraints
 from app.agents.tools import ToolRegistry, build_default_registry
+from app.db.repositories.clarification_repo import MAX_CLARIFICATION_TURNS
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import SyncSessionLocal
 
@@ -1113,12 +1118,25 @@ class ParserAgent(BaseAgent):
         )
         legacy_clarification_question = final_constraints.get("clarification_question")
 
-        # Task 3.3 — Post-loop clarification decision. Only fires on a clean
-        # `finish` termination; the fallback/degraded paths already emit
-        # their own clarification text and we don't override them.
+        turn_number = int(state.get("turn_number") or 1)
+        country_scope_needed = needs_country_scope_clarification(
+            constraints=constraints,
+            raw_query=raw_query,
+            benchmark_supplier_ids=state.get("benchmark_supplier_ids") or [],
+            turn_number=turn_number,
+            max_turns=MAX_CLARIFICATION_TURNS,
+        )
+        scope_question = (
+            country_scope_question(constraints.get("location_country"))
+            if country_scope_needed
+            else None
+        )
+
+        # Existing semantic clarification rules run only after a clean Finish.
+        # The deterministic country-scope policy above is intentionally
+        # termination-agnostic so a useful degraded parse can also pause.
         composed_question: str | None = None
         if terminated_by == "finish":
-            turn_number = int(state.get("turn_number") or 1)
             composed_question = self._decide_clarification(
                 constraints=constraints,
                 trace=trace,
@@ -1136,7 +1154,11 @@ class ParserAgent(BaseAgent):
             and _question_mentions_location(legacy_clarification_question)
         )
 
-        if use_legacy_location_question:
+        if scope_question is not None:
+            clarification_needed = True
+            clarification_question = scope_question
+            composed_question = None
+        elif use_legacy_location_question:
             clarification_needed = True
             clarification_question = legacy_clarification_question
             composed_question = None
@@ -1154,6 +1176,10 @@ class ParserAgent(BaseAgent):
             clarification_question = (
                 legacy_clarification_question if clarification_needed else None
             )
+
+        clarification_resumable = clarification_needed and (
+            terminated_by == "finish" or scope_question is not None
+        )
 
         duration_ms = int((time.time() - start) * 1000)
         tools_used = [t["action"] for t in trace if t.get("action") and t["action"] != "Finish"]
@@ -1194,6 +1220,7 @@ class ParserAgent(BaseAgent):
         state["detected_language"] = constraints.get("original_language") or "en"
         state["needs_clarification"] = clarification_needed
         state["clarification_question"] = clarification_question
+        state["clarification_resumable"] = clarification_resumable
         state["pipeline_status"] = (
             "needs_clarification" if clarification_needed else "running"
         )
@@ -1204,13 +1231,15 @@ class ParserAgent(BaseAgent):
         # Both origins are audited: the post-loop composer AND the legacy
         # path where the LLM set clarification_needed in its Finish payload
         # (Task 3.4 smoke found the latter raised a resumable dialogue with
-        # no audit row). Degraded paths are excluded — they don't pause.
-        if clarification_needed and terminated_by == "finish":
-            origin = (
-                "Post-loop trigger fired"
-                if composed_question is not None
-                else "LLM Finish payload requested clarification"
-            )
+        # no audit row). Deterministic degraded country-scope questions are
+        # resumable and therefore audited; other degraded messages are not.
+        if clarification_needed and clarification_resumable:
+            if scope_question is not None:
+                origin = "Deterministic country-scope gate fired"
+            elif composed_question is not None:
+                origin = "Post-loop trigger fired"
+            else:
+                origin = "LLM Finish payload requested clarification"
             self._append_audit_entry(
                 state,
                 agent_name="clarification_handler",
@@ -1285,6 +1314,7 @@ class ParserAgent(BaseAgent):
         state["detected_language"] = "en"
         state["needs_clarification"] = True
         state["clarification_question"] = question
+        state["clarification_resumable"] = True
         state["pipeline_status"] = "needs_clarification"
         return state
 
@@ -1354,13 +1384,6 @@ class ParserAgent(BaseAgent):
             constraints, _OPERATIONAL_CONSTRAINT_KEYS
         )
         has_ranking_preference = self._raw_query_has_preference_signal(raw_query)
-        has_precise_location = bool(
-            self._has_any_constraint(
-                constraints,
-                ("location_city", "location_region", "location_radius_km"),
-            )
-        )
-
         # Rule 1c — do not run open-ended web discovery without a search
         # geography unless the user explicitly asks for a global/unbounded
         # search. This remains true on resumed turns: if the first answer only
@@ -1388,20 +1411,6 @@ class ParserAgent(BaseAgent):
             )
         ):
             return None
-
-        # Rule 1e — product + country is still broad when the user gives no
-        # certification, delivery, capacity, radius, city/region, or ranking
-        # preference. Ask what should drive the result quality.
-        if (
-            has_product
-            and self._has_any_constraint(constraints, ("location_country",))
-            and not has_precise_location
-            and not has_operational_constraint
-            and not has_ranking_preference
-        ):
-            return self._compose_clarification_question(
-                raw_query, constraints, missing="operational_preference"
-            )
 
         # Rule 2 — low confidence AND sparse constraints.
         if confidence < CLARIFICATION_CONFIDENCE_FLOOR and constraint_count < CLARIFICATION_MIN_CONSTRAINTS:

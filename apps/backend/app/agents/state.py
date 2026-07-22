@@ -130,6 +130,7 @@ class AgentState(TypedDict):
     detected_language: str
     needs_clarification: bool
     clarification_question: str | None
+    clarification_resumable: bool
 
     # ── Multi-turn clarification dialogue ─────────────────────────────
     # Populated by parser_node when the Parser raises a clarification: the

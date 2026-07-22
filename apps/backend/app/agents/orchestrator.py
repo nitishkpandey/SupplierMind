@@ -99,6 +99,7 @@ def _create_initial_state(
         detected_language="en",
         needs_clarification=False,
         clarification_question=None,
+        clarification_resumable=False,
         react_trace=[],
         react_terminated_by=None,
 
