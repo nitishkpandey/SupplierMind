@@ -16,8 +16,9 @@ Design choices (see Yao et al. 2022, arXiv:2210.03629):
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass
@@ -109,9 +110,9 @@ def build_user_registry(
     memory regardless of the Action Input it emits.
 
     `lookup_min_similarity` is an optional override of the cosine threshold
-    on the memory search. The default (0.65 in past_query.py) is intentionally
-    conservative; the live demo uses a lower value while the threshold is
-    being tuned against real query distributions.
+    on the memory search. The default (0.45 in past_query.py) was tuned
+    against a measured Voyage cosine distribution — see the comment on
+    `_DEFAULT_MIN_SIMILARITY` there.
     """
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
     from app.agents.tools.geocode import geocode_location_tool

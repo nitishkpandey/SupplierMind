@@ -16,7 +16,7 @@ They must stay in sync:
 - When a supplier is updated → update PostgreSQL, re-embed, update Milvus
 - When a supplier is deleted → soft-delete in PostgreSQL, delete from Milvus
 """
-import time
+import asyncio
 import json
 import logging
 import uuid
@@ -24,7 +24,6 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.embeddings import get_embedding_client
 from app.core.vector_store import get_vector_store
 from app.db.models import Supplier
 from app.db.repositories.supplier_repo import SupplierRepository
@@ -58,7 +57,6 @@ async def ingest_suppliers_from_json(
 
     supplier_repo = SupplierRepository(db)
     vector_store = get_vector_store()
-    embed_client = get_embedding_client()
 
     stats = {"inserted": 0, "skipped": 0, "failed": 0}
 
@@ -120,13 +118,15 @@ async def ingest_suppliers_from_json(
 
         # Step 2: Generate embeddings and insert into Milvus
         try:
-            embedding_ids = vector_store.add_suppliers(
+            # Sync Voyage embedding + Milvus insert — off the event loop
+            embedding_ids = await asyncio.to_thread(
+                vector_store.add_suppliers,
                 [raw for raw in batch_to_insert if uuid.UUID(raw["id"]) in
-                 {s.id for s in inserted_suppliers}]
+                 {s.id for s in inserted_suppliers}],
             )
 
             # Step 3: Update PostgreSQL with embedding IDs
-            for supplier, emb_id in zip(inserted_suppliers, embedding_ids):
+            for supplier, emb_id in zip(inserted_suppliers, embedding_ids, strict=False):
                 supplier.embedding_id = emb_id
 
             await db.flush()
@@ -145,7 +145,7 @@ async def ingest_suppliers_from_json(
             stats["inserted"] += len(inserted_suppliers)
 
         # Wait 20 seconds between batches (3 RPM = 1 req per 20s)
-        time.sleep(20)
+        await asyncio.sleep(20)
 
     await db.commit()
     logger.info(

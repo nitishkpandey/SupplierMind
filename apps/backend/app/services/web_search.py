@@ -11,8 +11,8 @@ Tavily is built for AI agents:
 
 import logging
 import math
+from collections.abc import Sequence
 from functools import lru_cache
-from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -103,12 +103,12 @@ class WebSearchService:
 
     def search_suppliers(
         self,
-        category: Optional[str] = None,
-        country: Optional[str] = None,
-        city: Optional[str] = None,
-        certifications: Optional[list[str]] = None,
-        product_terms: Optional[list[str]] = None,
-        raw_query: Optional[str] = None,
+        category: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        certifications: list[str] | None = None,
+        product_terms: list[str] | None = None,
+        raw_query: str | None = None,
         max_results: int = 10,
         timeout_seconds: float | None = None,
     ) -> list[WebSearchResult]:
@@ -175,12 +175,12 @@ class WebSearchService:
     def _build_supplier_queries(
         cls,
         *,
-        category: Optional[str],
-        country: Optional[str],
-        city: Optional[str],
-        certifications: Optional[list[str]],
-        product_terms: Optional[list[str]],
-        raw_query: Optional[str],
+        category: str | None,
+        country: str | None,
+        city: str | None,
+        certifications: list[str] | None,
+        product_terms: list[str] | None,
+        raw_query: str | None,
     ) -> list[tuple[str, str]]:
         location = " ".join(cls._dedupe_terms([city, country]))
         cert_text = " ".join(cls._dedupe_terms(certifications or []))
@@ -257,7 +257,7 @@ class WebSearchService:
         return queries
 
     @staticmethod
-    def _dedupe_terms(values: list[str | None]) -> list[str]:
+    def _dedupe_terms(values: Sequence[str | None]) -> list[str]:
         terms: list[str] = []
         seen: set[str] = set()
         for value in values:

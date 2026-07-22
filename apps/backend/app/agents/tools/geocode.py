@@ -47,6 +47,9 @@ def _run(location_name: str, *, _geocoder: GeocodingService | None = None) -> di
             "bounds": list(result.bounds) if result.bounds else None,
         }
 
+    # Unreachable in production: the real GeocodingService always defines
+    # geocode_details. This fallback exists only for test fakes that stub
+    # bare `geocode()` (see _FakeGeocoder et al. in tests/unit).
     coords = geocoder.geocode(name)
     if not coords:
         return {"found": False, "reason": f"no geocode result for {name!r}"}

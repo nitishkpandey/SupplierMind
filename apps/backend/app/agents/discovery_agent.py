@@ -3,15 +3,19 @@
 import json
 import logging
 import time
+from collections.abc import Mapping
+from typing import Any, cast
 
 from sqlalchemy import Text, func, or_, select
 
 from app.agents.base import BaseAgent
 from app.agents.compliance_agent import canonical_cert_key
-from app.agents.state import AgentState
+from app.agents.state import AgentState, ParsedConstraints
+from app.core.llm import complete_json_dict
 from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import SyncSessionLocal
+from app.utils.geo import haversine_km
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +68,7 @@ class DiscoveryAgent(BaseAgent):
     def _filter_candidate_rows_by_geography(
         *,
         rows: list[tuple[str, float | None, float | None]],
-        constraints: dict,
+        constraints: Mapping[str, Any],
     ) -> tuple[list[str], dict[str, float], str | None]:
         """Apply requested radius/region constraints as fail-closed hard filters."""
         radius = constraints.get("location_radius_km")
@@ -73,13 +77,16 @@ class DiscoveryAgent(BaseAgent):
         center_lat = constraints.get("location_lat")
         center_lng = constraints.get("location_lng")
 
-        if region and (
-            not isinstance(bounds, (list, tuple))
-            or len(bounds) != 4
-        ):
-            return [], {}, "region_bounds_unverified"
-        if radius is not None and (center_lat is None or center_lng is None):
-            return [], {}, "radius_center_unverified"
+        south = west = north = east = 0.0
+        if region:
+            if not isinstance(bounds, list | tuple) or len(bounds) != 4:
+                return [], {}, "region_bounds_unverified"
+            south, west, north, east = (float(value) for value in bounds)
+        center_lat_f = center_lng_f = 0.0
+        if radius is not None:
+            if center_lat is None or center_lng is None:
+                return [], {}, "radius_center_unverified"
+            center_lat_f, center_lng_f = float(center_lat), float(center_lng)
 
         retained: list[str] = []
         distances: dict[str, float] = {}
@@ -88,15 +95,13 @@ class DiscoveryAgent(BaseAgent):
             if lat is None or lng is None:
                 continue
 
-            if region:
-                south, west, north, east = (float(value) for value in bounds)
-                if not (south <= float(lat) <= north and west <= float(lng) <= east):
-                    continue
+            if region and not (south <= float(lat) <= north and west <= float(lng) <= east):
+                continue
 
             if radius is not None:
-                distance = SupplierRepository._haversine(
-                    float(center_lat),
-                    float(center_lng),
+                distance = haversine_km(
+                    center_lat_f,
+                    center_lng_f,
                     float(lat),
                     float(lng),
                 )
@@ -121,7 +126,7 @@ class DiscoveryAgent(BaseAgent):
         constraints = state.get("parsed_constraints") or {}
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
-        user_id = state.get("user_id")
+        user_id = state["user_id"]
         exclude_pending = state.get("exclude_pending", False)
         allowed_supplier_ids = set(state.get("benchmark_supplier_ids") or [])
 
@@ -136,7 +141,7 @@ class DiscoveryAgent(BaseAgent):
         )
 
     def _run_search(
-        self, state: AgentState, constraints: dict, retry_count: int, search_scope: str,
+        self, state: AgentState, constraints: Mapping[str, Any], retry_count: int, search_scope: str,
         user_id: str, exclude_pending: bool = False,
         allowed_supplier_ids: set[str] | None = None,
     ) -> AgentState:
@@ -326,7 +331,10 @@ class DiscoveryAgent(BaseAgent):
                             tier_assignments[sid_str] = "discovered"
 
         except Exception as e:
+            # Re-raise so BaseAgent.run marks the pipeline failed — a DB
+            # outage must be distinguishable from a genuine empty result.
             logger.error("[discovery] DB search failed: %s", e)
+            raise
 
         # ── Step 4: Merge with Reciprocal Rank Fusion ─────────────────
         all_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked) | set(geo_ranked)
@@ -415,7 +423,8 @@ class DiscoveryAgent(BaseAgent):
                 state.get("relaxed_constraints", []),
             )
             if relaxed is not None and relax_key:
-                state["parsed_constraints"] = relaxed
+                # relaxed is a plain-dict copy of ParsedConstraints minus one key
+                state["parsed_constraints"] = cast("ParsedConstraints", relaxed)
                 state["retry_count"] = retry_count + 1
                 state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
                 logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
@@ -568,7 +577,7 @@ class DiscoveryAgent(BaseAgent):
 
         return {str(i) for i in valid}
 
-    def _build_query_text(self, constraints: dict, raw_query: str) -> str:
+    def _build_query_text(self, constraints: Mapping[str, Any], raw_query: str) -> str:
         parts = [raw_query]
         if constraints.get("product_type"):
             parts.append(f"product: {constraints['product_type']}")
@@ -637,7 +646,7 @@ class DiscoveryAgent(BaseAgent):
         return query
 
     @staticmethod
-    def _product_keyword_terms(constraints: dict) -> list[str]:
+    def _product_keyword_terms(constraints: Mapping[str, Any]) -> list[str]:
         """Terms for DB keyword retrieval when embeddings are incomplete."""
         raw_terms = []
         if constraints.get("product_type"):
@@ -690,7 +699,7 @@ class DiscoveryAgent(BaseAgent):
         return output
 
     @staticmethod
-    def _extract_city_from_constraints(constraints: dict) -> str | None:
+    def _extract_city_from_constraints(constraints: Mapping[str, Any]) -> str | None:
         if constraints.get("location_radius_km"):
             return None
         city = constraints.get("location_city")
@@ -703,7 +712,7 @@ class DiscoveryAgent(BaseAgent):
 
     def _decide_relaxation(
         self,
-        constraints: dict,
+        constraints: Mapping[str, Any],
         result_count: int,
         previous: list[str],
     ) -> tuple[dict | None, str]:
@@ -716,7 +725,7 @@ class DiscoveryAgent(BaseAgent):
             return None, ""
 
         try:
-            raw = self.llm.complete_json([
+            decision = complete_json_dict(self.llm, [
                 {"role": "system", "content": "Return JSON only."},
                 {"role": "user", "content": RELAXATION_PROMPT.format(
                     constraints=json.dumps({k: v for k, v in constraints.items() if v}, default=str),
@@ -724,7 +733,6 @@ class DiscoveryAgent(BaseAgent):
                     previous=previous,
                 )},
             ])
-            decision = json.loads(raw)
             key = decision.get("relax_constraint", "")
             new_val = decision.get("new_value")
 

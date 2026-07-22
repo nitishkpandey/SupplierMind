@@ -55,6 +55,20 @@ dev = [
     "matplotlib>=3.10.9",
 ]
 
+[tool.mypy]
+# Third-party libs that ship no stubs or py.typed marker.
+
+[[tool.mypy.overrides]]
+module = [
+    "geopy.*",
+    "jose.*",
+    "passlib.*",
+    "voyageai.*",
+    "pymilvus.*",
+    "bs4.*",
+]
+ignore_missing_imports = true
+
 [tool.ruff]
 include = ["app/**/*.py", "tests/**/*.py", "data/**/*.py", "scripts/**/*.py"]
 line-length = 100

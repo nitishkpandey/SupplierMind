@@ -41,6 +41,31 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Maps the flat auth payload (dev-login / refresh) to the User shape.
+export function toUser(payload: {
+  user_id: string;
+  email: string;
+  name: string;
+  role: User["role"];
+}): User {
+  return {
+    id: payload.user_id,
+    email: payload.email,
+    name: payload.name,
+    role: payload.role,
+  };
+}
+
+// Exchange a refresh token for a new session; stores it in the auth store
+// and returns the new access token. Throws if the refresh is rejected.
+export async function refreshSession(refreshToken: string): Promise<string> {
+  const res = await axios.post(`${BASE_URL}/auth/refresh`, {
+    refresh_token: refreshToken,
+  });
+  useAuthStore.getState().setAuth(res.data.access_token, toUser(res.data));
+  return res.data.access_token;
+}
+
 // Response interceptor: handle 401 with token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -54,17 +79,7 @@ api.interceptors.response.use(
       const refreshToken = sessionStorage.getItem("sm_refresh_token");
       if (refreshToken) {
         try {
-          const res = await axios.post(`${BASE_URL}/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-          const newToken = res.data.access_token;
-          const user: User = {
-            id: res.data.user_id,
-            email: res.data.email,
-            name: res.data.name,
-            role: res.data.role,
-          };
-          useAuthStore.getState().setAuth(newToken, user);
+          const newToken = await refreshSession(refreshToken);
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } catch {
@@ -100,15 +115,6 @@ export const queryService = {
     api.get(`/queries/${queryId}/audit`),
 
   // Multi-turn clarification dialogue
-  getClarification: (queryId: string) =>
-    api.get<{
-      id: string;
-      question: string;
-      turn_number: number;
-      max_turns: number;
-      created_at: string;
-    }>(`/queries/${queryId}/clarification`),
-
   submitClarification: (queryId: string, answer: string) =>
     api.post<{
       id: string;
@@ -120,8 +126,6 @@ export const queryService = {
 
 // Supplier service methods
 export const supplierService = {
-  getById: (id: string) => api.get<{ id: string }>(`/suppliers/${id}`),
-  list: (page = 1) => api.get(`/suppliers?offset=${(page - 1) * 20}&limit=20`),
   stats: () =>
     api.get<{
       total_active: number;
@@ -156,7 +160,6 @@ export const authService = {
       name: string;
       role: User["role"];
     }>("/auth/dev-login", { email, role }),
-  getMe: () => api.get("/auth/me"),
   logout: () => {
     useAuthStore.getState().clearAuth();
     sessionStorage.removeItem("sm_refresh_token");
@@ -165,7 +168,6 @@ export const authService = {
 
 // Evaluation service
 export const evalService = {
-  getResults: () => api.get("/eval/results"),
   getReport: () => api.get("/eval/report"),
   triggerRun: (baselinesOnly = false) =>
     api.post("/eval/run", null, { params: { baselines_only: baselinesOnly } }),

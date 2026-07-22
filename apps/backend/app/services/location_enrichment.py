@@ -2,14 +2,14 @@
 
 import logging
 import re
-import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
-from app.utils.text_normalization import clean_optional_text
+from app.utils.text_normalization import clean_optional_text, strip_accents
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class GeoapifyLocationService:
     def is_available(self) -> bool:
         return bool(self.geocoding_api_key or self.places_api_key)
 
-    def enrich(self, supplier: dict, constraints: dict | None = None) -> VerifiedLocation | None:
+    def enrich(self, supplier: dict, constraints: Mapping[str, Any] | None = None) -> VerifiedLocation | None:
         constraints = constraints or {}
         if self._supplier_conflicts_with_constraints(supplier, constraints):
             return None
@@ -89,7 +89,7 @@ class GeoapifyLocationService:
     def _build_geocoding_query(
         self,
         supplier: dict,
-        constraints: dict,
+        constraints: Mapping[str, Any],
     ) -> tuple[str | None, str | None]:
         address = clean_optional_text(supplier.get("address"))
         city = clean_optional_text(supplier.get("city"))
@@ -153,7 +153,7 @@ class GeoapifyLocationService:
         self,
         *,
         name: str | None,
-        constraints: dict,
+        constraints: Mapping[str, Any],
     ) -> VerifiedLocation | None:
         if not name:
             return None
@@ -168,7 +168,7 @@ class GeoapifyLocationService:
         if not location_filter:
             return None
 
-        params = {
+        params: dict[str, str | int] = {
             "categories": self.places_categories,
             "name": name,
             "limit": 1,
@@ -234,10 +234,13 @@ class GeoapifyLocationService:
     def _confidence(props: dict) -> float:
         rank = props.get("rank") or {}
         value = rank.get("confidence")
+        if value is None:
+            return 0.0
         try:
             return float(value)
         except (TypeError, ValueError):
-            return 1.0
+            # No rank reported — treat as unverified, not high-confidence.
+            return 0.0
 
     @staticmethod
     def _name_matches(expected_name: str, props: dict) -> bool:
@@ -280,7 +283,7 @@ class GeoapifyLocationService:
         return parts
 
     @staticmethod
-    def _matches_constraints(location: VerifiedLocation, constraints: dict) -> bool:
+    def _matches_constraints(location: VerifiedLocation, constraints: Mapping[str, Any]) -> bool:
         requested_country = clean_optional_text(
             constraints.get("location_country") or constraints.get("country")
         )
@@ -297,7 +300,7 @@ class GeoapifyLocationService:
         return True
 
     @staticmethod
-    def _supplier_conflicts_with_constraints(supplier: dict, constraints: dict) -> bool:
+    def _supplier_conflicts_with_constraints(supplier: dict, constraints: Mapping[str, Any]) -> bool:
         requested_country = clean_optional_text(
             constraints.get("location_country") or constraints.get("country")
         )
@@ -316,9 +319,7 @@ def _normalize_name(value: str) -> str:
 
 
 def _normalize_location_name(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value or ""))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    return " ".join(re.findall(r"[a-z0-9]+", text.casefold()))
+    return " ".join(re.findall(r"[a-z0-9]+", strip_accents(value).casefold()))
 
 
 def _is_region_filter(value: str) -> bool:

@@ -169,7 +169,6 @@ def _build_failure_analysis(per_query: dict) -> dict:
                 "reason": "Execution > 45 seconds (likely LLM rate limit)",
             })
 
-    all_p5 = [q.get("precision_at_5", 0) for q in sm_queries]
     p5_by_difficulty = {
         d: [q.get("precision_at_5", 0) for q in sm_queries if q.get("difficulty") == d]
         for d in ["simple", "medium", "hard"]

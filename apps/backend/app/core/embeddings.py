@@ -227,7 +227,7 @@ class EmbeddingClient:
                 )
                 fresh.extend(vectors)
 
-            for idx, text, vector in zip(miss_indices, miss_texts, fresh):
+            for idx, text, vector in zip(miss_indices, miss_texts, fresh, strict=False):
                 results[idx] = vector
                 self._cache_set(text, input_type, vector)
 

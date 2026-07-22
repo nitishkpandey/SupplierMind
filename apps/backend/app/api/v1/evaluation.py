@@ -28,9 +28,9 @@ REPORT_FILE = Path(__file__).parent.parent.parent.parent / "data" / "thesis_repo
 )
 async def trigger_evaluation(
     background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(require_admin)],
     baselines_only: bool = False,
     query_limit: int | None = None,
-    current_user: Annotated[User, Depends(require_admin)] = None,
 ) -> dict:
     """
     Triggers a full evaluation run in the background.
@@ -52,7 +52,7 @@ async def trigger_evaluation(
 
 @router.get("/results", summary="Get latest evaluation results")
 async def get_results(
-    current_user: Annotated[User, Depends(require_admin)] = None,
+    current_user: Annotated[User, Depends(require_admin)],
 ) -> dict:
     """Returns the most recent evaluation results."""
     if not RESULTS_FILE.exists():
@@ -66,7 +66,7 @@ async def get_results(
 
 @router.get("/report", summary="Get thesis report from latest results")
 async def get_report(
-    current_user: Annotated[User, Depends(require_admin)] = None,
+    current_user: Annotated[User, Depends(require_admin)],
 ) -> dict:
     """Returns the formatted thesis report."""
     if not REPORT_FILE.exists():
@@ -89,8 +89,8 @@ async def _run_evaluation_background(
     """Background task for running evaluation."""
     try:
         from app.core.cache import InMemoryCache, set_cache_instance
-        from app.evaluation.runner import run_full_evaluation
         from app.evaluation.report import generate_thesis_report
+        from app.evaluation.runner import run_full_evaluation
 
         if not baselines_only:
             from app.core.vector_store import create_vector_store, set_vector_store_instance

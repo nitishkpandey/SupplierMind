@@ -24,12 +24,14 @@ import json
 import logging
 import re
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from app.agents.base import BaseAgent
 from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState, ComplianceResult, SupplierComplianceResult
+from app.core.llm import complete_json_dict
 from app.utils.capacity_units import compare_capacity
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
@@ -93,7 +95,7 @@ _CERT_ALIASES: dict[str, str] = {
 }
 
 
-def canonical_cert_key(raw: str) -> Optional[str]:
+def canonical_cert_key(raw: str) -> str | None:
     """Resolve a raw cert string to its canonical taxonomy key, or None.
 
     Exact normalized match first, then explicit aliases, then a length-guarded
@@ -117,7 +119,7 @@ def canonical_cert_key(raw: str) -> Optional[str]:
 
 def taxonomy_cert_verdict(
     required_cert: str, supplier_certs: list[str]
-) -> Optional[dict]:
+) -> dict | None:
     """Decide a required cert against a supplier's certs using the taxonomy only.
 
     Returns a verdict dict {status, reason, matched_via} when the taxonomy is
@@ -246,7 +248,7 @@ def build_evidence_pool(supplier: dict) -> str:
     return "\n".join(parts)
 
 
-def verify_evidence_quote(evidence_quote: Optional[str], evidence_pool: str) -> dict:
+def verify_evidence_quote(evidence_quote: str | None, evidence_pool: str) -> dict:
     """Check an LLM evidence_quote against the supplier's evidence pool.
 
     Returns {"ok": bool, "flag": Optional[str]}. flag is the machine reason when
@@ -267,8 +269,8 @@ def verify_evidence_quote(evidence_quote: Optional[str], evidence_pool: str) -> 
 
 
 def quote_or_fail_verdict(
-    status: str, confidence: float, evidence_quote: Optional[str], evidence_pool: str
-) -> tuple[str, Optional[str]]:
+    status: str, confidence: float, evidence_quote: str | None, evidence_pool: str
+) -> tuple[str, str | None]:
     """Apply the quote-or-fail rule to one LLM verdict.
 
     Returns (new_status, flag). flag is None when the verdict stands as-is, else a
@@ -383,7 +385,7 @@ def _product_tokens(values: list[object]) -> set[str]:
     return tokens
 
 
-def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[ComplianceResult]:
+def product_fit_verdict(supplier: dict, constraints: Mapping[str, Any]) -> ComplianceResult | None:
     """Deterministically reject obvious product/category mismatches."""
     req_category = _normalise_category(
         constraints.get("category_hint") or constraints.get("category")
@@ -578,8 +580,8 @@ class ComplianceAgent(BaseAgent):
     def _check_supplier(
         self,
         supplier: dict,
-        constraints: dict,
-        geo_distance: Optional[float],
+        constraints: Mapping[str, Any],
+        geo_distance: float | None,
     ) -> SupplierComplianceResult:
         """Run all compliance checks for one supplier."""
         results: list[ComplianceResult] = []
@@ -622,8 +624,7 @@ class ComplianceAgent(BaseAgent):
         req_country = (req_country_text or "").casefold()
         sup_country = (sup_country_text or "").casefold()
         if not has_radius_constraint \
-                and req_country and sup_country and req_country != sup_country \
-                and req_country not in sup_country and sup_country not in req_country:
+                and req_country and sup_country and req_country != sup_country:
             results.append({
                 "constraint_name": "country",
                 "status": "FAIL",
@@ -700,7 +701,7 @@ class ComplianceAgent(BaseAgent):
             self._llm_supplier_count += 1
 
         # ── Numeric check: Capacity ───────────────────────────────────
-        if constraints.get("capacity_min") and constraints.get("capacity_unit"):
+        if constraints.get("capacity_min") is not None and constraints.get("capacity_unit"):
             cap_result = self._check_capacity(
                 supplier,
                 constraints["capacity_min"],
@@ -712,9 +713,9 @@ class ComplianceAgent(BaseAgent):
         # Bug 2 (Phase D): a specified lead-time constraint must always produce a
         # verdict. Previously the gate only fired when the supplier reported a
         # lead time, so suppliers with no lead_time_days silently passed. Use
-        # `is not None` so a genuine 0-day (same-day) lead time is not mistaken
-        # for a missing value.
-        if constraints.get("lead_time_max_days"):
+        # `is not None` on both the constraint gate and the supplier value so a
+        # genuine 0-day (same-day) lead time is not mistaken for a missing value.
+        if constraints.get("lead_time_max_days") is not None:
             max_lt = constraints["lead_time_max_days"]
             actual_lt = supplier.get("lead_time_days")
             if actual_lt is None:
@@ -827,14 +828,14 @@ Return JSON object:
                     deadline_state,
                     reserve=2.0,
                 )
-            raw = self.llm.complete_json(
+            data = complete_json_dict(
+                self.llm,
                 [
                     {"role": "system", "content": COMPLIANCE_BATCH_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
                 **llm_kwargs,
             )
-            data = json.loads(raw)
             items = data.get("results", [])
             if not isinstance(items, list):
                 raise ValueError("LLM returned non-list results")

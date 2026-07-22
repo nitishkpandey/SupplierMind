@@ -55,13 +55,15 @@ from app.agents.evaluator_agent import EvaluatorAgent
 from app.agents.external_discovery_agent import ExternalDiscoveryAgent
 from app.agents.parser_agent import ParserAgent
 from app.agents.ranking_agent import RankingAgent
-from app.agents.state import AgentState
+from app.agents.state import AgentState, ParsedConstraints
 from app.agents.tools import build_user_registry
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+# ponytail: 2 workers so one stuck memory write can't block every later
+# query's finalize; grow (or add a queue) if timeouts become common.
 _query_memory_executor = ThreadPoolExecutor(
-    max_workers=1,
+    max_workers=2,
     thread_name_prefix="suppliermind-query-memory",
 )
 
@@ -73,7 +75,7 @@ def _create_initial_state(
     search_scope: str,
     *,
     turn_number: int = 1,
-    previous_partial_constraints: dict | None = None,
+    previous_partial_constraints: ParsedConstraints | None = None,
     exclude_pending: bool = False,
     benchmark_supplier_ids: list[str] | None = None,
 ) -> AgentState:
@@ -97,6 +99,8 @@ def _create_initial_state(
         detected_language="en",
         needs_clarification=False,
         clarification_question=None,
+        react_trace=[],
+        react_terminated_by=None,
 
         # Clarification dialogue
         clarification_id=None,
@@ -269,6 +273,8 @@ def finalize_node(state: AgentState) -> AgentState:
             output_summary=f"memory_id={memory_id}",
         )
     except FutureTimeoutError:
+        # cancel() only prevents a still-queued write from starting; a write
+        # already running cannot be cancelled and finishes in the background.
         future.cancel()
         duration_ms = int((time.time() - start) * 1000)
         logger.warning(
@@ -363,7 +369,7 @@ def evaluator_node(state: AgentState) -> AgentState:
 def after_parser(state: AgentState) -> Literal["external_discovery_node", "discovery_node", "__end__"]:
     if state.get("needs_clarification") or state.get("error"):
         logger.info("[orchestrator] Routing to END: clarification or error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
     if state.get("search_scope") == "approved_only" or state.get("benchmark_supplier_ids"):
         logger.info("[orchestrator] Internal-only search path selected")
@@ -375,14 +381,14 @@ def after_parser(state: AgentState) -> Literal["external_discovery_node", "disco
 def after_external_discovery(state: AgentState) -> Literal["discovery_node", "__end__"]:
     if state.get("error"):
         logger.info("[orchestrator] Routing to END: external discovery error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
     return "discovery_node"
 
 
 def after_discovery(state: AgentState) -> Literal["external_discovery_node", "compliance_node", "__end__"]:
     if state.get("error"):
         logger.info("[orchestrator] Routing to END: discovery error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
     if not state.get("candidate_supplier_ids"):
         # On a retry pass (evaluator already looped us back once), never bounce
@@ -390,11 +396,11 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
         # adding new first-pass candidates. Accept the empty result and end.
         if state.get("evaluator_retries", 0) > 0:
             logger.info("[orchestrator] Routing to END: no candidates on retry pass (external_discovery not re-run)")
-            return END
+            return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
         if state.get("benchmark_supplier_ids"):
             logger.info("[orchestrator] Routing to END: fixed benchmark corpus has no candidates")
-            return END
+            return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
         # First-pass auto-fallback: if we only searched approved and found
         # nothing, expand scope to 'both' and discover from the web once.
@@ -405,7 +411,7 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
             return "external_discovery_node"
 
         logger.info("[orchestrator] Routing to END: no candidates found even in 'both' scope")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
     return "compliance_node"
 
@@ -496,7 +502,7 @@ async def run_pipeline(
     search_scope: str = "approved_only",
     *,
     turn_number: int = 1,
-    previous_partial_constraints: dict | None = None,
+    previous_partial_constraints: ParsedConstraints | None = None,
     exclude_pending: bool = False,
     benchmark_supplier_ids: list[str] | None = None,
 ) -> AgentState:

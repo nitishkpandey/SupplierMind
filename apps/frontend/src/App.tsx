@@ -1,9 +1,8 @@
-import axios from "axios";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { AppLayout } from "@/features/layout/AppLayout";
-import type { User } from "@/types";
+import { refreshSession } from "@/services/api";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const AuthCallbackPage = lazy(() => import("@/pages/AuthCallbackPage"));
@@ -15,20 +14,6 @@ const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const AdminMetricsPage = lazy(() => import("@/pages/AdminMetricsPage"));
 const MySuppliersPage = lazy(() => import("@/pages/MySuppliersPage"));
 
-function toUser(payload: {
-  user_id: string;
-  email: string;
-  name: string;
-  role: User["role"];
-}): User {
-  return {
-    id: payload.user_id,
-    email: payload.email,
-    name: payload.name,
-    role: payload.role,
-  };
-}
-
 function PageSpinner() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
@@ -38,7 +23,7 @@ function PageSpinner() {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, setAuth, clearAuth } = useAuthStore();
+  const { isAuthenticated, clearAuth } = useAuthStore();
   const [isCheckingSession, setIsCheckingSession] = useState(
     () => !isAuthenticated && Boolean(sessionStorage.getItem("sm_refresh_token"))
   );
@@ -54,12 +39,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    axios
-      .post("/api/v1/auth/refresh", { refresh_token: refreshToken })
-      .then((res) => {
-        if (cancelled) return;
-        setAuth(res.data.access_token, toUser(res.data));
-      })
+    refreshSession(refreshToken)
       .catch(() => {
         if (cancelled) return;
         clearAuth();
@@ -74,7 +54,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [clearAuth, isAuthenticated, setAuth]);
+  }, [clearAuth, isAuthenticated]);
 
   if (isCheckingSession) {
     return <PageSpinner />;

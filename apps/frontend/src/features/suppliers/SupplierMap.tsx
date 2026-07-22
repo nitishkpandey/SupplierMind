@@ -20,9 +20,13 @@ export function SupplierMap({ results, constraints }: SupplierMapProps) {
   const mapInstanceRef = useRef<Map | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current) return;
+
+    let cancelled = false;
 
     import("leaflet").then((L) => {
+      if (cancelled || !mapRef.current) return;
+
       // Fix default marker icons (Leaflet + bundler path issue)
       delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -93,14 +97,16 @@ export function SupplierMap({ results, constraints }: SupplierMapProps) {
       });
     });
 
+    // ponytail: full teardown/rebuild on data change; incremental marker
+    // updates only if rebuild flicker ever becomes a problem.
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [results, constraints]);
 
   return (
     <div

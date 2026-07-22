@@ -9,15 +9,16 @@ reject them without leaving the result context.
 import json
 import logging
 import time
-import unicodedata
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any
 
 from app.agents.base import BaseAgent
-from app.agents.state import AgentState, SupplierComplianceResult
+from app.agents.state import AgentState, RankedSupplier, SupplierComplianceResult
 from app.utils.text_normalization import (
     clean_optional_text,
     clean_text_list,
     normalise_supplier_name_for_dedupe,
+    strip_accents,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,16 +97,16 @@ def _format_capacity(value, unit: str) -> str:
     """Format capacity exactly from the DB value — no rounding, no invention."""
     if value is None:
         return "not specified"
-    if isinstance(value, (int, float)) and float(value).is_integer():
+    if isinstance(value, int | float) and float(value).is_integer():
         num = f"{int(value):,}"
-    elif isinstance(value, (int, float)):
+    elif isinstance(value, int | float):
         num = f"{value:,}"
     else:
         num = str(value)
     return f"{num} {unit}".strip() if unit else num
 
 
-def build_facts(supplier: dict, tier: str) -> dict:
+def build_facts(supplier: Mapping[str, Any], tier: str) -> dict:
     """Render the supplier's verifiable facts straight from the DB row."""
     lead = supplier.get("lead_time_days")
     location = ", ".join(
@@ -125,7 +126,7 @@ def build_facts(supplier: dict, tier: str) -> dict:
     }
 
 
-def build_match_reasons(comp_result: dict) -> list[str]:
+def build_match_reasons(comp_result: Mapping[str, Any]) -> list[str]:
     """One reason per PASS verdict."""
     return [
         _render_verdict_reason(r)
@@ -135,9 +136,9 @@ def build_match_reasons(comp_result: dict) -> list[str]:
 
 
 def build_concerns(
-    comp_result: dict,
-    semantic_score: Optional[float],
-    unsupported_preferences: Optional[list[str]] = None,
+    comp_result: Mapping[str, Any],
+    semantic_score: float | None,
+    unsupported_preferences: list[str] | None = None,
 ) -> list[str]:
     """One concern per FAIL/PARTIAL verdict, plus a low-semantic-match note."""
     concerns = [
@@ -154,7 +155,7 @@ def build_concerns(
     return concerns
 
 
-def build_summary(comp_result: dict, concerns: Optional[list[str]] = None) -> str:
+def build_summary(comp_result: Mapping[str, Any], concerns: list[str] | None = None) -> str:
     """One deterministic headline sentence from the verdict mix."""
     results = comp_result.get("compliance_results", [])
     n_fail = sum(1 for r in results if r.get("status") == "FAIL")
@@ -167,7 +168,7 @@ def build_summary(comp_result: dict, concerns: Optional[list[str]] = None) -> st
     return "Meets all specified requirements."
 
 
-def has_blocking_fail(comp_result: dict) -> bool:
+def has_blocking_fail(comp_result: Mapping[str, Any]) -> bool:
     """True if any compliance verdict for this candidate is FAIL.
 
     A candidate with any FAIL verdict is hard-excluded from the final result
@@ -250,11 +251,11 @@ def _dedupe_scored_results(
 
 
 def build_explanation(
-    supplier: dict,
+    supplier: Mapping[str, Any],
     tier: str,
-    comp_result: dict,
-    semantic_score: Optional[float],
-    unsupported_preferences: Optional[list[str]] = None,
+    comp_result: Mapping[str, Any],
+    semantic_score: float | None,
+    unsupported_preferences: list[str] | None = None,
 ) -> dict:
     """Assemble the full structured explanation. No LLM involved."""
     concerns = build_concerns(comp_result, semantic_score, unsupported_preferences)
@@ -384,6 +385,7 @@ class RankingAgent(BaseAgent):
 
             constraint_score = comp_result["pass_rate"]
             semantic_score = semantic_scores.get(sid, 0.5)
+            proximity_score: float | None
             if has_radius:
                 proximity_score = self._calculate_proximity_score(
                     geo_distances.get(sid),
@@ -436,7 +438,7 @@ class RankingAgent(BaseAgent):
         top_results = _select_top_results(scored, forced_review_ids)
 
         # ── Generate explanations for top results ─────────────────────
-        ranked: list[dict] = []
+        ranked: list[RankedSupplier] = []
         for rank, (total_score, comp_result) in enumerate(top_results, 1):
             sid = comp_result["supplier_id"]
             supplier = supplier_map.get(sid, {})
@@ -529,8 +531,8 @@ class RankingAgent(BaseAgent):
         return state
 
     def _calculate_proximity_score(
-        self, distance_km: Optional[float], radius_km: Optional[float]
-    ) -> Optional[float]:
+        self, distance_km: float | None, radius_km: float | None
+    ) -> float | None:
         if distance_km is None or radius_km is None:
             return None
         if radius_km == 0:
@@ -578,9 +580,7 @@ class RankingAgent(BaseAgent):
 
     @staticmethod
     def _normalise_city(value: object) -> str:
-        text = unicodedata.normalize("NFKD", str(value or ""))
-        text = "".join(ch for ch in text if not unicodedata.combining(ch))
-        return " ".join(text.casefold().split())
+        return " ".join(strip_accents(value).casefold().split())
 
     def _calculate_completeness(self, supplier: dict) -> float:
         fields = [

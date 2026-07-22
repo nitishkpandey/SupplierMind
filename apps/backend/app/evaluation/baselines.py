@@ -35,6 +35,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Supplier, SupplierStatus
+from app.db.repositories.supplier_repo import supplier_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ DOMAIN_SYNONYMS: dict[str, str] = {
 }
 
 # ── Country keywords ───────────────────────────────────────────────────
-COUNTRY_KEYWORDS: dict[str, str] = {
+COUNTRY_KEYWORDS: dict[str, str | None] = {
     "germany": "Germany", "german": "Germany", "deutschland": "Germany",
     "netherlands": "Netherlands", "dutch": "Netherlands", "holland": "Netherlands",
     "poland": "Poland", "polish": "Poland",
@@ -312,20 +313,12 @@ async def manual_baseline_search(
 
 def _supplier_to_dict(supplier: Supplier) -> dict:
     """Convert SQLAlchemy Supplier model to plain dict."""
-    return {
-        "id": str(supplier.id),
-        "name": supplier.name,
+    d = supplier_to_dict(supplier)
+    d.update({
         "description": supplier.description,
         "category": supplier.category,
-        "country": supplier.country,
-        "city": supplier.city,
-        "latitude": supplier.latitude,
-        "longitude": supplier.longitude,
-        "certifications": supplier.certifications or [],
-        "capacity_value": supplier.capacity_value,
-        "capacity_unit": supplier.capacity_unit,
-        "lead_time_days": supplier.lead_time_days,
-    }
+    })
+    return d
 
 
 def _normalise_allowed_supplier_ids(

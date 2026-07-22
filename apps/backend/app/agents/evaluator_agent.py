@@ -10,11 +10,14 @@ If the results are poor, it diagnoses the failure and decides on a retry strateg
 import json
 import logging
 import time
+from collections.abc import Mapping
+from typing import Any
 
 from app.agents.base import BaseAgent
 from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState
 from app.core.config import settings
+from app.core.llm import complete_json_dict
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ NON_RELAXABLE_CONSTRAINTS = (
 )
 
 
-def _is_high_quality_result(result: dict, constraints: dict) -> bool:
+def _is_high_quality_result(result: Mapping[str, Any], constraints: Mapping[str, Any]) -> bool:
     """Auto-accept only when blended score and semantic match are both healthy."""
     if result.get("total_score", 0.0) <= HIGH_QUALITY_THRESHOLD:
         return False
@@ -41,7 +44,7 @@ def _is_high_quality_result(result: dict, constraints: dict) -> bool:
     return True
 
 
-def _present_non_relaxable_constraints(parsed_constraints: dict) -> list[str]:
+def _present_non_relaxable_constraints(parsed_constraints: Mapping[str, Any]) -> list[str]:
     """User-stated procurement requirements that cannot be silently dropped."""
     present: list[str] = []
     for key in NON_RELAXABLE_CONSTRAINTS:
@@ -84,7 +87,7 @@ Return JSON only:
 def build_evaluator_prompt(
     *,
     raw_query: str,
-    parsed_constraints: dict,
+    parsed_constraints: Mapping[str, Any],
     search_scope: str,
     results_summary: str,
 ) -> str:
@@ -182,7 +185,7 @@ class EvaluatorAgent(BaseAgent):
         results_lines = []
         for r in ranked[:3]:
             results_lines.append(
-                f"- Supplier: {r['supplier_id']} (Tier: {r['tier']})\n"
+                f"- Supplier: {r['supplier_id']} (Tier: {r.get('tier', 'discovered')})\n"
                 f"  Score: {r['total_score']:.0%}\n"
                 f"  Semantic match: {r.get('semantic_score', 0.5):.0%}\n"
                 f"  Explanation: {r['explanation']}"
@@ -203,12 +206,12 @@ class EvaluatorAgent(BaseAgent):
                     evaluator_timeout,
                     remaining_seconds(state, reserve=2.0),
                 )
-            raw = self.llm.complete_json(
+            eval_result = complete_json_dict(
+                self.llm,
                 [{"role": "user", "content": prompt}],
                 temperature=0.0,
                 timeout=evaluator_timeout,
             )
-            eval_result = json.loads(raw)
             verdict = eval_result.get("verdict", "accept")
             strategy = eval_result.get("retry_strategy", "none")
             reasoning = eval_result.get("reasoning", "")

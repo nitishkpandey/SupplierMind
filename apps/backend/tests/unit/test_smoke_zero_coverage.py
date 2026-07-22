@@ -80,8 +80,7 @@ async def test_ingest_suppliers_from_json_smoke(tmp_path, monkeypatch):
     vstore = MagicMock()
     vstore.add_suppliers = MagicMock(return_value=["emb-1"])
     monkeypatch.setattr(ingestion, "get_vector_store", lambda: vstore)
-    monkeypatch.setattr(ingestion, "get_embedding_client", lambda: MagicMock())
-    monkeypatch.setattr(ingestion.time, "sleep", lambda *_: None)  # no 20s wait
+    monkeypatch.setattr(ingestion.asyncio, "sleep", AsyncMock())  # no 20s wait
 
     db = MagicMock()
     db.flush = AsyncMock()
