@@ -494,6 +494,43 @@ def test_web_search_city_is_in_every_query_and_runs_basic_depth(monkeypatch):
     assert all("Germany" in query for query in queries_seen)
 
 
+def test_web_search_compacts_overlapping_product_terms_generically():
+    assert WebSearchService._compact_product_terms([
+        "beer",
+        "beer",
+        "bottled beer",
+        "Helles",
+        "Pilsner",
+        "German beer",
+    ]) == ["beer", "Helles", "Pilsner"]
+
+
+def test_web_search_builds_compact_distinct_query_families():
+    queries = WebSearchService._build_supplier_queries(
+        category="office_supplies",
+        industry_context="workplace interiors",
+        country="Germany",
+        city="Berlin",
+        certifications=["ISO 9001"],
+        product_terms=["office furniture", "furniture", "desk", "chair"],
+        raw_query="office furniture, desks, and chairs in Berlin",
+    )
+
+    by_family = dict(queries)
+    assert "manufacturer" in by_family
+    assert "distributor" in by_family
+    assert "certification" in by_family
+    assert all("Berlin" in query and "Germany" in query for query in by_family.values())
+    assert any("workplace interiors" in query for query in by_family.values())
+    assert "manufacturer" in by_family["manufacturer"]
+    assert "distributor" in by_family["distributor"]
+    assert "wholesaler" in by_family["distributor"]
+    assert not any(
+        all(term in query.casefold() for term in ("office furniture", "desk", "chair"))
+        for query in by_family.values()
+    )
+
+
 def test_certification_query_runs_before_global_cap_is_applied():
     service = WebSearchService.__new__(WebSearchService)
     seen: list[str] = []
@@ -525,9 +562,11 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
 
         def __init__(self):
             self.max_results: int | None = None
+            self.industry_context: str | None = None
 
         def search_suppliers(self, **kwargs):
             self.max_results = kwargs["max_results"]
+            self.industry_context = kwargs["industry_context"]
             return []
 
     fake_search = FakeWebSearch()
@@ -542,6 +581,7 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
         "raw_query": "hand tools suppliers in Germany",
         "parsed_constraints": {
             "product_type": "hand tools",
+            "industry_context": "industrial maintenance",
             "category_hint": "tools_hardware",
             "location_country": "Germany",
         },
@@ -549,6 +589,7 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
     })
 
     assert fake_search.max_results == 6
+    assert fake_search.industry_context == "industrial maintenance"
 
 
 def test_supplier_extraction_bounds_optional_fallback_page_probes(monkeypatch):
