@@ -94,6 +94,58 @@ def _make_parser(llm: _FakeLLM, registry: ToolRegistry) -> ParserAgent:
     return parser
 
 
+def _country_scope_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "product_type": "industrial pumps",
+        "product_keywords": ["industrial pumps", "pumps"],
+        "industry_context": "industrial machinery",
+        "buyer_intent": "manufacturer",
+        "category_hint": "machinery",
+        "location_city": None,
+        "location_country": "Canada",
+        "location_region": None,
+        "location_lat": 56.1304,
+        "location_lng": -106.3468,
+        "location_radius_km": None,
+        "location_bounds": [41.6766, -141.0027, 83.3362, -52.3232],
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _run_country_scope_finish(
+    raw_query: str,
+    *,
+    payload_overrides: dict[str, Any] | None = None,
+    state_overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = _country_scope_payload(**(payload_overrides or {}))
+    llm = _FakeLLM(
+        [
+            "Thought: Constraints are parsed.\n"
+            f"Action: Finish\nAction Input: {json.dumps(payload)}"
+        ],
+        default="What matters most: certification, lead time, capacity, or proximity?",
+    )
+    parser = _make_parser(
+        llm,
+        _build_registry(geocoder=_FakeGeocoder((56.1304, -106.3468))),
+    )
+    state = _make_state(raw_query)
+    state.update(state_overrides or {})
+    return parser.execute(state)
+
+
 def test_good_reliable_suppliers_has_no_real_product_and_clarifies():
     """Quality adjectives describe supplier preference, not a product."""
     parser = ParserAgent.__new__(ParserAgent)
@@ -154,7 +206,8 @@ def test_clear_query_does_not_trigger_clarification():
     parser = _make_parser(llm, registry)
 
     out = parser.execute(_make_state(
-        "ISO 9001 cardboard packaging supplier in Germany, 10000 units/month"
+        "ISO 9001 cardboard packaging supplier throughout Germany, "
+        "10000 units/month"
     ))
 
     assert out["needs_clarification"] is False
@@ -349,7 +402,7 @@ def test_memory_hit_suppresses_clarification_when_product_missing():
         "industry_context": None,
         "buyer_intent": "any",
         "category_hint": None,
-        "location_city": None,
+        "location_city": "Berlin",
         "location_country": "Germany",  # → adds 1 constraint
         "location_region": None,
         "location_radius_km": None,
@@ -479,13 +532,8 @@ def test_product_only_query_asks_for_location_or_requirements():
     )
 
 
-def test_broad_country_product_query_asks_for_operational_preference():
-    """Product + country can still be too broad.
-
-    For a country-wide search with no certification, lead-time, capacity, radius,
-    or ranking preference, the agent should ask what matters most before
-    returning arbitrary-looking suppliers.
-    """
+def test_broad_country_product_query_asks_for_local_scope():
+    """Product plus country asks for a local scope or explicit country-wide intent."""
     registry = _build_registry(geocoder=_FakeGeocoder((51.1657, 10.4515)))
 
     finish_payload = {
@@ -509,31 +557,27 @@ def test_broad_country_product_query_asks_for_operational_preference():
         "clarification_needed": False,
         "clarification_question": None,
     }
-    llm = _FakeLLM([
-        'Thought: Geocode Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
-        f'Thought: Product and country are clear.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
-        "What matters most: certification, lead time, capacity, or proximity?",
-    ])
+    llm = _FakeLLM(
+        [
+            'Thought: Geocode Germany.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+            f'Thought: Product and country are clear.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+        ],
+        default="What matters most: certification, lead time, capacity, or proximity?",
+    )
     parser = _make_parser(llm, registry)
 
     out = parser.execute(_make_state("packaging suppliers in Germany"))
 
     assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
     assert out["pipeline_status"] == "needs_clarification"
-    question = out["clarification_question"] or ""
-    assert any(
-        word in question.lower()
-        for word in ("certification", "lead", "capacity", "proximity")
+    assert out["clarification_question"] == (
+        "Which city or region should I search near, or should I search all of Germany?"
     )
 
 
-def test_resumed_query_with_product_and_country_does_not_ask_optional_preferences():
-    """After the user answers a product clarification, product + country is
-    enough to start discovery.
-
-    Optional preferences are useful, but they must not burn the remaining
-    clarification turns and hit the max-turn guard.
-    """
+def test_resumed_query_without_scope_reasks_once():
+    """A resumed answer that adds a product but no scope gets one scope re-ask."""
     registry = _build_registry(geocoder=_FakeGeocoder((51.1657, 10.4515)))
 
     finish_payload = {
@@ -574,10 +618,107 @@ def test_resumed_query_with_product_and_country_does_not_ask_optional_preference
 
     out = parser.execute(state)
 
-    assert out["needs_clarification"] is False
-    assert out["pipeline_status"] == "running"
+    assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
+    assert out["clarification_question"] == (
+        "Which city or region should I search near, or should I search all of Germany?"
+    )
     assert out["parsed_constraints"]["product_type"] == "machinery tools"
     assert out["parsed_constraints"]["location_country"] == "Germany"
+
+
+def test_country_only_query_asks_for_city_region_or_countrywide_scope():
+    out = _run_country_scope_finish("Find industrial pump suppliers in Canada")
+
+    assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
+    assert out["clarification_question"] == (
+        "Which city or region should I search near, or should I search all of Canada?"
+    )
+
+
+def test_country_centroid_and_bounds_do_not_suppress_scope_question():
+    out = _run_country_scope_finish("Find industrial pump suppliers in Canada")
+
+    assert out["needs_clarification"] is True
+
+
+@pytest.mark.parametrize(
+    ("answer", "payload_overrides"),
+    [
+        ("Toronto", {"location_city": "Toronto"}),
+        ("Ontario", {"location_region": "Ontario"}),
+        (
+            "within 75 km of Toronto",
+            {"location_city": "Toronto", "location_radius_km": 75},
+        ),
+    ],
+)
+def test_valid_local_scope_answer_resumes_discovery(
+    answer: str,
+    payload_overrides: dict[str, Any],
+) -> None:
+    out = _run_country_scope_finish(
+        f"Find industrial pump suppliers in Canada\n\nUser clarification: {answer}",
+        payload_overrides=payload_overrides,
+        state_overrides={"turn_number": 2},
+    )
+
+    assert out["needs_clarification"] is False
+    assert out["pipeline_status"] == "running"
+
+
+def test_countrywide_answer_resumes_without_dropping_country():
+    out = _run_country_scope_finish(
+        "Find industrial pump suppliers in Canada\n\n"
+        "User clarification: all of Canada",
+        state_overrides={"turn_number": 2},
+    )
+
+    assert out["needs_clarification"] is False
+    assert out["parsed_constraints"]["location_country"] == "Canada"
+
+
+def test_countrywide_intent_in_original_query_does_not_pause():
+    out = _run_country_scope_finish(
+        "Find industrial pump suppliers throughout Canada",
+    )
+
+    assert out["needs_clarification"] is False
+    assert out["parsed_constraints"]["location_country"] == "Canada"
+
+
+def test_one_unusable_answer_reasks_for_scope():
+    out = _run_country_scope_finish(
+        "Find industrial pump suppliers in Canada\n\n"
+        "User clarification: just find the best ones",
+        state_overrides={"turn_number": 2},
+    )
+
+    assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
+
+
+def test_second_unusable_answer_fails_open_on_final_turn():
+    out = _run_country_scope_finish(
+        "Find industrial pump suppliers in Canada\n\n"
+        "User clarification: just find the best ones\n\n"
+        "User clarification: use your judgement",
+        state_overrides={"turn_number": 3},
+    )
+
+    assert out["needs_clarification"] is False
+    assert out["parsed_constraints"]["location_country"] == "Canada"
+
+
+def test_fixed_corpus_country_only_query_does_not_pause():
+    out = _run_country_scope_finish(
+        "Find industrial pump suppliers in Canada",
+        state_overrides={"benchmark_supplier_ids": ["supplier-1"]},
+    )
+
+    assert out["needs_clarification"] is False
+    assert out["parsed_constraints"]["location_country"] == "Canada"
 
 
 # ── 5. Fallback path (max_iterations) is not double-clarified ────────
