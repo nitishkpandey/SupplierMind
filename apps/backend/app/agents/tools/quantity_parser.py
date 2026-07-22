@@ -9,9 +9,10 @@ from app.agents.tools.registry import Tool
 from app.utils.capacity_units import normalise_capacity_unit
 
 _DESCRIPTION = (
-    "Parse a quantity + unit string into a normalised numeric value and unit. "
-    "Handles SI multipliers like 10k or 2.5M and per-period suffixes like "
-    "units/month, tons/year. Use for capacity and lead-time phrases. "
+    "Parse an explicit supplier capacity, throughput, or rate into a normalised "
+    "numeric value and unit. Handles SI multipliers like 10k or 2.5M and "
+    "per-period suffixes like units/month or tons/year. Never use for a buyer "
+    "order quantity, package size, or delivery deadline. "
     "No LLM call; purely deterministic."
 )
 

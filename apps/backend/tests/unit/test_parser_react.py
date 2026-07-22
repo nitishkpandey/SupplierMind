@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from app.agents.parser_agent import MAX_REACT_ITERATIONS, ParserAgent
-from app.agents.tools import ToolRegistry
+from app.agents.tools import Tool, ToolRegistry
 from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
 from app.agents.tools.geocode import geocode_location_tool
 from app.agents.tools.industry_context import infer_industry_context_tool
@@ -101,6 +101,97 @@ def _make_parser(llm: _FakeLLM, registry: ToolRegistry) -> ParserAgent:
     parser = ParserAgent(tool_registry=registry)
     parser.llm = llm  # type: ignore[assignment]
     return parser
+
+
+def _quantity_counting_registry(calls: list[str]) -> ToolRegistry:
+    registry = ToolRegistry()
+    real_tool = parse_quantity_unit_tool()
+
+    def run_quantity(text: str) -> dict[str, Any]:
+        calls.append(text)
+        return real_tool.fn(text=text)
+
+    registry.register(geocode_location_tool(_geocoder=None))
+    registry.register(canonicalize_certification_tool())
+    registry.register(infer_industry_context_tool(_llm=None))
+    registry.register(Tool(
+        name=real_tool.name,
+        description=real_tool.description,
+        args_schema=real_tool.args_schema,
+        fn=run_quantity,
+    ))
+    registry.register(lookup_past_query_tool())
+    return registry
+
+
+def _quantity_finish_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "product_type": "sparkling water",
+        "product_keywords": ["sparkling water"],
+        "industry_context": "beverages",
+        "buyer_intent": "any",
+        "category_hint": "food_ingredients",
+        "location_city": None,
+        "location_country": None,
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_buyer_order_quantity_is_hidden_and_not_executed():
+    quantity_calls: list[str] = []
+    finish_payload = _quantity_finish_payload()
+    llm = _FakeLLM([
+        'Thought: Parse the order amount.\nAction: parse_quantity_unit\n'
+        'Action Input: {"text": "1000 bottles"}',
+        f'Thought: Finish.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, _quantity_counting_registry(quantity_calls))
+
+    out = parser.execute(_make_state("buy 1000 bottles of sparkling water"))
+
+    assert quantity_calls == []
+    assert out["react_trace"][0]["observation"]["error"] == (
+        "quantity_tool_not_applicable"
+    )
+    assert "- parse_quantity_unit:" not in llm.calls[0][0]["content"]
+    assert out["parsed_constraints"]["capacity_min"] is None
+    assert out["parsed_constraints"]["capacity_unit"] is None
+
+
+def test_explicit_supplier_capacity_keeps_and_executes_quantity_tool():
+    quantity_calls: list[str] = []
+    finish_payload = _quantity_finish_payload(
+        capacity_min=None,
+        capacity_unit=None,
+    )
+    llm = _FakeLLM([
+        'Thought: Parse the capacity rate.\nAction: parse_quantity_unit\n'
+        'Action Input: {"text": "10k bottles/month"}',
+        f'Thought: Finish.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, _quantity_counting_registry(quantity_calls))
+
+    out = parser.execute(_make_state(
+        "find sparkling water suppliers with capacity of 10k bottles/month"
+    ))
+
+    assert quantity_calls == ["10k bottles/month"]
+    assert "- parse_quantity_unit:" in llm.calls[0][0]["content"]
+    assert out["parsed_constraints"]["capacity_min"] == 10000
+    assert out["parsed_constraints"]["capacity_unit"] == "units/month"
 
 
 # ── 1. Simple query — single tool call ───────────────────────────────
