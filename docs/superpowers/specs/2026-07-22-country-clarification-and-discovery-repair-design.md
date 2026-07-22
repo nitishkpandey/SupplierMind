@@ -4,11 +4,13 @@
 
 ## Objective
 
-Make country-only procurement requests pause for a delivery city, region, or
-radius before supplier discovery unless the user explicitly requests a
-country-wide search. After that behavior is proven, improve parser efficiency
-and web-query relevance in a separate change so valid web suppliers can reach
-the existing strict compliance pipeline.
+Make interactive country-only procurement requests pause for a delivery city,
+region, or radius before supplier discovery unless the user explicitly requests
+a country-wide search. Fixed-corpus benchmark evaluation bypasses this
+interactive gate and deterministically treats its country constraint as the
+intended nationwide scope. After that behavior is proven, improve parser
+efficiency and web-query relevance in a separate change so valid web suppliers
+can reach the existing strict compliance pipeline.
 
 The work targets the production failure observed for:
 
@@ -64,7 +66,14 @@ The gate pauses when all of the following are true:
 - a usable product or service is present;
 - `location_country` is present;
 - `location_city`, `location_region`, and `location_radius_km` are absent; and
-- the current user text does not explicitly request a country-wide search.
+- the current user text does not explicitly request a country-wide search; and
+- `benchmark_supplier_ids` is empty, meaning this is an interactive production
+  query rather than a fixed-corpus evaluation run.
+
+Only `location_city`, `location_region`, and `location_radius_km` satisfy the
+scope requirement. `location_lat`, `location_lng`, and `location_bounds` do not.
+Geocoding a country can populate its centroid and national bounding box; those
+artifacts must never make a country-only query appear locally scoped.
 
 The question will ask for one decision in one sentence:
 
@@ -79,6 +88,26 @@ Existing global/unbounded phrases remain supported, but country-wide intent is
 distinct from a worldwide search: it retains `location_country` as a hard
 constraint.
 
+Country-wide intent detection is one small pure function with focused positive
+and negative tests. A missed wording causes one clarification question rather
+than silently widening or narrowing the search.
+
+#### Fixed-corpus evaluation bypass
+
+SupplierBench evaluation calls `run_pipeline` once with
+`benchmark_supplier_ids` and has no interactive clarification loop. When that
+list is non-empty, the country-scope gate is bypassed deterministically and the
+parsed country remains a hard constraint. No evaluation-runner changes and no
+benchmark-query text exceptions are introduced.
+
+The bypass applies on clean and degraded parser terminations and suppresses the
+existing country-only `operational_preference` clarification as well as the new
+country-scope question. Other malformed benchmark input may still fail through
+the normal error path; evaluation is not given a general clarification bypass.
+
+This bypass applies only to fixed-corpus evaluation. Normal `approved_only` and
+`both` searches remain interactive and must satisfy the gate.
+
 When the gate fires:
 
 - `needs_clarification` and `pipeline_status` are set before the graph can route
@@ -92,6 +121,18 @@ On resume, the existing clarification flow merges the answer with the original
 query and partial constraints. A city, region, or radius answer continues into
 discovery. An explicit country-wide answer also continues, retains the country
 filter, and does not re-ask the same question.
+
+If the first answer still supplies neither local scope nor explicit
+country-wide intent, the gate asks the same scope decision once more. If the
+second answer is still unusable, the third parser turn proceeds country-wide
+while retaining `location_country`. The implementation uses the existing
+`turn_number` and `MAX_CLARIFICATION_TURNS = 3` boundary from
+`clarification_repo`; it does not add a second counter or permit an unbounded
+re-ask loop. In concrete terms:
+
+- turn 1 may raise the initial country-scope clarification;
+- turn 2 may raise one re-ask; and
+- turn 3 fails open to country-wide scope and continues discovery.
 
 This rule intentionally changes country-only behavior. A user who genuinely
 wants a nationwide search can state that in the original query or select it in
@@ -170,6 +211,11 @@ Phase 1 tests cover:
 - a city, region, and radius response each resume successfully;
 - a country-wide response resumes without dropping the country constraint;
 - explicit nationwide intent in the original query bypasses clarification; and
+- a fixed-corpus evaluation run with a country-only query does not pause;
+- country centroid latitude/longitude and national bounds do not satisfy the
+  scope requirement;
+- one unusable answer re-asks, while a second unusable answer proceeds
+  country-wide on the existing final turn; and
 - missing-product clarification behavior remains unchanged.
 
 Phase 2 tests cover:
@@ -193,11 +239,20 @@ through the live `both` scope after answering the location clarification.
   city, region, or all-Germany choice.
 - The same behavior occurs whether ReAct finishes cleanly or exhausts its
   iteration budget.
+- The rule applies to every product and country combination; no beer, brewery,
+  Germany, or benchmark-query string is hard-coded.
 - Answering `Munich`, `Bavaria`, or an explicit radius resumes the existing
   query with the prior product and country constraints intact.
 - Answering `all of Germany` resumes once and keeps Germany as a hard country
   constraint.
-- No external API or supplier search runs before the clarification is resolved.
+- Country centroid coordinates and country bounds do not suppress the question.
+- One unusable answer causes one re-ask; a second unusable answer proceeds
+  country-wide on turn 3 without dropping the country constraint.
+- SupplierBench runs with non-empty `benchmark_supplier_ids` never pause for
+  country scope and preserve the frozen benchmark execution contract.
+- For an interactive run that pauses, no external API or supplier search runs
+  before the clarification is resolved or the final-turn country-wide fallback
+  is reached.
 
 ### Phase 2
 
@@ -209,4 +264,3 @@ through the live `both` scope after answering the location clarification.
   validation when the search provider returns them.
 - Unrelated or wrong-country candidates continue to fail compliance or
   validation.
-
