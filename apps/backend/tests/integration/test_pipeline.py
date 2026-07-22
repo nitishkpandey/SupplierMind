@@ -5,8 +5,8 @@ Tests the complete flow: query → parser → discovery → compliance → ranki
 Verifies that the system returns results and the audit trail is populated.
 """
 
+
 import pytest
-import asyncio
 
 
 @pytest.mark.asyncio
@@ -15,7 +15,7 @@ async def test_full_pipeline_metals_query():
     from app.agents.orchestrator import run_pipeline
 
     state = await run_pipeline(
-        raw_query="Find ISO 9001 certified metal suppliers in Germany",
+        raw_query="Find ISO 9001 certified metal suppliers throughout Germany",
         query_id="test-query-001",
         user_id="test-user-001",
     )
@@ -37,8 +37,8 @@ async def test_full_pipeline_metals_query():
 @pytest.mark.asyncio
 async def test_parser_extracts_radius():
     """Test that radius constraints are extracted correctly."""
-    from app.agents.parser_agent import ParserAgent
     from app.agents.orchestrator import _create_initial_state
+    from app.agents.parser_agent import ParserAgent
 
     state = _create_initial_state(
         raw_query="Bronze supplier within 25km of Bremen ISO 9001 certified",
@@ -59,8 +59,8 @@ async def test_parser_extracts_radius():
 @pytest.mark.asyncio
 async def test_ambiguous_query_triggers_clarification():
     """Test that vague queries trigger clarification request."""
-    from app.agents.parser_agent import ParserAgent
     from app.agents.orchestrator import _create_initial_state
+    from app.agents.parser_agent import ParserAgent
 
     state = _create_initial_state(
         raw_query="good supplier",  # Too vague

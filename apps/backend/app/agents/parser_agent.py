@@ -1116,7 +1116,10 @@ class ParserAgent(BaseAgent):
         legacy_clarification_needed = (
             finish_payload_requested_clarification or confidence < CLARIFICATION_THRESHOLD
         )
-        legacy_clarification_question = final_constraints.get("clarification_question")
+        legacy_question_value = final_constraints.get("clarification_question")
+        legacy_clarification_question = (
+            legacy_question_value if isinstance(legacy_question_value, str) else None
+        )
 
         turn_number = int(state.get("turn_number") or 1)
         country_scope_needed = needs_country_scope_clarification(
@@ -1154,6 +1157,7 @@ class ParserAgent(BaseAgent):
             and _question_mentions_location(legacy_clarification_question)
         )
 
+        clarification_question: str | None
         if scope_question is not None:
             clarification_needed = True
             clarification_question = scope_question

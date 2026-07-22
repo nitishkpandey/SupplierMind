@@ -18,7 +18,6 @@ from app.agents.tools.quantity_parser import parse_quantity_unit_tool
 from app.agents.tools.registry import Tool, ToolRegistry
 from app.services.geocoding import GeocodeResult
 
-
 # ── Registry contract ────────────────────────────────────────────────
 
 
