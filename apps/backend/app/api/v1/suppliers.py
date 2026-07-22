@@ -5,15 +5,16 @@ FastAPI evaluates routes top-down. Static/specific routes like `/my-list` and
 """
 
 import uuid
+from datetime import UTC
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, update, delete, func
 
 from app.api.deps import get_current_user, require_admin, require_any_role, require_manager
 from app.core.vector_store import get_vector_store
-from app.db.models import AuditLog, Supplier, User, SupplierStatus, UserSupplierSave
+from app.db.models import AuditLog, Supplier, SupplierStatus, User, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import get_db
 from app.schemas.supplier import (
@@ -76,7 +77,7 @@ async def get_my_list(
 
     query = (
         select(Supplier)
-        .where(Supplier.is_active == True)
+        .where(Supplier.is_active == True)  # noqa: E712
         .where(cond)
         .order_by(Supplier.name.asc())
         .offset(offset)
@@ -88,7 +89,7 @@ async def get_my_list(
 
     # 2. Count total
     from sqlalchemy import func
-    count_query = select(func.count()).select_from(Supplier).where(Supplier.is_active == True).where(cond)
+    count_query = select(func.count()).select_from(Supplier).where(Supplier.is_active == True).where(cond)  # noqa: E712
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
@@ -106,21 +107,19 @@ async def get_my_list(
     summary="List all suppliers",
 )
 async def list_suppliers(
+    current_user: Annotated[User, Depends(require_any_role)],
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     category: str | None = None,
     country: str | None = None,
     status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: Annotated[User, Depends(require_any_role)] = None,
 ) -> dict:
     """List active suppliers (optionally filtered by status).
 
     Readable by any authenticated user so analysts can SEE pending_review
     suppliers in the Pending Review tab. Approve/reject remain manager-gated.
     """
-    repo = SupplierRepository(db)
-    
     conds = []
     if category:
         conds.append(Supplier.category == category)
@@ -129,14 +128,14 @@ async def list_suppliers(
     if status_filter:
         conds.append(Supplier.status == status_filter)
 
-    query = select(Supplier).where(Supplier.is_active == True)
+    query = select(Supplier).where(Supplier.is_active == True)  # noqa: E712
     for c in conds:
         query = query.where(c)
-        
+
     query = query.order_by(Supplier.name.asc()).offset(offset).limit(limit)
     items = (await db.execute(query)).scalars().all()
 
-    count_query = select(func.count()).select_from(Supplier).where(Supplier.is_active == True)
+    count_query = select(func.count()).select_from(Supplier).where(Supplier.is_active == True)  # noqa: E712
     for c in conds:
         count_query = count_query.where(c)
     total = (await db.execute(count_query)).scalar_one()
@@ -180,8 +179,8 @@ async def create_supplier(
 )
 async def get_supplier(
     supplier_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
-    current_user: Annotated[User, Depends(get_current_user)] = None,
 ) -> Supplier:
     """Get a specific supplier by ID."""
     repo = SupplierRepository(db)
@@ -266,9 +265,9 @@ async def _record_admin_decision(
     reasoning also surfaces human reasoning — the HITL audit trail lives
     in one table.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     previous_status = supplier.status.value if supplier.status else None
 
     supplier.status = new_status
@@ -373,7 +372,11 @@ async def reject_supplier(
     ).scalar_one_or_none()
     if supplier is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    if supplier.status not in (SupplierStatus.discovered, SupplierStatus.approved):
+    if supplier.status not in (
+        SupplierStatus.discovered,
+        SupplierStatus.pending_review,
+        SupplierStatus.approved,
+    ):
         raise HTTPException(
             status_code=409,
             detail=f"Cannot reject supplier in '{supplier.status.value}' state.",

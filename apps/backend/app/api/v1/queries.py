@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import Query as QueryParam  # DB model already owns the name `Query`
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,17 +137,19 @@ async def submit_query(
             detail=f"Query too long. Maximum {settings.QUERY_MAX_LENGTH} characters.",
         )
 
-    # Check for prompt injection
+    # Check for prompt injection.
+    # ponytail: heuristic tripwire only — substring matching is trivially
+    # bypassed; the real defense is the downstream prompt/tool design.
+    # Broad single-word patterns ("act as", "disregard") were dropped:
+    # they flagged legitimate procurement queries without stopping anyone.
     injection_patterns = [
         "ignore previous instructions",
         "ignore all instructions",
         "you are now",
-        "act as",
-        "disregard",
         "new persona",
     ]
-    query_lower = body.raw_query.lower()
-    if any(p in query_lower for p in injection_patterns):
+    normalized_query = " ".join(body.raw_query.casefold().split())
+    if any(p in normalized_query for p in injection_patterns):
         logger.warning(
             "Prompt injection detected from user=%s: %r",
             current_user.id,
@@ -296,9 +299,9 @@ async def stream_query_progress(
     summary="Get query history for current user",
 )
 async def list_queries(
-    offset: int = 0,
-    limit: int = 20,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
+    current_user: Annotated[User, Depends(get_current_user)],
+    offset: int = QueryParam(0, ge=0),
+    limit: int = QueryParam(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get paginated query history for the authenticated user."""
@@ -810,6 +813,9 @@ async def _run_pipeline_background(
     from app.db.session import AsyncSessionLocal
 
     start_time = time.time()
+    # Remember which buffer this run owns so the finally-cleanup can't pop
+    # a fresh buffer that a clarification resume re-mounted meanwhile.
+    owned_buffer = _sse_events.get(query_id)
 
     def _push(event_type: str, data: dict) -> None:
         if query_id in _sse_events:
@@ -985,7 +991,8 @@ async def _run_pipeline_background(
 
     finally:
         await asyncio.sleep(settings.SSE_CLEANUP_DELAY_SECONDS)
-        _sse_events.pop(query_id, None)
+        if _sse_events.get(query_id) is owned_buffer:
+            _sse_events.pop(query_id, None)
 
 
 async def _mark_query_failed(query_id: str, message: str) -> None:

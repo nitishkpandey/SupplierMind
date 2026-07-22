@@ -1,10 +1,9 @@
 """
 app/services/geocoding.py — Location name to coordinates using Nominatim.
 
-Cache strategy:
-1. Check PostgreSQL geocode_cache table first
-2. On miss: call Nominatim API
-3. Store result in cache forever (city coordinates don't change)
+Cache strategy: a process-wide in-memory dict, keyed by the normalised
+location name. On miss we call the Nominatim API and cache the result for
+the lifetime of the process (city coordinates don't change).
 
 Rate limit: Nominatim allows 1 req/sec. We cache aggressively so
 in practice we'll only call Nominatim for unique location names.
@@ -13,7 +12,6 @@ in practice we'll only call Nominatim for unique location names.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
 from geopy.geocoders import Nominatim
@@ -35,7 +33,7 @@ class GeocodeResult:
     bounds: tuple[float, float, float, float] | None = None
 
 
-# In-memory cache for the current session (fast lookup before DB check)
+# Process-wide in-memory cache; lives for the lifetime of the process.
 _memory_cache: dict[str, GeocodeResult] = {}
 
 
@@ -43,10 +41,7 @@ class GeocodingService:
     """
     Converts location names to (latitude, longitude) coordinates.
 
-    Uses a two-level cache:
-    1. In-memory dict (fastest — no DB round trip)
-    2. PostgreSQL geocode_cache table (persists across restarts)
-    3. Nominatim API (only on cache miss)
+    In-memory dict cache first; Nominatim API only on cache miss.
     """
 
     def __init__(self) -> None:
@@ -55,7 +50,7 @@ class GeocodingService:
             timeout=10,
         )
 
-    def geocode(self, location_name: str) -> Optional[tuple[float, float]]:
+    def geocode(self, location_name: str) -> tuple[float, float] | None:
         """
         Convert a location name to (lat, lng) coordinates.
 
@@ -75,14 +70,12 @@ class GeocodingService:
         # Normalise the key
         key = location_name.strip().lower()
 
-        # Level 1: in-memory cache
+        # In-memory cache
         if key in _memory_cache:
             logger.debug("[geocoding] Memory cache hit: %r", location_name)
             return _memory_cache[key]
 
-        # Level 2: Call Nominatim (DB cache check happens in sync routes)
-        # For the agents, we use the in-memory cache + API only
-        # (DB cache is populated via the admin ingestion flow)
+        # Cache miss: call Nominatim
         result = self._call_nominatim(location_name)
         if result:
             _memory_cache[key] = result
@@ -143,7 +136,7 @@ def _first_text(mapping: dict, *keys: str) -> str | None:
 
 def _normalise_bounding_box(value: object) -> tuple[float, float, float, float] | None:
     """Convert Nominatim's south/north/west/east box to south/west/north/east."""
-    if not isinstance(value, (list, tuple)) or len(value) != 4:
+    if not isinstance(value, list | tuple) or len(value) != 4:
         return None
     try:
         south, north, west, east = (float(item) for item in value)

@@ -2,10 +2,12 @@
  * Handles the OAuth callback redirect from the backend.
  *
  * Backend redirects here after OAuth success:
- * /auth/callback?access_token=XXX&refresh_token=YYY&role=ZZZ
+ * /auth/callback#access_token=XXX&refresh_token=YYY&role=ZZZ
+ * (fragment, not query — the browser never sends it to servers,
+ * so tokens stay out of logs and Referer headers)
  *
  * This page:
- * 1. Extracts tokens from URL params
+ * 1. Extracts tokens from the URL fragment (errors arrive as ?error=)
  * 2. Fetches user profile from /auth/me
  * 3. Stores in Zustand + sessionStorage
  * 4. Redirects to dashboard
@@ -23,8 +25,9 @@ export default function AuthCallbackPage() {
   const { setAuth } = useAuthStore();
 
   useEffect(() => {
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
     const error = params.get("error");
 
     if (error || !accessToken) {

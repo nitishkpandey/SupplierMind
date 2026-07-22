@@ -253,7 +253,7 @@ class MilvusVectorStore(BaseVectorStore):
 
     def delete_supplier(self, supplier_id: str) -> None:
         """Remove supplier's vector from Milvus."""
-        self._collection.delete(f'supplier_id == "{supplier_id}"')
+        self._collection.delete(_milvus_supplier_expr([supplier_id]))
         self._collection.flush()
 
     def count(self) -> int:
@@ -291,7 +291,7 @@ class ChromaVectorStore(BaseVectorStore):
 
         self._collection.add(
             ids=supplier_ids,
-            embeddings=embeddings,
+            embeddings=embeddings,  # type: ignore[arg-type]  # chromadb's Embeddings alias is invariant; list[list[float]] is safe
             documents=texts,
             metadatas=[{"supplier_id": sid} for sid in supplier_ids],
         )
@@ -331,8 +331,10 @@ class ChromaVectorStore(BaseVectorStore):
 
         search_results = []
         if results["ids"] and results["ids"][0]:
+            distances = results["distances"]
+            assert distances is not None  # "distances" is requested in include
             for i, supplier_id in enumerate(results["ids"][0]):
-                distance = results["distances"][0][i]
+                distance = distances[0][i]
                 # ChromaDB returns cosine distance (0=identical, 2=opposite)
                 # Convert to similarity score (1=identical, 0=unrelated)
                 similarity = 1.0 - (distance / 2.0)

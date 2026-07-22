@@ -4,7 +4,6 @@ app/schemas/supplier.py — Pydantic models for supplier API.
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,30 +12,30 @@ class SupplierResponse(BaseModel):
     """Full supplier data returned by the API."""
     id: uuid.UUID
     name: str
-    description: Optional[str] = None
-    category: Optional[str] = None
-    country: Optional[str] = None
-    city: Optional[str] = None
-    address: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    certifications: Optional[list[str]] = None
-    certification_details: Optional[dict] = None
-    capacity_value: Optional[float] = None
-    capacity_unit: Optional[str] = None
-    lead_time_days: Optional[int] = None
-    website: Optional[str] = None
-    contact_email: Optional[str] = None
-    source: Optional[str] = None
+    description: str | None = None
+    category: str | None = None
+    country: str | None = None
+    city: str | None = None
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    certifications: list[str] | None = None
+    certification_details: dict | None = None
+    capacity_value: float | None = None
+    capacity_unit: str | None = None
+    lead_time_days: int | None = None
+    website: str | None = None
+    contact_email: str | None = None
+    source: str | None = None
     status: str
-    source_url: Optional[str] = None
-    source_citations: Optional[dict] = None
+    source_url: str | None = None
+    source_citations: dict | None = None
     is_active: bool
     created_at: datetime
     # Task 2.4 — HITL approval rationale, only set after an admin decision.
-    approval_justification: Optional[str] = None
-    approval_action: Optional[str] = None
-    approval_decided_at: Optional[datetime] = None
+    approval_justification: str | None = None
+    approval_action: str | None = None
+    approval_decided_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -56,19 +55,19 @@ class SupplierApprovalRequest(BaseModel):
 class SupplierCreate(BaseModel):
     """Data required to create a new supplier (admin only)."""
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    category: Optional[str] = None
-    country: Optional[str] = None
-    city: Optional[str] = None
-    address: Optional[str] = None
-    latitude: Optional[float] = Field(None, ge=-90, le=90)
-    longitude: Optional[float] = Field(None, ge=-180, le=180)
-    certifications: Optional[list[str]] = None
-    capacity_value: Optional[float] = Field(None, ge=0)
-    capacity_unit: Optional[str] = None
-    lead_time_days: Optional[int] = Field(None, ge=0, le=365)
-    website: Optional[str] = None
-    contact_email: Optional[str] = None
+    description: str | None = None
+    category: str | None = None
+    country: str | None = None
+    city: str | None = None
+    address: str | None = None
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
+    certifications: list[str] | None = None
+    capacity_value: float | None = Field(None, ge=0)
+    capacity_unit: str | None = None
+    lead_time_days: int | None = Field(None, ge=0, le=365)
+    website: str | None = None
+    contact_email: str | None = None
 
 
 class SupplierListResponse(BaseModel):

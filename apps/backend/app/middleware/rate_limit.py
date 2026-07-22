@@ -10,9 +10,10 @@ Default limits (configurable via settings):
   - 429 Too Many Requests with Retry-After header on breach
 """
 
-import time
 import logging
+import time
 from collections import defaultdict, deque
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -24,6 +25,21 @@ _MAX_REQUESTS = 20
 
 # { identity: deque of timestamps }
 _windows: dict[str, deque] = defaultdict(deque)
+_last_prune = 0.0
+
+
+def _prune_windows(now: float) -> None:
+    """Drop identities whose entire window has expired, so the dict is bounded
+    by active clients rather than growing forever. Runs at most once per window.
+    """
+    global _last_prune
+    if now - _last_prune < _WINDOW_SECONDS:
+        return
+    _last_prune = now
+    cutoff = now - _WINDOW_SECONDS
+    stale = [key for key, window in _windows.items() if not window or window[-1] < cutoff]
+    for key in stale:
+        del _windows[key]
 
 
 def _get_identity(request: Request) -> str:
@@ -37,8 +53,15 @@ def _get_identity(request: Request) -> str:
             return f"user:{payload['sub']}"
         except Exception:
             pass
-    # Fallback: use client IP (less precise but still protects unauthenticated routes)
-    return f"ip:{request.client.host if request.client else 'unknown'}"
+    # Fallback: client IP. Behind a reverse proxy request.client.host is the
+    # proxy, which would collapse every user into one bucket — prefer the first
+    # hop of X-Forwarded-For when present.
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+    return f"ip:{client_ip}"
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -57,6 +80,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         identity = _get_identity(request)
         now = time.monotonic()
+        _prune_windows(now)
         window = _windows[identity]
 
         # Drop timestamps outside the sliding window

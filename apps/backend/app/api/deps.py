@@ -18,11 +18,11 @@ USAGE in any route:
         ...
 """
 
-import uuid
 import logging
+import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status, Query
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,7 +81,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token. Please login again.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     user_id_str: str | None = payload.get("sub")
     if not user_id_str:
@@ -92,11 +92,11 @@ async def get_current_user(
 
     try:
         user_id = uuid.UUID(user_id_str)
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user ID in token.",
-        )
+        ) from e
 
     user_repo = UserRepository(db)
     user = await user_repo.get_by_id(user_id)

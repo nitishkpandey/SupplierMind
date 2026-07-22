@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { authService } from "@/services/api";
+import { authService, toUser } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
+import { apiBaseUrl } from "@/lib/utils";
 
 // Github icon as SVG (lucide version workaround)
 function GithubIcon() {
@@ -34,7 +35,6 @@ export default function LoginPage() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [devLoginPending, setDevLoginPending] = useState(false);
   const [devLoginError, setDevLoginError] = useState<string | null>(null);
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   const handleGoogleLogin = () => {
     window.location.href = `${apiBaseUrl}/api/v1/auth/google/authorize`;
@@ -50,12 +50,7 @@ export default function LoginPage() {
     try {
       const { data } = await authService.devLogin();
       sessionStorage.setItem("sm_refresh_token", data.refresh_token);
-      setAuth(data.access_token, {
-        id: data.user_id,
-        email: data.email,
-        name: data.name,
-        role: data.role,
-      });
+      setAuth(data.access_token, toUser(data));
       navigate("/dashboard", { replace: true });
     } catch {
       setDevLoginError("Development login failed. Check that the backend is running in development mode.");

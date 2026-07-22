@@ -1,9 +1,10 @@
 """app/db/repositories/query_repo.py — Query CRUD operations."""
 
 import uuid
+
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models import PendingClarification, Query
 from app.db.repositories.base import BaseRepository

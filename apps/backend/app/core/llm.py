@@ -19,6 +19,7 @@ per-process total (`client.total_cost_usd`) so a benchmark run can report
 spend per paradigm.
 """
 
+import json
 import logging
 import re
 import threading
@@ -269,9 +270,9 @@ class OpenAIProvider(_UsageTracking):
         request_timeout = timeout
         if timeout is not None:
             request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
-        response = self._client.chat.completions.create(
+        response = self._client.chat.completions.create(  # type: ignore[call-overload]  # messages are plain dicts; OpenAI SDK validates at runtime
             model=resolved_model,
-            messages=messages,  # type: ignore[arg-type]
+            messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={"type": "json_object"},
@@ -287,8 +288,6 @@ class OpenAIProvider(_UsageTracking):
             self._rate_limiter.update_actual_tokens(model, ts, int(total))
         self._track(model, response)
 
-    def count_tokens_estimate(self, text: str) -> int:
-        return len(text) // 4
 
 
 # Backwards-compatible alias: BaseAgent and the tools type-annotate against
@@ -315,3 +314,14 @@ def build_llm_client() -> Any:
 def get_llm_client() -> Any:
     """Returns a cached LLM client instance — one for the whole process."""
     return build_llm_client()
+
+
+def complete_json_dict(
+    client: Any, messages: list[dict[str, str]], **kwargs: Any
+) -> dict[str, Any]:
+    """complete_json + json.loads in one step.
+
+    Provider and JSON-decode errors propagate unchanged so every call site
+    keeps its own fallback value and logging.
+    """
+    return json.loads(client.complete_json(messages, **kwargs))

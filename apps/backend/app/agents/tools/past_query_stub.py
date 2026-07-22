@@ -11,6 +11,10 @@ from typing import Any
 
 from app.agents.tools.registry import Tool
 
+# Deliberately NOT imported from past_query.py: that module pulls in
+# query_memory (Milvus/Voyage clients) at import time, and this stub exists
+# precisely so callers can build a registry without those imports. The
+# description also intentionally differs (it admits the degraded behaviour).
 _DESCRIPTION = (
     "Find semantically-similar past queries from this user's history. Use when "
     "the current query is ambiguous and prior queries might disambiguate, or "

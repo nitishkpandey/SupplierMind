@@ -99,6 +99,20 @@ def test_clear_history_deletes_only_current_users_query_artifacts():
     fake_session.commit.assert_awaited_once()
 
 
+def test_history_rejects_zero_limit():
+    user = _fake_user()
+    app.dependency_overrides[get_current_user] = lambda: user
+
+    async def session_override():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = session_override
+
+    response = TestClient(app).get("/api/v1/queries", params={"limit": 0})
+
+    assert response.status_code == 422  # was ZeroDivisionError → 500
+
+
 def test_history_marks_open_pending_query_as_needs_clarification():
     user = _fake_user()
     query_id = uuid4()

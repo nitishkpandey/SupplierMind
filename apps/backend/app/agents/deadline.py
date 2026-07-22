@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Mapping
+from typing import Any
 
 
-class QueryDeadlineExceeded(RuntimeError):
+class QueryDeadlineExceeded(RuntimeError):  # noqa: N818
     """Raised when continuing work would exceed the query execution budget."""
 
 
 def remaining_seconds(
-    state: Mapping[str, object],
+    state: Mapping[str, Any],
     reserve: float = 0.0,
     *,
     monotonic: Callable[[], float] = time.monotonic,

@@ -316,11 +316,7 @@ export default function ResultsPage() {
       ) : (
         <div className="space-y-4">
           {queryData.results.map((result) => (
-            <SupplierCard
-              key={result.supplier_id}
-              result={result}
-              hasProximity={hasRadius}
-            />
+            <SupplierCard key={result.supplier_id} result={result} />
           ))}
         </div>
       )}

@@ -10,9 +10,9 @@ DRY principle applied at the database layer.
 """
 
 import uuid
-from typing import Any, Generic, Type, TypeVar
+from typing import Generic, TypeVar
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Base
@@ -31,14 +31,14 @@ class BaseRepository(Generic[ModelType]):
                 super().__init__(Supplier, db)
     """
 
-    def __init__(self, model: Type[ModelType], db: AsyncSession) -> None:
+    def __init__(self, model: type[ModelType], db: AsyncSession) -> None:
         self.model = model
         self.db = db
 
     async def get_by_id(self, id: uuid.UUID) -> ModelType | None:
         """Get one record by primary key. Returns None if not found."""
         result = await self.db.execute(
-            select(self.model).where(self.model.id == id)
+            select(self.model).where(self.model.id == id)  # type: ignore[attr-defined]  # every mapped model defines id; Base itself doesn't
         )
         return result.scalar_one_or_none()
 

@@ -26,11 +26,12 @@ import time
 import uuid
 from collections.abc import Iterable
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.state import SupplierComplianceResult
 from app.db.session import AsyncSessionLocal
 from app.evaluation.baselines import keyword_baseline_search, manual_baseline_search
 from app.evaluation.corpus import benchmark_supplier_ids
@@ -63,7 +64,7 @@ async def run_suppliermind_query(
     query_id: str,
     *,
     allowed_supplier_ids: Iterable[str] | None = None,
-) -> tuple[list[str], list[dict], int]:
+) -> tuple[list[str], list[SupplierComplianceResult], int]:
     """
     Run one query through the full SupplierMind pipeline.
 
@@ -190,6 +191,7 @@ async def _fetch_supplier_dicts(
     from sqlalchemy import select
 
     from app.db.models import Supplier, SupplierStatus
+    from app.db.repositories.supplier_repo import supplier_to_dict
 
     if not ids:
         return []
@@ -214,18 +216,7 @@ async def _fetch_supplier_dicts(
         s = rows.get(sid)
         if s is None:
             continue
-        out.append({
-            "id": str(s.id),
-            "name": s.name,
-            "country": s.country,
-            "city": s.city,
-            "certifications": list(s.certifications or []),
-            "capacity_value": s.capacity_value,
-            "capacity_unit": s.capacity_unit,
-            "lead_time_days": s.lead_time_days,
-            "latitude": s.latitude,
-            "longitude": s.longitude,
-        })
+        out.append(supplier_to_dict(s))
     return out
 
 
@@ -508,7 +499,7 @@ async def run_full_evaluation(
         checkpoint = {
             "completed_queries": i,
             "total_queries": total,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "per_query_metrics": {
                 "suppliermind": [asdict(m) for m in sm_metrics],
                 "keyword_sql": [asdict(m) for m in kw_metrics],
@@ -535,7 +526,7 @@ async def run_full_evaluation(
 
     results = {
         "run_id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "query_count": total,
         "benchmark_file": str(BENCHMARK_FILE),
         "per_query_metrics": {

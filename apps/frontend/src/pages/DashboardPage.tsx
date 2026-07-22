@@ -4,12 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { queryService, supplierService } from "@/services/api";
+import { agentStepsForScope } from "@/features/queries/resultPresentation";
+import { queryStatusIcon } from "@/features/queries/statusIcons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Clock, CheckCircle, XCircle, Brain } from "lucide-react";
+import { Search, Brain } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+
+// Full pipeline (scope "both" includes external discovery) — stays in sync
+// with the real agent list instead of a hardcoded count.
+const AGENT_STEPS = agentStepsForScope("both");
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -33,9 +39,9 @@ export default function DashboardPage() {
         : `${supplierStats.indexed_suppliers.toLocaleString()} indexed; reindex needed`;
 
   const statusIcon = (status: string) => {
-    if (status === "completed") return <CheckCircle className="w-4 h-4 text-green-500" />;
-    if (status === "failed") return <XCircle className="w-4 h-4 text-red-500" />;
-    return <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />;
+    const { icon: Icon, color } = queryStatusIcon(status);
+    const pulse = status === "completed" || status === "failed" ? "" : " animate-pulse";
+    return <Icon className={`w-4 h-4 ${color}${pulse}`} />;
   };
 
   return (
@@ -94,9 +100,9 @@ export default function DashboardPage() {
             <CardTitle className="text-sm text-muted-foreground">Active Agents</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">5</p>
+            <p className="text-3xl font-bold">{AGENT_STEPS.length}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Parser, Discovery, Compliance, Ranking, Orchestrator
+              {AGENT_STEPS.map((step) => step.label).join(", ")}
             </p>
           </CardContent>
         </Card>

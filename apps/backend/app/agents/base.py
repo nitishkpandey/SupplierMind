@@ -15,12 +15,13 @@ BaseAgent writes them once. Each agent inherits.
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.state import AgentState
 from app.core.llm import LLMClient, get_llm_client
-from app.utils.text_normalization import clean_optional_text, clean_text_list
+from app.utils.text_normalization import clean_optional_text
 
 logger = logging.getLogger(__name__)
 
@@ -112,34 +113,29 @@ class BaseAgent(ABC):
 
     def _fetch_suppliers(self, supplier_ids: list[str]) -> list[dict]:
         """Fetch supplier data using sync DB session (no async conflicts)."""
+        from app.db.repositories.supplier_repo import (
+            SupplierRepository,
+            supplier_to_dict,
+        )
         from app.db.session import SyncSessionLocal
-        from app.db.repositories.supplier_repo import SupplierRepository
 
         with SyncSessionLocal() as db:
             suppliers = SupplierRepository.get_by_ids_sync(db, supplier_ids)
-            return [
-                {
-                    "id": str(s.id),
-                    "name": clean_optional_text(s.name),
+            out = []
+            for s in suppliers:
+                d = supplier_to_dict(s, clean=True)
+                d.update({
                     "description": clean_optional_text(s.description),
                     "category": clean_optional_text(s.category),
-                    "country": clean_optional_text(s.country),
-                    "city": clean_optional_text(s.city),
-                    "latitude": s.latitude,
-                    "longitude": s.longitude,
-                    "certifications": clean_text_list(s.certifications),
                     "certification_details": s.certification_details or {},
                     "source_citations": s.source_citations or {},
-                    "capacity_value": s.capacity_value,
-                    "capacity_unit": clean_optional_text(s.capacity_unit),
-                    "lead_time_days": s.lead_time_days,
                     "website": clean_optional_text(s.website),
                     "contact_email": clean_optional_text(s.contact_email),
-                }
-                for s in suppliers
-            ]
+                })
+                out.append(d)
+            return out
 
-    def _extract_country_from_constraints(self, constraints: dict) -> Optional[str]:
+    def _extract_country_from_constraints(self, constraints: Mapping[str, Any]) -> str | None:
         if constraints.get("location_country"):
             return constraints["location_country"]
         location = constraints.get("location_name", "") or ""
@@ -149,7 +145,7 @@ class BaseAgent(ABC):
                 return parts[-1]
         return None
 
-    def _extract_city_from_constraints(self, constraints: dict) -> Optional[str]:
+    def _extract_city_from_constraints(self, constraints: dict) -> str | None:
         if constraints.get("location_city"):
             return constraints["location_city"]
         location = constraints.get("location_name", "") or ""

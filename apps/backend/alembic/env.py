@@ -39,7 +39,7 @@ target_metadata = Base.metadata
 
 # All SupplierMind tables — only these should be managed by Alembic
 SUPPLIERMIND_TABLES = {
-    "suppliers", "users", "queries", "query_results", "audit_logs", "geocode_cache",
+    "suppliers", "users", "queries", "query_results", "audit_logs",
 }
 
 

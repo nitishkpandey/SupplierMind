@@ -1,6 +1,7 @@
 """Shared cleanup for optional text extracted from external sources."""
 
 import re
+import unicodedata
 from collections.abc import Iterable
 
 NULL_TEXT_VALUES = {
@@ -50,6 +51,12 @@ def clean_text_list(values: Iterable | None) -> list[str]:
         seen.add(key)
         cleaned.append(text)
     return cleaned
+
+
+def strip_accents(value: object) -> str:
+    """NFKD-decompose and drop combining marks (e.g. "München" → "Munchen")."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
 
 
 def normalise_supplier_name_for_dedupe(name: str) -> str:

@@ -12,6 +12,7 @@ IMPORTANT: Agents MUST use get_sync_db() or SyncSessionLocal.
 """
 
 from collections.abc import AsyncGenerator, Generator
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncSession,

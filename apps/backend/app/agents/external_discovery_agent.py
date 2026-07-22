@@ -3,7 +3,8 @@
 import logging
 import time
 import uuid
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any
 
 from app.agents.base import BaseAgent
 from app.agents.deadline import remaining_seconds
@@ -72,7 +73,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             )
             return state
 
-        constraints = state.get("parsed_constraints") or {}
+        constraints: Mapping[str, Any] = state.get("parsed_constraints") or {}
 
         # ── Step 1: Web search ───────────────────────────────────────
         max_web_results = min(
@@ -277,7 +278,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         supplier["source_citations"] = citations
 
     @staticmethod
-    def _product_terms_from_constraints(constraints: dict) -> list[str]:
+    def _product_terms_from_constraints(constraints: Mapping[str, Any]) -> list[str]:
         terms: list[str] = []
         if constraints.get("product_type"):
             terms.append(str(constraints["product_type"]))
@@ -294,7 +295,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             cleaned_terms.append(cleaned)
         return cleaned_terms[:8]
 
-    def _is_duplicate(self, db, name: str, country: Optional[str]) -> bool:
+    def _is_duplicate(self, db, name: str, country: str | None) -> bool:
         """Check if a supplier already exists by normalized name + country."""
         from sqlalchemy import select
 
@@ -342,8 +343,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                         contact_email=s.get("contact_email"),
                         source="web_discovery",
                         # Web-discovered suppliers enter a pending-review state
-                        # so they never bypass manager approval. They are still
-                        # embedded after commit and shown with a badge in search.
+                        # so they never bypass manager approval. They are
+                        # embedded before commit and shown with a badge in search.
                         status=SupplierStatus.pending_review,
                         source_url=s.get("source_url"),
                         source_citations=s.get("source_citations") or {},
@@ -353,19 +354,27 @@ class ExternalDiscoveryAgent(BaseAgent):
                     supplier_objects.append((supplier_id, s))
                     new_ids.append(str(supplier_id))
 
-                db.commit()
+                # Embed BEFORE commit: a Milvus failure raises here, the
+                # session exit rolls back the uncommitted Postgres rows, and
+                # both stores stay in sync.
+                # ponytail: if commit fails after the vector add, Milvus keeps
+                # orphan vectors (harmless — search resolves via Postgres);
+                # add reconciliation if that ever matters.
+                vs = get_vector_store()
+                embed_dicts = [
+                    {**s, "id": new_ids[i]}
+                    for i, (sid, s) in enumerate(supplier_objects)
+                ]
+                vs.add_suppliers(embed_dicts)
 
-            vs = get_vector_store()
-            embed_dicts = [
-                {**s, "id": new_ids[i]}
-                for i, (sid, s) in enumerate(supplier_objects)
-            ]
-            vs.add_suppliers(embed_dicts)
+                db.commit()
 
             logger.debug("[external_discovery] Ingested %d new suppliers", len(new_ids))
 
         except Exception as e:
             logger.error("[external_discovery] Ingestion failed: %s", e)
+            # Rows were rolled back — never report IDs that don't exist.
+            return []
 
         return new_ids
 
@@ -374,7 +383,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         certifications = supplier.get("certifications") or []
         citations = supplier.get("source_citations") or {}
         cert_citation = citations.get("certifications") if isinstance(citations, dict) else None
-        per_cert = {}
+        per_cert: dict[str, Any] = {}
         if isinstance(cert_citation, dict):
             per_cert = cert_citation.get("certifications") or {}
 

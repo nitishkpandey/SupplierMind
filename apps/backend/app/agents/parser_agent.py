@@ -20,13 +20,14 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.base import BaseAgent
 from app.agents.deadline import remaining_seconds
-from app.agents.state import AgentState
+from app.agents.state import AgentState, ParsedConstraints
 from app.agents.tools import ToolRegistry, build_default_registry
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import SyncSessionLocal
@@ -364,7 +365,7 @@ def _raw_query_states_capacity(raw_query: str) -> bool:
 def _capacity_value_matches(left: object, right: object) -> bool:
     """Loose numeric equality for capacity values copied through JSON memory."""
     try:
-        return float(left) == float(right)
+        return float(left) == float(right)  # type: ignore[arg-type]  # TypeError from non-numerics handled below
     except (TypeError, ValueError):
         return left == right
 
@@ -421,7 +422,7 @@ def _clear_non_capacity_quantity(
     raw["capacity_unit"] = None
 
 
-def _extract_lead_time_days(raw_query: str) -> Optional[int]:
+def _extract_lead_time_days(raw_query: str) -> int | None:
     """Recover a lead-time ceiling from common delivery phrasings."""
     for pattern in _LEAD_TIME_PATTERNS:
         match = pattern.search(raw_query or "")
@@ -544,7 +545,7 @@ def _constraint_location_tokens(raw: dict) -> set[str]:
     return tokens
 
 
-def _clean_product_phrase(value: object, raw: dict) -> Optional[str]:
+def _clean_product_phrase(value: object, raw: dict) -> str | None:
     """Strip constraint/cert/location debris from a candidate product phrase."""
     text = _clean_optional_text(value)
     if not text:
@@ -590,7 +591,7 @@ def _is_constraint_soup_product(value: object, raw: dict) -> bool:
     )
 
 
-def _extract_product_from_raw_query(raw_query: str, raw: dict) -> Optional[str]:
+def _extract_product_from_raw_query(raw_query: str, raw: dict) -> str | None:
     """Recover the requested product from common 'X supplier' phrasing."""
     text = " ".join((raw_query or "").replace("\n", " ").split())
     if not text:
@@ -609,7 +610,7 @@ def _extract_product_from_raw_query(raw_query: str, raw: dict) -> Optional[str]:
     return None
 
 
-def _merge_product_keyword(raw_keywords: list[object], product_type: Optional[str], raw: dict) -> list[str]:
+def _merge_product_keyword(raw_keywords: list[object], product_type: str | None, raw: dict) -> list[str]:
     keywords: list[str] = []
     seen: set[str] = set()
     for value in ([product_type] if product_type else []) + list(raw_keywords or []):
@@ -646,7 +647,7 @@ def _geocode_step_applies(
     *,
     step: dict,
     raw_query: str,
-    prior_partial: Optional[dict],
+    prior_partial: Mapping[str, Any] | None,
 ) -> bool:
     obs = step.get("observation") or {}
     if step.get("action") != "geocode_location" or not obs.get("found"):
@@ -667,7 +668,7 @@ def _merge_geocode_location_observations(
     raw: dict,
     trace: list[dict],
     raw_query: str,
-    prior_partial: Optional[dict],
+    prior_partial: Mapping[str, Any] | None,
 ) -> None:
     """Use geocode observations to correct city/country fields before search.
 
@@ -713,7 +714,7 @@ def _merge_geocode_location_observations(
             raw["location_region"] = obs_region
 
 
-def _clean_optional_text(value: object) -> Optional[str]:
+def _clean_optional_text(value: object) -> str | None:
     """Convert common LLM null sentinels into real None values."""
     if not isinstance(value, str):
         return None if value is None else str(value)
@@ -1074,7 +1075,7 @@ class ParserAgent(BaseAgent):
                         }
                     else:
                         result = tool.fn(**step.action_input)
-                    entry["observation"] = result if isinstance(result, (dict, list)) else {"value": result}
+                    entry["observation"] = result if isinstance(result, dict | list) else {"value": result}
                 except TypeError as e:
                     entry["observation"] = {"error": "bad_args", "detail": str(e)}
                 except Exception as e:  # noqa: BLE001 — surface any tool failure as observation
@@ -1100,7 +1101,10 @@ class ParserAgent(BaseAgent):
         constraints = self._normalise_constraints(
             final_constraints, trace, raw_query=raw_query, prior_partial=prior_partial
         )
-        confidence = float(final_constraints.get("confidence", 0.5) or 0.5)
+        try:
+            confidence = float(final_constraints.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5  # non-numeric confidence (e.g. "high") — use default
         finish_payload_requested_clarification = bool(
             final_constraints.get("clarification_needed")
         )
@@ -1112,7 +1116,7 @@ class ParserAgent(BaseAgent):
         # Task 3.3 — Post-loop clarification decision. Only fires on a clean
         # `finish` termination; the fallback/degraded paths already emit
         # their own clarification text and we don't override them.
-        composed_question: Optional[str] = None
+        composed_question: str | None = None
         if terminated_by == "finish":
             turn_number = int(state.get("turn_number") or 1)
             composed_question = self._decide_clarification(
@@ -1286,13 +1290,13 @@ class ParserAgent(BaseAgent):
 
     def _decide_clarification(
         self,
-        constraints: dict,
+        constraints: Mapping[str, Any],
         trace: list[dict],
         raw_query: str,
         confidence: float,
-        memory_context: Optional[str],
+        memory_context: str | None,
         turn_number: int = 1,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Task 3.3 — decide whether to interrupt the pipeline with a question.
 
         Three trigger rules, evaluated in priority order. The first rule that
@@ -1416,7 +1420,7 @@ class ParserAgent(BaseAgent):
         return None
 
     @staticmethod
-    def _has_any_constraint(constraints: dict, keys: tuple[str, ...]) -> bool:
+    def _has_any_constraint(constraints: Mapping[str, Any], keys: tuple[str, ...]) -> bool:
         """True when any named constraint is present and meaningful."""
         for key in keys:
             value = constraints.get(key)
@@ -1447,7 +1451,7 @@ class ParserAgent(BaseAgent):
         )
 
     @staticmethod
-    def _raw_query_has_product_signal(raw_query: str, constraints: dict) -> bool:
+    def _raw_query_has_product_signal(raw_query: str, constraints: Mapping[str, Any]) -> bool:
         """True when the raw query names a product/service beyond location,
         certification, capacity, or generic supplier-search words."""
         tokens = re.findall(r"[a-zA-Z0-9]+", (raw_query or "").lower())
@@ -1490,7 +1494,7 @@ class ParserAgent(BaseAgent):
     def _compose_clarification_question(
         self,
         raw_query: str,
-        partial_constraints: dict,
+        partial_constraints: Mapping[str, Any],
         missing: str,
     ) -> str:
         """Single focused LLM call: render ONE short question for the user.
@@ -1532,7 +1536,7 @@ class ParserAgent(BaseAgent):
         return self._tidy_clarification_question(raw) or self._fallback_clarification(missing)
 
     @staticmethod
-    def _format_constraints_for_clarification(constraints: dict) -> str:
+    def _format_constraints_for_clarification(constraints: Mapping[str, Any]) -> str:
         """Render the small subset of fields the LLM needs to write a question.
 
         Kept minimal on purpose — handing the LLM the full schema invites it
@@ -1620,7 +1624,7 @@ class ParserAgent(BaseAgent):
         input_summary: str,
         output_summary: str,
         duration_ms: int,
-        reasoning: Optional[str] = None,
+        reasoning: str | None = None,
     ) -> None:
         """Audit-log appender that lets us record entries under a different
         agent_name than self (e.g. 'clarification_handler' is not a real
@@ -1638,8 +1642,8 @@ class ParserAgent(BaseAgent):
     def _build_initial_user_message(
         self,
         raw_query: str,
-        memory_context: Optional[str],
-        prior_partial: Optional[dict] = None,
+        memory_context: str | None,
+        prior_partial: Mapping[str, Any] | None = None,
     ) -> str:
         parts: list[str] = []
         if memory_context:
@@ -1665,7 +1669,7 @@ class ParserAgent(BaseAgent):
         )
         return "\n\n".join(parts)
 
-    def _load_user_memory(self, user_id: str) -> Optional[str]:
+    def _load_user_memory(self, user_id: str) -> str | None:
         if not user_id:
             return None
         try:
@@ -1715,7 +1719,7 @@ class ParserAgent(BaseAgent):
         raw: dict,
         trace: list[dict],
         raw_query: str,
-        prior_partial: Optional[dict],
+        prior_partial: Mapping[str, Any] | None,
     ) -> tuple[list[str], list[str]]:
         """Split the LLM's cert list by provenance — the cert-hallucination fix.
 
@@ -1813,8 +1817,8 @@ class ParserAgent(BaseAgent):
         raw: dict,
         trace: list[dict],
         raw_query: str = "",
-        prior_partial: Optional[dict] = None,
-    ) -> dict:
+        prior_partial: Mapping[str, Any] | None = None,
+    ) -> ParsedConstraints:
         """Map the LLM's Finish payload to the ParsedConstraints shape.
 
         Tolerant of missing keys and of legacy "location" nesting. Promotes
