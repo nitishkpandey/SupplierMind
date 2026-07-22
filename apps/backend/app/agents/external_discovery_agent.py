@@ -82,6 +82,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         )
         web_results = self.web_search.search_suppliers(
             category=constraints.get("category_hint") or constraints.get("category"),
+            industry_context=constraints.get("industry_context"),
             country=self._extract_country_from_constraints(constraints),
             city=constraints.get("location_city"),
             certifications=constraints.get("certifications"),
