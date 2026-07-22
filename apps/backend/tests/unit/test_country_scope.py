@@ -116,3 +116,78 @@ def test_initial_state_wires_benchmark_supplier_ids_to_parser_state() -> None:
     )
 
     assert state["benchmark_supplier_ids"] == ["supplier-1"]
+
+
+def _parser_node_state(*, resumable: bool) -> dict[str, Any]:
+    return {
+        "raw_query": "Find industrial pump suppliers in Canada",
+        "query_id": "00000000-0000-0000-0000-000000000001",
+        "user_id": "00000000-0000-0000-0000-000000000002",
+        "needs_clarification": True,
+        "clarification_resumable": resumable,
+        "clarification_question": (
+            "Which city or region should I search near, or should I search all of Canada?"
+        ),
+        "react_terminated_by": "max_iterations",
+        "parsed_constraints": {
+            "product_type": "industrial pumps",
+            "location_country": "Canada",
+        },
+        "react_trace": [],
+        "audit_log": [],
+    }
+
+
+def test_parser_node_persists_resumable_degraded_scope_question(monkeypatch) -> None:
+    class FakeParserAgent:
+        def __init__(self, tool_registry=None) -> None:
+            self.tool_registry = tool_registry
+
+        def run(self, state):
+            return state
+
+    persisted: list[dict[str, Any]] = []
+
+    def fake_persist(state):
+        persisted.append(state)
+        state["clarification_id"] = "clarification-1"
+
+    monkeypatch.setattr(orchestrator, "build_user_registry", lambda user_id: object())
+    monkeypatch.setattr(orchestrator, "ParserAgent", FakeParserAgent)
+    monkeypatch.setattr(orchestrator, "_persist_clarification_for_state", fake_persist)
+
+    out = orchestrator.parser_node(_parser_node_state(resumable=True))
+
+    assert persisted == [out]
+    assert out["clarification_id"] == "clarification-1"
+
+
+def test_parser_node_does_not_persist_nonresumable_degraded_failure(
+    monkeypatch,
+) -> None:
+    class FakeParserAgent:
+        def __init__(self, tool_registry=None) -> None:
+            self.tool_registry = tool_registry
+
+        def run(self, state):
+            return state
+
+    persisted: list[dict[str, Any]] = []
+    monkeypatch.setattr(orchestrator, "build_user_registry", lambda user_id: object())
+    monkeypatch.setattr(orchestrator, "ParserAgent", FakeParserAgent)
+    monkeypatch.setattr(
+        orchestrator,
+        "_persist_clarification_for_state",
+        lambda state: persisted.append(state),
+    )
+
+    orchestrator.parser_node(_parser_node_state(resumable=False))
+
+    assert persisted == []
+
+
+def test_paused_country_scope_stops_before_discovery() -> None:
+    from langgraph.graph import END
+
+    state = _parser_node_state(resumable=True)
+    assert orchestrator.after_parser(state) == END

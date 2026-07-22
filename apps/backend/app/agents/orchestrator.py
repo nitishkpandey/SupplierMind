@@ -160,15 +160,10 @@ def parser_node(state: AgentState) -> AgentState:
 
     state = agent.run(state)
 
-    # Persist pause state when the Parser raised a clarification on a clean
-    # `finish` termination, or via the pre-loop clarification gate
-    # (contentless query, no ReAct run). The fallback/degraded paths also
-    # set needs_clarification=True but those carry no resumable state —
-    # they just degrade gracefully — so we skip persistence there.
-    if state.get("needs_clarification") and state.get("react_terminated_by") in (
-        "finish",
-        "pre_loop_clarification",
-    ):
+    # Persist clean, pre-loop, and deterministic degraded country-scope pauses.
+    # Other degraded messages are explicitly non-resumable and keep the API's
+    # existing fail-safe behavior instead of creating an unusable dialogue.
+    if state.get("needs_clarification") and state.get("clarification_resumable"):
         try:
             _persist_clarification_for_state(state)
         except Exception as e:  # noqa: BLE001 — persistence must never crash pipeline
