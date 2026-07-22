@@ -51,16 +51,20 @@ def test_build_llm_client_returns_openai_provider():
 
 def test_build_llm_client_unsupported_provider_raises():
     # Anything but "openai" is rejected in the single-provider deployment.
-    with patch.object(llm_mod.settings, "LLM_PROVIDER", "anthropic"):
-        with pytest.raises(ValueError, match="Only 'openai' is supported"):
-            build_llm_client()
+    with (
+        patch.object(llm_mod.settings, "LLM_PROVIDER", "anthropic"),
+        pytest.raises(ValueError, match="Only 'openai' is supported"),
+    ):
+        build_llm_client()
 
 
 def test_build_llm_client_openai_without_key_raises():
-    with patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"), \
-         patch.object(llm_mod.settings, "OPENAI_API_KEY", ""):
-        with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-            build_llm_client()
+    with (
+        patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"),
+        patch.object(llm_mod.settings, "OPENAI_API_KEY", ""),
+        pytest.raises(ValueError, match="OPENAI_API_KEY"),
+    ):
+        build_llm_client()
 
 
 # -- 3. No fallback: there is no wrapper, and OpenAI failures surface -----------
