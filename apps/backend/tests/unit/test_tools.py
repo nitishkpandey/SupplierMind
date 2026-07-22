@@ -53,6 +53,17 @@ def test_registry_list_for_prompt_includes_all_tools():
     assert '"k": 2' in rendered
 
 
+def test_registry_list_for_prompt_can_exclude_one_tool():
+    reg = ToolRegistry()
+    reg.register(Tool(name="keep", description="visible", args_schema={}, fn=lambda: None))
+    reg.register(Tool(name="hide", description="hidden", args_schema={}, fn=lambda: None))
+
+    rendered = reg.list_for_prompt(exclude_names={"hide"})
+
+    assert "- keep: visible" in rendered
+    assert "- hide: hidden" not in rendered
+
+
 def test_build_default_registry_has_five_tools():
     reg = build_default_registry()
     assert sorted(reg.names()) == sorted([
@@ -205,6 +216,15 @@ def test_parse_quantity_unit_unparseable_returns_parsed_false():
     tool = parse_quantity_unit_tool()
     out = tool.fn(text="lots and lots")
     assert out["parsed"] is False
+
+
+def test_parse_quantity_unit_description_is_capacity_only():
+    description = parse_quantity_unit_tool().description.casefold()
+
+    assert "supplier capacity" in description
+    assert "never" in description
+    assert "buyer order" in description
+    assert "lead-time" not in description
 
 
 # ── lookup_past_query stub ───────────────────────────────────────────

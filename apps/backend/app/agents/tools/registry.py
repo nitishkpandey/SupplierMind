@@ -16,7 +16,7 @@ Design choices (see Yao et al. 2022, arXiv:2210.03629):
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,10 +62,17 @@ class ToolRegistry:
     def __len__(self) -> int:
         return len(self._tools)
 
-    def list_for_prompt(self) -> str:
+    def list_for_prompt(
+        self,
+        *,
+        exclude_names: Collection[str] = (),
+    ) -> str:
         """Render the registered tools as a string the LLM can read."""
+        excluded = set(exclude_names)
         lines: list[str] = []
         for tool in self._tools.values():
+            if tool.name in excluded:
+                continue
             lines.append(f"- {tool.name}: {tool.description}")
             lines.append(f"  arguments: {json.dumps(tool.args_schema)}")
         return "\n".join(lines)

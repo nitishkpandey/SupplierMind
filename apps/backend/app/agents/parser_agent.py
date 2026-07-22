@@ -842,8 +842,13 @@ def _parse_react_response(text: str) -> _ReActStep:
 # ── Prompt builder ───────────────────────────────────────────────────
 
 
-def _build_system_prompt(tool_registry: ToolRegistry) -> str:
-    tools_block = tool_registry.list_for_prompt()
+def _build_system_prompt(
+    tool_registry: ToolRegistry,
+    *,
+    allow_quantity_tool: bool = True,
+) -> str:
+    excluded_tools = () if allow_quantity_tool else ("parse_quantity_unit",)
+    tools_block = tool_registry.list_for_prompt(exclude_names=excluded_tools)
     schema_block = json.dumps(FINISH_SCHEMA, indent=2)
     return f"""You are a procurement-query parser running a ReAct loop. Your job is to
 convert a natural-language procurement query into a structured set of
@@ -885,6 +890,9 @@ Rules:
   came back from `infer_industry_context` as commonly-required-in-this-industry
   go in `industry_typical_certs` instead. Never copy inferred certs into
   `certifications`; doing so wrongly rejects every supplier that lacks them.
+- Buyer purchase quantities and package sizes describe demand, not supplier
+  capacity. Only use a quantity tool when the query explicitly asks for
+  supplier capacity, throughput, production rate, or a per-period minimum.
 - The Finish Action Input MUST be a single JSON object matching this schema:
 
 {schema_block}
@@ -927,7 +935,11 @@ class ParserAgent(BaseAgent):
         if prior_partial is None and not memory_context and _is_contentless_query(raw_query):
             return self._raise_pre_loop_clarification(state, raw_query, start)
 
-        system_prompt = _build_system_prompt(self.tools)
+        allow_quantity_tool = _raw_query_states_capacity(raw_query)
+        system_prompt = _build_system_prompt(
+            self.tools,
+            allow_quantity_tool=allow_quantity_tool,
+        )
         user_open = self._build_initial_user_message(
             raw_query, memory_context, prior_partial
         )
@@ -1015,6 +1027,23 @@ class ParserAgent(BaseAgent):
                 trace.append(entry)
                 terminated_by = "finish"
                 break
+
+            if step.action == "parse_quantity_unit" and not allow_quantity_tool:
+                entry["observation"] = {
+                    "error": "quantity_tool_not_applicable",
+                    "detail": (
+                        "The query has no explicit supplier capacity or rate "
+                        "requirement. Treat purchase quantities and package sizes "
+                        "as demand context and finish."
+                    ),
+                }
+                trace.append(entry)
+                messages.append({"role": "assistant", "content": response})
+                messages.append({
+                    "role": "user",
+                    "content": f"Observation: {json.dumps(entry['observation'])}",
+                })
+                continue
 
             # Same-args dedup: refuse a repeat of (tool, args) we already saw.
             args_key = json.dumps(step.action_input, sort_keys=True, default=str)
