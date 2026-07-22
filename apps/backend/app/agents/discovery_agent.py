@@ -1,31 +1,29 @@
-"""
-app/agents/discovery_agent.py — Hybrid supplier retrieval with tier awareness.
-
-PRODUCTION V2 CHANGES:
-- Retrieval respects search_scope ("approved_only" vs "both")
-- Queries Tier 2 (user-saved) suppliers automatically
-- Records tier_assignments in state for downstream ranking boosts
-"""
+"""Hybrid supplier retrieval with tier and benchmark-corpus awareness."""
 
 import json
 import logging
 import time
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, cast
 
 from sqlalchemy import Text, func, or_, select
 
 from app.agents.base import BaseAgent
 from app.agents.compliance_agent import canonical_cert_key
-from app.agents.state import AgentState
+from app.agents.state import AgentState, ParsedConstraints
+from app.core.llm import complete_json_dict
 from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import SyncSessionLocal
+from app.utils.geo import haversine_km
 
 logger = logging.getLogger(__name__)
 
 MIN_RESULTS = 5
 MAX_RETRIES = 3
 RRF_K = 60
+CANDIDATE_HANDOFF_LIMIT = 25
+PROTECTED_CHANNEL_LIMIT = 10
 
 # Parser categories that are valid procurement concepts but absent from the
 # current synthetic SupplierBench corpus. Expand them to nearby corpus
@@ -66,6 +64,55 @@ class DiscoveryAgent(BaseAgent):
 
     agent_name = "discovery"
 
+    @staticmethod
+    def _filter_candidate_rows_by_geography(
+        *,
+        rows: list[tuple[str, float | None, float | None]],
+        constraints: Mapping[str, Any],
+    ) -> tuple[list[str], dict[str, float], str | None]:
+        """Apply requested radius/region constraints as fail-closed hard filters."""
+        radius = constraints.get("location_radius_km")
+        region = constraints.get("location_region")
+        bounds = constraints.get("location_bounds")
+        center_lat = constraints.get("location_lat")
+        center_lng = constraints.get("location_lng")
+
+        south = west = north = east = 0.0
+        if region:
+            if not isinstance(bounds, list | tuple) or len(bounds) != 4:
+                return [], {}, "region_bounds_unverified"
+            south, west, north, east = (float(value) for value in bounds)
+        center_lat_f = center_lng_f = 0.0
+        if radius is not None:
+            if center_lat is None or center_lng is None:
+                return [], {}, "radius_center_unverified"
+            center_lat_f, center_lng_f = float(center_lat), float(center_lng)
+
+        retained: list[str] = []
+        distances: dict[str, float] = {}
+        for raw_id, lat, lng in rows:
+            sid = str(raw_id)
+            if lat is None or lng is None:
+                continue
+
+            if region and not (south <= float(lat) <= north and west <= float(lng) <= east):
+                continue
+
+            if radius is not None:
+                distance = haversine_km(
+                    center_lat_f,
+                    center_lng_f,
+                    float(lat),
+                    float(lng),
+                )
+                if distance > float(radius):
+                    continue
+                distances[sid] = distance
+
+            retained.append(sid)
+
+        return retained, distances, None
+
     def execute(self, state: AgentState) -> AgentState:
         # Ensure defaults
         state.setdefault("candidate_supplier_ids", [])
@@ -74,23 +121,29 @@ class DiscoveryAgent(BaseAgent):
         state.setdefault("relaxed_constraints", [])
         state.setdefault("tier_assignments", {})
         state.setdefault("retry_count", 0)
+        state.setdefault("benchmark_supplier_ids", [])
 
         constraints = state.get("parsed_constraints") or {}
         retry_count = state.get("retry_count", 0)
         search_scope = state.get("search_scope", "approved_only")
-        user_id = state.get("user_id")
-        # HITL: pending_review suppliers are in-scope only for "both"
-        # (Discover New Suppliers). Approved-only stays approved/saved DB rows.
-        # The eval path also sets exclude_pending=True for reproducibility.
+        user_id = state["user_id"]
         exclude_pending = state.get("exclude_pending", False)
+        allowed_supplier_ids = set(state.get("benchmark_supplier_ids") or [])
 
         return self._run_search(
-            state, constraints, retry_count, search_scope, user_id, exclude_pending
+            state,
+            constraints,
+            retry_count,
+            search_scope,
+            user_id,
+            exclude_pending,
+            allowed_supplier_ids=allowed_supplier_ids or None,
         )
 
     def _run_search(
-        self, state: AgentState, constraints: dict, retry_count: int, search_scope: str,
+        self, state: AgentState, constraints: Mapping[str, Any], retry_count: int, search_scope: str,
         user_id: str, exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> AgentState:
         start = time.time()
 
@@ -102,11 +155,20 @@ class DiscoveryAgent(BaseAgent):
             from app.core.vector_store import get_vector_store
             vs = get_vector_store()
             query_text = self._build_query_text(constraints, state["raw_query"])
-            sem_results = vs.search(query_text, top_k=20) # Get more to filter locally
+            search_kwargs = {}
+            if allowed_supplier_ids is not None:
+                search_kwargs["allowed_supplier_ids"] = allowed_supplier_ids
+            sem_results = vs.search(query_text, top_k=20, **search_kwargs)
 
-            # Filter vector results by scope (Milvus doesn't currently index status in this prototype)
             with SyncSessionLocal() as db:
-                valid_ids = self._filter_ids_by_scope(db, [r.supplier_id for r in sem_results], search_scope, user_id, exclude_pending)
+                valid_ids = self._filter_ids_by_scope(
+                    db,
+                    [r.supplier_id for r in sem_results],
+                    search_scope,
+                    user_id,
+                    exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
+                )
                 filtered_results = [r for r in sem_results if r.supplier_id in valid_ids]
 
                 semantic_ranked = {r.supplier_id: i + 1 for i, r in enumerate(filtered_results[:10])}
@@ -153,34 +215,54 @@ class DiscoveryAgent(BaseAgent):
                 category = constraints.get("category_hint")
                 category_values = self._category_filter_values(category)
                 country = self._extract_country_from_constraints(constraints)
+                city = self._extract_city_from_constraints(constraints)
                 certs = constraints.get("certifications")
                 product_terms = self._product_keyword_terms(constraints)
 
-                has_structured_filters = bool(category_values or country or certs or product_terms)
+                has_structured_filters = bool(category_values or country or city or certs or product_terms)
                 structured = []
                 if has_structured_filters:
-                    query = self._build_structured_query(
-                        scope_filter=scope_filter,
-                        category_values=category_values,
-                        country=country,
-                        certs=certs,
-                        product_terms=product_terms,
+                    def fetch_structured(
+                        *,
+                        city_filter: str | None,
+                        keyword_terms: list[str],
+                    ) -> list[Supplier]:
+                        query = self._build_structured_query(
+                            scope_filter=scope_filter,
+                            category_values=category_values,
+                            country=country,
+                            city=city_filter,
+                            certs=certs,
+                            product_terms=keyword_terms,
+                            allowed_supplier_ids=allowed_supplier_ids,
+                        )
+                        return list(db.execute(query.limit(20)).scalars().all())
+
+                    structured = fetch_structured(
+                        city_filter=city,
+                        keyword_terms=product_terms,
                     )
-                    structured = db.execute(query.limit(20)).scalars().all()
+
+                    if not structured and city:
+                        structured = fetch_structured(
+                            city_filter=None,
+                            keyword_terms=product_terms,
+                        )
 
                     if (
                         not structured
                         and len(category_values) > 1
                         and product_terms
                     ):
-                        query = self._build_structured_query(
-                            scope_filter=scope_filter,
-                            category_values=category_values,
-                            country=country,
-                            certs=certs,
-                            product_terms=[],
+                        structured = fetch_structured(
+                            city_filter=city,
+                            keyword_terms=[],
                         )
-                        structured = db.execute(query.limit(20)).scalars().all()
+                        if not structured and city:
+                            structured = fetch_structured(
+                                city_filter=None,
+                                keyword_terms=[],
+                            )
                 structured_ranked = {str(s.id): i + 1 for i, s in enumerate(structured)}
                 logger.debug("[discovery] Structured filter: %d results", len(structured))
 
@@ -190,6 +272,7 @@ class DiscoveryAgent(BaseAgent):
                     scope=search_scope,
                     user_id=user_id,
                     exclude_pending=exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
                 )
                 fresh_ranked = {sid: i + 1 for i, sid in enumerate(fresh_ids)}
                 if fresh_ranked:
@@ -198,15 +281,36 @@ class DiscoveryAgent(BaseAgent):
                         len(fresh_ranked),
                     )
 
-                # Build tier assignments for ALL found suppliers
-                all_found_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked)
+                # Strategy 3: Geospatial radius
+                if (constraints.get("location_lat") is not None and
+                    constraints.get("location_lng") is not None and
+                    constraints.get("location_radius_km") is not None):
+                    geo_with_dist = SupplierRepository.filter_by_radius_sync(
+                        db=db,
+                        center_lat=constraints["location_lat"],
+                        center_lng=constraints["location_lng"],
+                        radius_km=constraints["location_radius_km"],
+                    )
+                    geo_ids = [str(s.id) for s, _ in geo_with_dist]
+                    valid_geo_ids = self._filter_ids_by_scope(
+                        db,
+                        geo_ids,
+                        search_scope,
+                        user_id,
+                        exclude_pending,
+                        allowed_supplier_ids=allowed_supplier_ids,
+                    )
+                    valid_geo = [(s, d) for s, d in geo_with_dist if str(s.id) in valid_geo_ids]
+                    geo_ranked = {str(s.id): i + 1 for i, (s, _) in enumerate(valid_geo)}
+                    geo_distances = {str(s.id): dist for s, dist in valid_geo}
+                    logger.debug("[discovery] Geospatial: %d results", len(valid_geo))
+
+                all_found_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked) | set(geo_ranked)
                 if all_found_ids:
-                    # Determine tiers
                     suppliers_info = db.execute(
                         select(Supplier.id, Supplier.status).where(Supplier.id.in_(all_found_ids))
                     ).all()
 
-                    # Find which ones are saved by user
                     saved_ids = set()
                     if user_id:
                         saved_ids = set(db.execute(
@@ -217,36 +321,20 @@ class DiscoveryAgent(BaseAgent):
 
                     for sid, status in suppliers_info:
                         sid_str = str(sid)
-                        # Tier 2 overrides Tier 3, Tier 1 is top
                         if status == SupplierStatus.approved:
                             tier_assignments[sid_str] = "approved"
                         elif sid in saved_ids:
                             tier_assignments[sid_str] = "saved"
                         elif status == SupplierStatus.pending_review:
-                            # Sprint A: label honestly so the UI badge is correct;
-                            # no tier boost — pending suppliers rank on merit.
                             tier_assignments[sid_str] = "pending_review"
                         else:
                             tier_assignments[sid_str] = "discovered"
 
-                # Strategy 3: Geospatial radius
-                if (constraints.get("location_lat") and
-                    constraints.get("location_lng") and
-                    constraints.get("location_radius_km")):
-                    geo_with_dist = SupplierRepository.filter_by_radius_sync(
-                        db=db,
-                        center_lat=constraints["location_lat"],
-                        center_lng=constraints["location_lng"],
-                        radius_km=constraints["location_radius_km"],
-                    )
-                    # Filter geo results by scope locally
-                    valid_geo = [(s, d) for s, d in geo_with_dist if str(s.id) in tier_assignments]
-                    geo_ranked = {str(s.id): i + 1 for i, (s, _) in enumerate(valid_geo)}
-                    geo_distances = {str(s.id): dist for s, dist in valid_geo}
-                    logger.debug("[discovery] Geospatial: %d results", len(valid_geo))
-
         except Exception as e:
+            # Re-raise so BaseAgent.run marks the pipeline failed — a DB
+            # outage must be distinguishable from a genuine empty result.
             logger.error("[discovery] DB search failed: %s", e)
+            raise
 
         # ── Step 4: Merge with Reciprocal Rank Fusion ─────────────────
         all_ids = set(semantic_ranked) | set(structured_ranked) | set(fresh_ranked) | set(geo_ranked)
@@ -264,6 +352,43 @@ class DiscoveryAgent(BaseAgent):
             rrf_scores[sid] = score
 
         candidate_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)
+
+        # Semantic and structured retrieval may contribute geographically
+        # irrelevant candidates. Enforce requested radius/region constraints
+        # once, after all channels have merged, and fail closed when supplier
+        # coordinates or verified region bounds are unavailable.
+        geography_requested = (
+            constraints.get("location_radius_km") is not None
+            or bool(constraints.get("location_region"))
+        )
+        geography_diagnostic: str | None = None
+        if geography_requested and candidate_ids:
+            try:
+                with SyncSessionLocal() as db:
+                    coordinate_rows = db.execute(
+                        select(Supplier.id, Supplier.latitude, Supplier.longitude).where(
+                            Supplier.id.in_(candidate_ids)
+                        )
+                    ).all()
+                retained, hard_distances, geography_diagnostic = (
+                    self._filter_candidate_rows_by_geography(
+                        rows=[(str(sid), lat, lng) for sid, lat, lng in coordinate_rows],
+                        constraints=constraints,
+                    )
+                )
+                retained_set = set(retained)
+                candidate_ids = [sid for sid in candidate_ids if sid in retained_set]
+                geo_distances.update(hard_distances)
+            except Exception as exc:
+                logger.error("[discovery] Hard geographic filter failed: %s", exc)
+                candidate_ids = []
+                geography_diagnostic = "geography_coordinates_unavailable"
+        elif geography_requested:
+            _, _, geography_diagnostic = self._filter_candidate_rows_by_geography(
+                rows=[],
+                constraints=constraints,
+            )
+        state["geography_diagnostic"] = geography_diagnostic
         duration_ms = int((time.time() - start) * 1000)
 
         logger.info(
@@ -298,18 +423,32 @@ class DiscoveryAgent(BaseAgent):
                 state.get("relaxed_constraints", []),
             )
             if relaxed is not None and relax_key:
-                state["parsed_constraints"] = relaxed
+                # relaxed is a plain-dict copy of ParsedConstraints minus one key
+                state["parsed_constraints"] = cast("ParsedConstraints", relaxed)
                 state["retry_count"] = retry_count + 1
                 state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
                 logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
                 return self._run_search(
-                    state, relaxed, retry_count + 1, search_scope, user_id, exclude_pending
+                    state,
+                    relaxed,
+                    retry_count + 1,
+                    search_scope,
+                    user_id,
+                    exclude_pending,
+                    allowed_supplier_ids=allowed_supplier_ids,
                 )
 
         # ── Final state ───────────────────────────────────────────────
-        state["candidate_supplier_ids"] = candidate_ids[:10]
-        state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in candidate_ids}
-        state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in candidate_ids}
+        selected_candidate_ids = self._candidate_handoff_ids(
+            rrf_sorted_ids=candidate_ids,
+            structured_ranked=structured_ranked,
+            fresh_ranked=fresh_ranked,
+            geo_ranked=geo_ranked,
+            semantic_ranked=semantic_ranked,
+        )
+        state["candidate_supplier_ids"] = selected_candidate_ids
+        state["semantic_scores"] = {k: v for k, v in semantic_scores.items() if k in selected_candidate_ids}
+        state["geo_distances"] = {k: v for k, v in geo_distances.items() if k in selected_candidate_ids}
         state["tier_assignments"] = tier_assignments
         state["retry_count"] = retry_count
 
@@ -333,6 +472,7 @@ class DiscoveryAgent(BaseAgent):
         scope: str,
         user_id: str,
         exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> list[str]:
         """Return freshly ingested web supplier IDs that belong in this run.
 
@@ -345,11 +485,58 @@ class DiscoveryAgent(BaseAgent):
         if not ordered or scope == "approved_only":
             return []
 
-        valid = self._filter_ids_by_scope(db, ordered, scope, user_id, exclude_pending)
+        valid = self._filter_ids_by_scope(
+            db,
+            ordered,
+            scope,
+            user_id,
+            exclude_pending,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
         return [sid for sid in ordered if sid in valid]
 
+    @staticmethod
+    def _candidate_handoff_ids(
+        *,
+        rrf_sorted_ids: list[str],
+        structured_ranked: dict[str, int],
+        fresh_ranked: dict[str, int],
+        geo_ranked: dict[str, int],
+        semantic_ranked: dict[str, int],
+    ) -> list[str]:
+        """Return a balanced downstream candidate pool.
+
+        A partial vector index can produce stale semantic matches. Protecting
+        high-intent channels prevents exact SQL, geo, and fresh web candidates
+        from being crowded out before compliance/ranking can score them.
+        """
+        selected: list[str] = []
+        seen: set[str] = set()
+
+        def add(ids: list[str], limit: int | None = None) -> None:
+            for sid in ids[:limit]:
+                if len(selected) >= CANDIDATE_HANDOFF_LIMIT:
+                    return
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                selected.append(sid)
+
+        add(list(fresh_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(geo_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(structured_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(list(semantic_ranked), PROTECTED_CHANNEL_LIMIT)
+        add(rrf_sorted_ids)
+        return selected[:CANDIDATE_HANDOFF_LIMIT]
+
     def _filter_ids_by_scope(
-        self, db, sids: list[str], scope: str, user_id: str, exclude_pending: bool = False
+        self,
+        db,
+        sids: list[str],
+        scope: str,
+        user_id: str,
+        exclude_pending: bool = False,
+        allowed_supplier_ids: set[str] | None = None,
     ) -> set[str]:
         """Returns subset of IDs that are allowed by the current search scope.
 
@@ -359,6 +546,11 @@ class DiscoveryAgent(BaseAgent):
         """
         if not sids:
             return set()
+
+        if allowed_supplier_ids is not None:
+            sids = [sid for sid in sids if sid in allowed_supplier_ids]
+            if not sids:
+                return set()
 
         base_conds = []
         if scope == "approved_only":
@@ -385,7 +577,7 @@ class DiscoveryAgent(BaseAgent):
 
         return {str(i) for i in valid}
 
-    def _build_query_text(self, constraints: dict, raw_query: str) -> str:
+    def _build_query_text(self, constraints: Mapping[str, Any], raw_query: str) -> str:
         parts = [raw_query]
         if constraints.get("product_type"):
             parts.append(f"product: {constraints['product_type']}")
@@ -418,15 +610,21 @@ class DiscoveryAgent(BaseAgent):
         scope_filter,
         category_values: list[str],
         country: str | None,
+        city: str | None,
         certs: list[str] | None,
         product_terms: list[str],
+        allowed_supplier_ids: set[str] | None = None,
     ):
         query = select(Supplier).where(Supplier.is_active.is_(True)).where(scope_filter)
+        if allowed_supplier_ids is not None:
+            query = query.where(Supplier.id.in_(allowed_supplier_ids))
 
         if category_values:
             query = query.where(Supplier.category.in_(category_values))
         if country:
             query = query.where(Supplier.country == country)
+        if city:
+            query = query.where(Supplier.city.ilike(city))
         if certs:
             for c in certs:
                 cert_filters = [
@@ -448,7 +646,7 @@ class DiscoveryAgent(BaseAgent):
         return query
 
     @staticmethod
-    def _product_keyword_terms(constraints: dict) -> list[str]:
+    def _product_keyword_terms(constraints: Mapping[str, Any]) -> list[str]:
         """Terms for DB keyword retrieval when embeddings are incomplete."""
         raw_terms = []
         if constraints.get("product_type"):
@@ -500,14 +698,26 @@ class DiscoveryAgent(BaseAgent):
             output.append(value)
         return output
 
+    @staticmethod
+    def _extract_city_from_constraints(constraints: Mapping[str, Any]) -> str | None:
+        if constraints.get("location_radius_km"):
+            return None
+        city = constraints.get("location_city")
+        if not isinstance(city, str) or not city.strip():
+            return None
+        country = constraints.get("location_country")
+        if isinstance(country, str) and city.strip().casefold() == country.strip().casefold():
+            return None
+        return city.strip()
+
     def _decide_relaxation(
         self,
-        constraints: dict,
+        constraints: Mapping[str, Any],
         result_count: int,
         previous: list[str],
-    ) -> tuple[Optional[dict], str]:
+    ) -> tuple[dict | None, str]:
         available = [
-            k for k in ["location_radius_km", "lead_time_max_days", "capacity_min"]
+            k for k in ["lead_time_max_days", "capacity_min"]
             if k in constraints and k not in previous
         ]
 
@@ -515,7 +725,7 @@ class DiscoveryAgent(BaseAgent):
             return None, ""
 
         try:
-            raw = self.llm.complete_json([
+            decision = complete_json_dict(self.llm, [
                 {"role": "system", "content": "Return JSON only."},
                 {"role": "user", "content": RELAXATION_PROMPT.format(
                     constraints=json.dumps({k: v for k, v in constraints.items() if v}, default=str),
@@ -523,7 +733,6 @@ class DiscoveryAgent(BaseAgent):
                     previous=previous,
                 )},
             ])
-            decision = json.loads(raw)
             key = decision.get("relax_constraint", "")
             new_val = decision.get("new_value")
 

@@ -136,6 +136,45 @@ def test_admin_can_fetch_other_users_query():
     assert response.status_code == 200, "admin bypass should permit cross-user fetch"
 
 
+def test_get_query_exposes_scope_evaluator_and_zero_diagnostics():
+    user = _fake_user(UserRole.procurement_manager)
+    fake_query = SimpleNamespace(
+        id=uuid4(),
+        user_id=user.id,
+        raw_query="ISO 9001 office furniture suppliers in Germany",
+        status=SimpleNamespace(value="completed"),
+        detected_language="en",
+        parsed_constraints={
+            "product_type": "office furniture",
+            "location_country": "Germany",
+            "certifications": ["ISO 9001"],
+        },
+        search_scope="both",
+        evaluator_retries=1,
+        evaluator_verdict="fail",
+        execution_time_ms=1200,
+        error_message=None,
+        created_at=SimpleNamespace(isoformat=lambda: "2026-06-02T00:00:00"),
+        completed_at=None,
+        results=[],
+        audit_logs=[SimpleNamespace(agent_name="external_discovery", action="completed")],
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    mock_repo = MagicMock()
+    mock_repo.get_with_results = AsyncMock(return_value=fake_query)
+
+    with patch("app.api.v1.queries.QueryRepository", return_value=mock_repo):
+        response = TestClient(app).get(f"/api/v1/queries/{fake_query.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["search_scope"] == "both"
+    assert body["evaluator_retries"] == 1
+    assert body["evaluator_verdict"] == "fail"
+    assert body["diagnostics"]["code"] == "strict_constraints_no_match"
+    assert "ISO 9001" in body["diagnostics"]["hard_constraints"]
+
+
 # ── 2. List endpoints scope by current_user.id at SQL layer ───────────
 def test_list_queries_filters_by_current_user_id():
     """

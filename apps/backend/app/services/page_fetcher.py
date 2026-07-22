@@ -13,9 +13,11 @@ this is acceptable. Production deployments would replace this with a sync
 Redis client or memcached.
 """
 
+import ipaddress
 import logging
+import socket
 import time
-from typing import Optional
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -23,6 +25,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 MAX_CONTENT_CHARS = 8000
+MAX_REDIRECTS = 5
 USER_AGENT = (
     "SupplierMind-Research/1.0 "
     "(academic project; contact: thesis@gisma.de)"
@@ -33,7 +36,7 @@ CACHE_TTL_SECONDS = 86400  # 24 hours
 _PAGE_CACHE: dict[str, tuple[str, float]] = {}
 
 
-def _cache_get(url: str) -> Optional[str]:
+def _cache_get(url: str) -> str | None:
     entry = _PAGE_CACHE.get(url)
     if entry is None:
         return None
@@ -51,21 +54,71 @@ def _cache_set(url: str, text: str) -> None:
     _PAGE_CACHE[url] = (text, time.time() + CACHE_TTL_SECONDS)
 
 
-def _fetch_raw(url: str) -> Optional[str]:
-    """Sync HTTP GET with timeout and proper headers."""
+def _is_url_allowed(url: str) -> bool:
+    """
+    SSRF guard: URLs come from external search results, so only allow
+    http(s) targets that resolve exclusively to public addresses. Rejects
+    loopback, private, link-local (cloud metadata 169.254.169.254), and
+    other non-global ranges via the stdlib.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = parsed.hostname
+    if not host:
+        return False
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, OSError):
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if not ip.is_global:
+            return False
+    return True
+
+
+def _fetch_raw(url: str, timeout_seconds: float | None = None) -> str | None:
+    """Sync HTTP GET with timeout and proper headers.
+
+    Redirects are followed manually so every hop is re-validated against the
+    SSRF guard — auto-follow would let a public URL bounce us to an internal
+    or metadata address.
+    """
     try:
         with httpx.Client(
-            timeout=15.0,
-            follow_redirects=True,
+            timeout=max(0.1, float(timeout_seconds or 15.0)),
+            follow_redirects=False,
             headers={"User-Agent": USER_AGENT},
         ) as client:
-            response = client.get(url)
-            if response.status_code != 200:
-                logger.debug(
-                    "[fetcher] Non-200 for %s: %d", url, response.status_code
-                )
-                return None
-            return response.text
+            for _ in range(MAX_REDIRECTS + 1):
+                if not _is_url_allowed(url):
+                    logger.debug("[fetcher] Blocked non-public URL: %s", url)
+                    return None
+                response = client.get(url)
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        return None
+                    url = str(httpx.URL(url).join(location))
+                    continue
+                if response.status_code != 200:
+                    logger.debug(
+                        "[fetcher] Non-200 for %s: %d", url, response.status_code
+                    )
+                    return None
+                return response.text
+            logger.debug("[fetcher] Too many redirects for %s", url)
+            return None
     except Exception as e:
         logger.debug("[fetcher] Failed for %s: %s", url, e)
         return None
@@ -91,7 +144,7 @@ def _extract_text(html: str) -> str:
         return ""
 
 
-def fetch_page_content(url: str) -> Optional[str]:
+def fetch_page_content(url: str, timeout_seconds: float | None = None) -> str | None:
     """
     Fetch and extract clean text from a webpage.
     Synchronous — safe to call from agent nodes.
@@ -108,7 +161,7 @@ def fetch_page_content(url: str) -> Optional[str]:
         return cached
 
     # Fetch
-    html = _fetch_raw(url)
+    html = _fetch_raw(url, timeout_seconds=timeout_seconds)
     if not html:
         return None
 

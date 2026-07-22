@@ -9,10 +9,12 @@ Pure routing-function tests — no pipeline execution, no LLM/network.
 """
 
 import logging
+import time
 
 from langgraph.graph import END
 
-from app.agents.orchestrator import after_discovery, after_evaluator
+from app.agents.orchestrator import after_discovery, after_evaluator, finalize_node
+from app.core.config import settings
 
 
 # ── after_evaluator ──────────────────────────────────────────────────
@@ -69,3 +71,32 @@ def test_candidates_route_to_compliance():
         "evaluator_retries": 0,
     }
     assert after_discovery(state) == "compliance_node"
+
+
+def test_finalize_memory_write_timeout_does_not_block_user_result(monkeypatch):
+    class SlowMemoryService:
+        def write(self, **kwargs):
+            time.sleep(0.2)
+            return "late-memory-id"
+
+    monkeypatch.setattr(settings, "QUERY_MEMORY_WRITE_TIMEOUT_SECONDS", 0.01, raising=False)
+    monkeypatch.setattr(
+        "app.services.query_memory.get_memory_service",
+        lambda: SlowMemoryService(),
+    )
+
+    state = {
+        "evaluator_verdict": "auto_accept",
+        "user_id": "user-123",
+        "raw_query": "Find office furniture suppliers in Germany",
+        "parsed_constraints": {"product_type": "office furniture"},
+        "audit_log": [],
+    }
+
+    start = time.time()
+    out = finalize_node(state)
+    elapsed = time.time() - start
+
+    assert elapsed < 0.1
+    assert out is state
+    assert state["audit_log"][-1]["action"] == "memory_write_timeout"

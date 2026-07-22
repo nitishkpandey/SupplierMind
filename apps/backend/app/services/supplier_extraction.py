@@ -11,14 +11,14 @@ HALLUCINATION GUARDS:
 - Unverifiable facts are set to None with a log message
 """
 
-import json
 import logging
 import re
-from typing import Optional
+import time
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 from app.agents.compliance_agent import CERT_TAXONOMY
-from app.core.llm import get_llm_client
+from app.core.llm import complete_json_dict, get_llm_client
 from app.services.page_fetcher import fetch_page_content
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
@@ -179,7 +179,8 @@ class SupplierExtractionService:
         text = f"TITLE: {title}\nURL: {url}\nSNIPPET: {snippet[:500]}"
 
         try:
-            raw = self.llm.complete_json(
+            return complete_json_dict(
+                self.llm,
                 [
                     {"role": "system", "content": STAGE_1_PROMPT},
                     {"role": "user", "content": text},
@@ -187,7 +188,6 @@ class SupplierExtractionService:
                 temperature=0.0,
                 max_tokens=200,
             )
-            return json.loads(raw)
         except Exception as e:
             # LLM unavailable. Do NOT auto-reject —
             # that silently discards real suppliers when the API is throttled.
@@ -218,8 +218,8 @@ class SupplierExtractionService:
         return False
 
     def stage2_extract(
-        self, url: str
-    ) -> Optional[dict]:
+        self, url: str, deadline_at: float | None = None
+    ) -> dict | None:
         """
         Stage 2: Rich extraction from full page content. SYNC.
         Fetches the page, runs LLM extraction, verifies facts.
@@ -234,7 +234,8 @@ class SupplierExtractionService:
         text = f"SOURCE URL: {url}\n\nPAGE CONTENT:\n{full_content[:8000]}"
 
         try:
-            raw = self.llm.complete_json(
+            parsed = complete_json_dict(
+                self.llm,
                 [
                     {"role": "system", "content": STAGE_2_PROMPT},
                     {"role": "user", "content": text},
@@ -242,7 +243,6 @@ class SupplierExtractionService:
                 temperature=0.0,
                 max_tokens=1500,
             )
-            parsed = json.loads(raw)
         except Exception as e:
             logger.warning("[extraction] Stage 2 LLM failed: %s", e)
             return None
@@ -253,8 +253,12 @@ class SupplierExtractionService:
         )
 
         location_evidence = {}
-        if not verified.get("city") and not verified.get("address"):
-            location_evidence = self._discover_location_from_site(url)
+        if (
+            not verified.get("city")
+            and not verified.get("address")
+            and self._has_budget(deadline_at, min_seconds=5.0)
+        ):
+            location_evidence = self._discover_location_from_site(url, deadline_at=deadline_at)
             if location_evidence:
                 verified["city"] = verified.get("city") or location_evidence.get("city")
                 verified["country"] = verified.get("country") or location_evidence.get("country")
@@ -270,11 +274,15 @@ class SupplierExtractionService:
             verified.get("certifications") or None,
         )
         if not verified.get("certifications"):
-            cert_evidence = self._discover_certifications_from_site(url, full_content)
+            cert_evidence = self._discover_certifications_from_site(
+                url,
+                full_content,
+                deadline_at=deadline_at,
+            )
             verified["certifications"] = list(cert_evidence.keys())
 
         # Build source_citations dict
-        citations_dict = {}
+        citations_dict: dict[str, dict[str, Any]] = {}
         raw_citations = verified.get("citations") or {}
         for field in ("name", "description", "certifications", "capacity", "lead_time_days"):
             source_phrase = clean_optional_text(raw_citations.get(field))
@@ -413,12 +421,16 @@ class SupplierExtractionService:
         self,
         source_url: str,
         source_text: str,
+        deadline_at: float | None = None,
     ) -> dict[str, dict]:
         evidence = self._find_certification_mentions(source_text, source_url)
         if evidence:
             return evidence
 
         for url in self._quality_page_candidates(source_url)[:_CERT_PAGE_FETCH_LIMIT]:
+            if not self._has_budget(deadline_at, min_seconds=4.0):
+                logger.info("[extraction] Skipping optional cert page probes: deadline near")
+                break
             page_text = fetch_page_content(url)
             if not page_text:
                 continue
@@ -432,7 +444,7 @@ class SupplierExtractionService:
         cls,
         text: str,
         url: str,
-        target_certs: Optional[list[str]] = None,
+        target_certs: list[str] | None = None,
     ) -> dict[str, dict]:
         if not text:
             return {}
@@ -518,9 +530,16 @@ class SupplierExtractionService:
             candidates.append(candidate)
         return candidates
 
-    def _discover_location_from_site(self, source_url: str) -> dict:
+    def _discover_location_from_site(
+        self,
+        source_url: str,
+        deadline_at: float | None = None,
+    ) -> dict:
         candidates = self._site_page_candidates(source_url, _LOCATION_PAGE_PATHS)
         for url in candidates[:_LOCATION_PAGE_FETCH_LIMIT]:
+            if not self._has_budget(deadline_at, min_seconds=4.0):
+                logger.info("[extraction] Skipping optional location page probes: deadline near")
+                break
             page_text = fetch_page_content(url)
             if not page_text:
                 continue
@@ -621,7 +640,7 @@ class SupplierExtractionService:
         )
         return cleaned.strip(" ,.-")
 
-    def _infer_category(self, parsed: dict) -> Optional[str]:
+    def _infer_category(self, parsed: dict) -> str | None:
         """Heuristic category from product/industry keywords."""
         text = (
             (parsed.get("description") or "") + " " +
@@ -641,6 +660,10 @@ class SupplierExtractionService:
             "food_ingredients": ["food", "ingredient", "additive"],
             "software_services": ["software", "saas", "platform", "cloud"],
             "construction_materials": ["concrete", "insulation", "building material"],
+            "office_supplies": [
+                "office furniture", "office chair", "desk", "workstation",
+                "workplace furniture", "office storage",
+            ],
         }
 
         for category, keywords in category_keywords.items():
@@ -649,13 +672,19 @@ class SupplierExtractionService:
 
         return None
 
+    @staticmethod
+    def _has_budget(deadline_at: float | None, min_seconds: float) -> bool:
+        if deadline_at is None:
+            return True
+        return time.monotonic() + min_seconds < deadline_at
+
     # Keep the old method name for backward compatibility
     def extract_from_web_result(
         self,
         title: str,
         url: str,
         content: str,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Legacy single-pass extraction. Delegates to two-stage internally."""
         stage1 = self.stage1_classify(title, url, content)
         if not stage1.get("is_supplier") or stage1.get("confidence", 0) < 0.5:

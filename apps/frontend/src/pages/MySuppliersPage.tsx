@@ -1,28 +1,15 @@
 import { useState, useEffect } from "react";
-import { isAxiosError } from "axios";
 import { supplierWorkflowService } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
+import { canModerate } from "@/lib/utils";
 import type { Supplier } from "@/types";
 import { formatSupplierLocation } from "@/features/suppliers/location";
+import { JustificationDialog } from "@/features/suppliers/JustificationDialog";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { MapPin, ShieldCheck, Bookmark, ExternalLink, AlertCircle, Trash2 } from "lucide-react";
-
-// Mirror SupplierCard's justification dialog constraints (Sprint A HITL).
-const JUSTIFICATION_MIN = 20;
-const JUSTIFICATION_MAX = 1000;
 
 type Decision = { supplier: Supplier; action: "approve" | "reject" };
 
@@ -34,13 +21,10 @@ export default function MySuppliersPage() {
 
   // Approve/reject is manager-gated (admin OR procurement_manager); analysts
   // see the Pending Review tab read-only.
-  const canModerate = user?.role === "admin" || user?.role === "procurement_manager";
+  const userCanModerate = canModerate(user);
 
-  // Justification dialog state (reuses the SupplierCard pattern).
+  // Justification dialog state (shared JustificationDialog owns the form).
   const [decision, setDecision] = useState<Decision | null>(null);
-  const [justification, setJustification] = useState("");
-  const [decisionError, setDecisionError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -62,48 +46,15 @@ export default function MySuppliersPage() {
 
   const saved = suppliers.filter((s) => s.status === "saved");
 
-  const openDecision = (supplier: Supplier, action: "approve" | "reject") => {
-    setDecision({ supplier, action });
-    setJustification("");
-    setDecisionError(null);
-  };
-
-  const closeDecision = () => {
-    if (isProcessing) return;
-    setDecision(null);
-    setJustification("");
-    setDecisionError(null);
-  };
-
-  const justificationLength = justification.trim().length;
-  const submitDisabled =
-    isProcessing ||
-    justificationLength < JUSTIFICATION_MIN ||
-    justificationLength > JUSTIFICATION_MAX;
-
-  const submitDecision = async () => {
+  const submitDecision = async (text: string) => {
     if (!decision) return;
-    const text = justification.trim();
-    if (text.length < JUSTIFICATION_MIN) return;
-    setIsProcessing(true);
-    setDecisionError(null);
     const { supplier, action } = decision;
-    try {
-      if (action === "approve") {
-        await supplierWorkflowService.approve(supplier.id, text);
-        setPending((prev) => prev.filter((s) => s.id !== supplier.id));
-      } else {
-        await supplierWorkflowService.reject(supplier.id, text);
-        setPending((prev) => prev.filter((s) => s.id !== supplier.id));
-      }
-      setDecision(null);
-      setJustification("");
-    } catch (e: unknown) {
-      const msg = isAxiosError(e) ? e.response?.data?.detail ?? "Request failed. Try again." : "Request failed. Try again.";
-      setDecisionError(typeof msg === "string" ? msg : "Request failed.");
-    } finally {
-      setIsProcessing(false);
+    if (action === "approve") {
+      await supplierWorkflowService.approve(supplier.id, text);
+    } else {
+      await supplierWorkflowService.reject(supplier.id, text);
     }
+    setPending((prev) => prev.filter((s) => s.id !== supplier.id));
   };
 
   if (isLoading) {
@@ -159,10 +110,9 @@ export default function MySuppliersPage() {
                   key={s.id}
                   supplier={s}
                   pending
-                  canModerate={canModerate}
-                  disabled={isProcessing}
-                  onApprove={() => openDecision(s, "approve")}
-                  onReject={() => openDecision(s, "reject")}
+                  canModerate={userCanModerate}
+                  onApprove={() => setDecision({ supplier: s, action: "approve" })}
+                  onReject={() => setDecision({ supplier: s, action: "reject" })}
                 />
               ))}
             </div>
@@ -170,57 +120,13 @@ export default function MySuppliersPage() {
         </TabsContent>
       </Tabs>
 
-      {/* HITL justification dialog — reuses SupplierCard's approve/reject pattern */}
-      <Dialog open={decision !== null} onOpenChange={(open) => { if (!open) closeDecision(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {decision?.action === "approve" ? "Approve" : "Reject"}{" "}
-              {decision?.supplier.name ?? "supplier"}?
-            </DialogTitle>
-            <DialogDescription>
-              {decision?.action === "approve"
-                ? "Promotes to Tier 1 (approved) and surfaces this supplier in every user's search."
-                : "Removes from discovery results for every user."}{" "}
-              Record why this decision is correct — the rationale is persisted in the audit log.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-2">
-            <Label htmlFor="justification">Justification</Label>
-            <Textarea
-              id="justification"
-              value={justification}
-              onChange={(e) => setJustification(e.target.value.slice(0, JUSTIFICATION_MAX))}
-              placeholder="e.g. Verified AS9100 certification via cert body lookup; confirmed Bavaria facility matches query."
-              rows={5}
-              disabled={isProcessing}
-              autoFocus
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span className={justificationLength < JUSTIFICATION_MIN ? "text-destructive" : ""}>
-                Minimum {JUSTIFICATION_MIN} characters
-                {justificationLength < JUSTIFICATION_MIN && ` (${JUSTIFICATION_MIN - justificationLength} more)`}
-              </span>
-              <span>{justificationLength}/{JUSTIFICATION_MAX}</span>
-            </div>
-            {decisionError && <p className="text-xs text-destructive">{decisionError}</p>}
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={closeDecision} disabled={isProcessing}>
-              Cancel
-            </Button>
-            <Button
-              variant={decision?.action === "reject" ? "destructive" : "default"}
-              onClick={submitDecision}
-              disabled={submitDisabled}
-            >
-              {decision?.action === "approve" ? "Approve supplier" : "Reject supplier"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* HITL justification dialog — shared with SupplierCard's approve/reject flow */}
+      <JustificationDialog
+        action={decision?.action ?? null}
+        supplierName={decision?.supplier.name}
+        onClose={() => setDecision(null)}
+        onSubmit={submitDecision}
+      />
     </div>
   );
 }
@@ -229,14 +135,12 @@ function SimpleSupplierCard({
   supplier,
   pending = false,
   canModerate = false,
-  disabled = false,
   onApprove,
   onReject,
 }: {
   supplier: Supplier;
   pending?: boolean;
   canModerate?: boolean;
-  disabled?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
 }) {
@@ -300,7 +204,6 @@ function SimpleSupplierCard({
                   size="sm"
                   className="h-8 text-xs gap-1.5"
                   onClick={onApprove}
-                  disabled={disabled}
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Approve
@@ -310,7 +213,6 @@ function SimpleSupplierCard({
                   size="sm"
                   className="h-8 text-xs gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={onReject}
-                  disabled={disabled}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Reject

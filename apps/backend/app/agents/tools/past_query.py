@@ -1,12 +1,11 @@
-"""lookup_past_query — semantic recall over the user's prior queries (Task 3.2).
+"""lookup_past_query — semantic recall over the user's prior queries.
 
-Replaces the empty-list stub from Task 3.1 with a real Milvus-backed search.
 The implementation is a factory: callers construct a Tool by passing a
 QueryMemoryService and the `current_user_id` for the request. The user_id is
 closure-bound at factory time so the LLM physically cannot point the search
 at another user's history, regardless of what it emits in `Action Input`.
 
-This is the privacy-critical surface in Task 3.2 — see test_query_memory.py's
+This is the privacy-critical surface; see test_query_memory.py's
 `test_lookup_tool_ignores_user_id_override_attempt` for the structural pin.
 """
 
@@ -47,7 +46,7 @@ _ARGS_SCHEMA = {
 }
 
 _MAX_TOP_K = 5
-# Tuned 2026-06-10 (Task 3.4) from a measured Voyage cosine distribution:
+# Tuned from a measured Voyage cosine distribution:
 # related cross-domain paraphrases ("fabric" probe vs. textile seed queries)
 # score 0.395-0.512 while unrelated industrial queries top out at 0.436.
 # The original 0.65 (spec default) returned zero hits for every paraphrase

@@ -31,6 +31,7 @@ export interface ParsedConstraints {
   location_lat?: number;
   location_lng?: number;
   location_radius_km?: number;
+  location_bounds?: number[];
   certifications?: string[];
   industry_typical_certs?: string[];
   capacity_min?: number;
@@ -137,11 +138,39 @@ export interface QueryResponse {
   status: QueryStatus;
   detected_language?: string;
   parsed_constraints?: ParsedConstraints;
+  search_scope?: SearchScope;
+  evaluator_retries?: number;
+  evaluator_verdict?: string | null;
+  diagnostics?: QueryDiagnostics;
   execution_time_ms?: number;
   error_message?: string;
   created_at: string;
   completed_at?: string;
   results?: QueryResult[];
+}
+
+export interface QueryDiagnostics {
+  hard_constraints?: string[];
+  external_discovery_ran?: boolean;
+  partial?: boolean;
+  code?: string | null;
+  message?: string | null;
+}
+
+export interface QueryHistoryItem {
+  id: string;
+  raw_query: string;
+  status: QueryStatus;
+  execution_time_ms?: number | null;
+  created_at: string;
+  results: Array<{ rank: number }>;
+}
+
+export interface QueryHistoryResponse {
+  items: QueryHistoryItem[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface QueryWithResults extends QueryResponse {

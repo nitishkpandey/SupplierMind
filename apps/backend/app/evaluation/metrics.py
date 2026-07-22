@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Optional
+
+from app.agents.state import SupplierComplianceResult
+from app.utils.geo import haversine_km
 
 
 @dataclass
@@ -37,10 +39,10 @@ class QueryMetrics:
     reciprocal_rank: float             # 1/rank of first correct result
     constraint_satisfaction_rate: float  # Average CSR across returned suppliers
     execution_time_ms: int             # How long did this query take?
-    compliance_data: Optional[list[dict]] = field(default=None)  # From SupplierMind only
-    cost_usd: Optional[float] = field(default=None)        # LLM spend attributed to this call
-    raw_names: Optional[list[str]] = field(default=None)   # Names as the model emitted them (P1/P2)
-    reasoning: Optional[str] = field(default=None)         # Model-stated reasoning (P1/P2)
+    compliance_data: list[SupplierComplianceResult] | None = field(default=None)  # From SupplierMind only
+    cost_usd: float | None = field(default=None)        # LLM spend attributed to this call
+    raw_names: list[str] | None = field(default=None)   # Names as the model emitted them (P1/P2)
+    reasoning: str | None = field(default=None)         # Model-stated reasoning (P1/P2)
 
 
 @dataclass
@@ -113,7 +115,7 @@ def reciprocal_rank(retrieved: list[str], relevant: set[str]) -> float:
 
 
 def constraint_satisfaction_rate_from_compliance(
-    compliance_results: list[dict],
+    compliance_results: list[SupplierComplianceResult],
 ) -> float:
     """
     Calculate CSR from SupplierMind's compliance agent output.
@@ -169,22 +171,8 @@ def constraint_satisfaction_rate_from_suppliers(
     Returns:
         Average CSR across returned suppliers
     """
-    import math
-
     if not supplier_records or not constraints:
         return 0.0
-
-    def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-        R = 6371.0
-        dlat = math.radians(lat2 - lat1)
-        dlng = math.radians(lng2 - lng1)
-        a = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(math.radians(lat1))
-            * math.cos(math.radians(lat2))
-            * math.sin(dlng / 2) ** 2
-        )
-        return R * 2 * math.asin(math.sqrt(a))
 
     supplier_rates = []
     for supplier in supplier_records[:5]:
@@ -234,7 +222,7 @@ def constraint_satisfaction_rate_from_suppliers(
             and supplier.get("latitude")
             and supplier.get("longitude")
         ):
-            dist = haversine(
+            dist = haversine_km(
                 constraints["location_lat"],
                 constraints["location_lng"],
                 supplier["latitude"],

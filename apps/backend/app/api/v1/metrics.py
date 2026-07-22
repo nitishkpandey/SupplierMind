@@ -11,10 +11,10 @@ endpoint stays sub-second even after the audit_logs table grows.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -184,7 +184,7 @@ async def get_admin_metrics(
 
     return {
         "window_hours": window_hours,
-        "as_of": datetime.now(timezone.utc).isoformat(),
+        "as_of": datetime.now(UTC).isoformat(),
         "summary": summary,
         "agent_latency": agent_latency,
         "throttle_events": throttle_events,

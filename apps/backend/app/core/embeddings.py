@@ -8,8 +8,9 @@ Used by:
 
 CACHING STRATEGY:
 Embedding the same text twice costs API tokens and time.
-We cache embeddings in Redis with a long TTL (7 days).
-Supplier descriptions rarely change, so cache hits will be very high.
+The sync embedding client keeps a small process-local TTL cache. This avoids
+async/sync mixing in LangGraph agent nodes while still preventing repeated
+embedding calls during discovery retries and benchmark runs.
 """
 
 import hashlib
@@ -18,14 +19,14 @@ import time
 from functools import lru_cache
 
 import voyageai
-from voyageai.error import RateLimitError
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
 )
+from voyageai.error import RateLimitError
 
 from app.core.config import settings
 
@@ -226,7 +227,7 @@ class EmbeddingClient:
                 )
                 fresh.extend(vectors)
 
-            for idx, text, vector in zip(miss_indices, miss_texts, fresh):
+            for idx, text, vector in zip(miss_indices, miss_texts, fresh, strict=False):
                 results[idx] = vector
                 self._cache_set(text, input_type, vector)
 

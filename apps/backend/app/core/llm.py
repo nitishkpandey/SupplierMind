@@ -19,9 +19,11 @@ per-process total (`client.total_cost_usd`) so a benchmark run can report
 spend per paradigm.
 """
 
+import json
 import logging
 import re
 import threading
+import time
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
@@ -130,6 +132,7 @@ class LLMProvider(Protocol):
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.1,
         stop: list[str] | None = None,
+        timeout: float | None = None,
     ) -> str: ...
 
     def complete_json(
@@ -139,6 +142,7 @@ class LLMProvider(Protocol):
         model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.0,
+        timeout: float | None = None,
     ) -> str: ...
 
 
@@ -179,7 +183,7 @@ def _is_retryable_openai_error(exc: BaseException) -> bool:
         return getattr(exc, "code", None) != "insufficient_quota"
     if isinstance(exc, openai.APIStatusError):
         return exc.status_code >= 500
-    if isinstance(exc, (openai.APIConnectionError, openai.APITimeoutError)):
+    if isinstance(exc, openai.APIConnectionError | openai.APITimeoutError):
         return True
     return False
 
@@ -217,17 +221,25 @@ class OpenAIProvider(_UsageTracking):
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.1,
         stop: list[str] | None = None,
+        timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
+        wait_started = time.monotonic()
         ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
+            resolved_model,
+            estimate_message_tokens(messages, max_tokens),
+            max_wait_seconds=timeout,
         )
+        request_timeout = timeout
+        if timeout is not None:
+            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
         response = self._client.chat.completions.create(
             model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
             temperature=temperature,
             stop=stop,
+            timeout=request_timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or ""
@@ -246,17 +258,25 @@ class OpenAIProvider(_UsageTracking):
         model: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.0,
+        timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
+        wait_started = time.monotonic()
         ts = self._rate_limiter.acquire(
-            resolved_model, estimate_message_tokens(messages, max_tokens)
+            resolved_model,
+            estimate_message_tokens(messages, max_tokens),
+            max_wait_seconds=timeout,
         )
-        response = self._client.chat.completions.create(
+        request_timeout = timeout
+        if timeout is not None:
+            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
+        response = self._client.chat.completions.create(  # type: ignore[call-overload]  # messages are plain dicts; OpenAI SDK validates at runtime
             model=resolved_model,
-            messages=messages,  # type: ignore[arg-type]
+            messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={"type": "json_object"},
+            timeout=request_timeout,
         )
         self._record_usage(resolved_model, ts, response)
         return response.choices[0].message.content or "{}"
@@ -268,8 +288,6 @@ class OpenAIProvider(_UsageTracking):
             self._rate_limiter.update_actual_tokens(model, ts, int(total))
         self._track(model, response)
 
-    def count_tokens_estimate(self, text: str) -> int:
-        return len(text) // 4
 
 
 # Backwards-compatible alias: BaseAgent and the tools type-annotate against
@@ -296,3 +314,14 @@ def build_llm_client() -> Any:
 def get_llm_client() -> Any:
     """Returns a cached LLM client instance — one for the whole process."""
     return build_llm_client()
+
+
+def complete_json_dict(
+    client: Any, messages: list[dict[str, str]], **kwargs: Any
+) -> dict[str, Any]:
+    """complete_json + json.loads in one step.
+
+    Provider and JSON-decode errors propagate unchanged so every call site
+    keeps its own fallback value and logging.
+    """
+    return json.loads(client.complete_json(messages, **kwargs))

@@ -1,9 +1,8 @@
-"""lookup_past_query — stub bridge to Task 3.2's semantic long-term memory.
+"""No-op lookup_past_query fallback.
 
-Returns an empty list today. Task 3.2 will replace the implementation with a
-Milvus semantic search over the user's prior parsed queries. The Tool's name,
-description, and arg shape are stable so that the ReAct prompt does not need
-to change when 3.2 lands.
+Production parser runs use app.agents.tools.past_query with user-scoped Milvus
+memory. This fallback is used only by tests or degraded parser construction
+when memory initialization is unavailable.
 """
 
 from __future__ import annotations
@@ -12,11 +11,15 @@ from typing import Any
 
 from app.agents.tools.registry import Tool
 
+# Deliberately NOT imported from past_query.py: that module pulls in
+# query_memory (Milvus/Voyage clients) at import time, and this stub exists
+# precisely so callers can build a registry without those imports. The
+# description also intentionally differs (it admits the degraded behaviour).
 _DESCRIPTION = (
     "Find semantically-similar past queries from this user's history. Use when "
     "the current query is ambiguous and prior queries might disambiguate, or "
-    "when it references context like 'same as last time'. (Stub — returns an "
-    "empty list until semantic memory lands in Task 3.2.)"
+    "when it references context like 'same as last time'. In this degraded "
+    "fallback registry it returns an empty list."
 )
 
 _ARGS_SCHEMA = {
@@ -30,7 +33,6 @@ _ARGS_SCHEMA = {
 
 
 def _run(query_text: str, top_k: int = 3) -> list[dict[str, Any]]:
-    # Argument validation kept loose; Task 3.2 will tighten with real input.
     _ = (query_text or "").strip(), int(top_k or 0)
     return []
 

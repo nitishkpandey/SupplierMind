@@ -32,9 +32,9 @@ export default function AdminPage() {
         const metrics = metricsRaw as Record<string, { mean: number }>;
         return {
           name: key === "suppliermind" ? "SupplierMind" : key === "manual_simulation" ? "Manual Sim" : "Keyword SQL",
-          "P@5": parseFloat((metrics.precision_at_5?.mean * 100).toFixed(1)),
-          CSR: parseFloat((metrics.constraint_satisfaction_rate?.mean * 100).toFixed(1)),
-          MRR: parseFloat((metrics.mean_reciprocal_rank?.mean * 100).toFixed(1)),
+          "P@5": parseFloat(((metrics.precision_at_5?.mean ?? 0) * 100).toFixed(1)),
+          CSR: parseFloat(((metrics.constraint_satisfaction_rate?.mean ?? 0) * 100).toFixed(1)),
+          MRR: parseFloat(((metrics.mean_reciprocal_rank?.mean ?? 0) * 100).toFixed(1)),
         };
       })
     : [];

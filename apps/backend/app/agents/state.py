@@ -13,42 +13,42 @@ LangGraph initialises the state dict at the start of a pipeline run.
 If a field has no default, LangGraph raises an error on initialisation.
 """
 
-from typing import Optional
 
 from typing_extensions import TypedDict
 
 
 class ParsedConstraints(TypedDict, total=False):
-    """Production v2: rich product intent representation."""
-    # Product intent (replaces category as primary key)
-    product_type: Optional[str]
-    product_keywords: Optional[list[str]]
-    industry_context: Optional[str]
-    buyer_intent: Optional[str]
-    category_hint: Optional[str]
+    """Structured procurement intent extracted from a natural-language query."""
+    # Product intent
+    product_type: str | None
+    product_keywords: list[str] | None
+    industry_context: str | None
+    buyer_intent: str | None
+    category_hint: str | None
 
     # Location
-    location_name: Optional[str]
-    location_city: Optional[str]
-    location_country: Optional[str]
-    location_region: Optional[str]
-    location_lat: Optional[float]
-    location_lng: Optional[float]
-    location_radius_km: Optional[float]
+    location_name: str | None
+    location_city: str | None
+    location_country: str | None
+    location_region: str | None
+    location_lat: float | None
+    location_lng: float | None
+    location_radius_km: float | None
+    location_bounds: list[float] | None  # south, west, north, east
 
     # Constraints
-    certifications: Optional[list[str]]            # HARD gate — user-stated certs only
-    industry_typical_certs: Optional[list[str]]    # SOFT hints — inferred, never gating
-    capacity_min: Optional[float]
-    capacity_unit: Optional[str]
-    lead_time_max_days: Optional[int]
-    ranking_preferences: Optional[list[str]]       # Supported ranking signals from user text
-    unsupported_preferences: Optional[list[str]]   # Requested signals with no trusted data source
+    certifications: list[str] | None            # HARD gate — user-stated certs only
+    industry_typical_certs: list[str] | None    # SOFT hints — inferred, never gating
+    capacity_min: float | None
+    capacity_unit: str | None
+    lead_time_max_days: int | None
+    ranking_preferences: list[str] | None       # Supported ranking signals from user text
+    unsupported_preferences: list[str] | None   # Requested signals with no trusted data source
 
     # Query metadata
-    query_type: Optional[str]
-    complexity: Optional[str]
-    original_language: Optional[str]
+    query_type: str | None
+    complexity: str | None
+    original_language: str | None
 
 
 class ComplianceResult(TypedDict, total=False):
@@ -57,8 +57,8 @@ class ComplianceResult(TypedDict, total=False):
     status: str               # "PASS", "FAIL", "PARTIAL"
     reason: str               # Human-readable explanation
     confidence: float         # 0.0 to 1.0
-    evidence_quote: str       # Task 1.4: verbatim phrase the LLM cited (LLM path only)
-    quote_flag: str           # Task 1.4: downgrade reason, e.g. "quote_not_in_source"
+    evidence_quote: str       # Verbatim phrase cited by the LLM path
+    quote_flag: str           # Downgrade reason, e.g. "quote_not_in_source"
 
 
 class SupplierComplianceResult(TypedDict):
@@ -74,34 +74,34 @@ class RankedSupplier(TypedDict):
     """One ranked supplier in the final shortlist."""
     rank: int
     supplier_id: str
+    tier: str                            # "approved" | "saved" | "pending_review" | "discovered"
     total_score: float
     constraint_score: float
     semantic_score: float
-    proximity_score: Optional[float]
+    proximity_score: float | None
     completeness_score: float
     preference_score: float
     compliance_matrix: dict[str, str]   # {constraint: "PASS"/"FAIL"/"PARTIAL"}
     explanation: str                     # LLM-generated explanation
-    distance_km: Optional[float]
+    distance_km: float | None
 
 
 class AuditEntry(TypedDict, total=False):
     """One entry in the agent audit trail.
 
     `input_snapshot` / `output_snapshot` are optional structured payloads
-    introduced for Task 3.1's ReAct trace. When present they override the
-    plain-string summaries at the API flush stage so the full trace lands
-    in audit_logs.{input,output}_snapshot as JSON.
+    used for ReAct traces and richer agent diagnostics. When present they
+    override the plain-string summaries at the API flush stage.
     """
     agent_name: str
     action: str
-    reasoning: Optional[str]
+    reasoning: str | None
     input_summary: str
     output_summary: str
     duration_ms: int
     timestamp: str
-    input_snapshot: Optional[dict]
-    output_snapshot: Optional[dict]
+    input_snapshot: dict | None
+    output_snapshot: dict | None
 
 
 class AgentState(TypedDict):
@@ -123,22 +123,24 @@ class AgentState(TypedDict):
     raw_query: str
     query_id: str
     user_id: str
+    deadline_at: float  # monotonic timestamp shared by the full pipeline
 
     # ── Parser Agent output ───────────────────────────────────────────
-    parsed_constraints: Optional[ParsedConstraints]
+    parsed_constraints: ParsedConstraints | None
     detected_language: str
     needs_clarification: bool
-    clarification_question: Optional[str]
+    clarification_question: str | None
+    clarification_resumable: bool
 
-    # ── Task 3.3 — Multi-turn clarification dialogue ──────────────────
+    # ── Multi-turn clarification dialogue ─────────────────────────────
     # Populated by parser_node when the Parser raises a clarification: the
     # DB row id under which the partial state has been persisted, so the
     # API layer can hand it back to the user. `turn_number` is 1 on first
     # ask, 2/3 on resumed re-asks. `previous_partial_constraints` is the
     # hint the resumed Parser prompt uses to avoid starting from scratch.
-    clarification_id: Optional[str]
+    clarification_id: str | None
     turn_number: int
-    previous_partial_constraints: Optional[ParsedConstraints]
+    previous_partial_constraints: ParsedConstraints | None
 
     # ── External Discovery Agent output ───────────────────────────────
     newly_discovered_supplier_ids: list[str]
@@ -148,6 +150,7 @@ class AgentState(TypedDict):
     candidate_supplier_ids: list[str]
     semantic_scores: dict[str, float]   # {supplier_id: similarity_score}
     geo_distances: dict[str, float]     # {supplier_id: distance_km}
+    geography_diagnostic: str | None
     retry_count: int
     relaxed_constraints: list[str]      # Which constraints were relaxed on retry
 
@@ -157,25 +160,26 @@ class AgentState(TypedDict):
     # ── Ranking Agent output ──────────────────────────────────────────
     ranked_suppliers: list[RankedSupplier]
 
-    # ── Production v2 additions ───────────────────────────────────────
+    # ── Governance and evaluation controls ────────────────────────────
     search_scope: str
-    # Sprint A (HITL): pending_review suppliers are in-scope for normal search
-    # (the UI shows them with a badge). The eval/benchmark path sets this True
-    # so evaluation never sees pending suppliers, keeping SupplierBench-25
-    # reproducible — independent of scope.
+    # pending_review suppliers are visible in normal discover-new searches,
+    # but excluded from thesis evaluation.
     exclude_pending: bool
+    # Fixed supplier corpus used by thesis evaluation. Normal product searches
+    # leave this empty so the full active database remains searchable.
+    benchmark_supplier_ids: list[str]
     tier_assignments: dict[str, str]
     evaluator_retries: int
-    evaluator_verdict: Optional[str]
+    evaluator_verdict: str | None
     evaluator_should_retry: bool
 
-    # ── Task 3.1 — ReAct trace + termination reason ─────────────────
+    # ── ReAct trace + termination reason ──────────────────────────────
     react_trace: list[dict]
-    react_terminated_by: Optional[str]   # "finish" | "max_iterations" | "parse_failed"
+    react_terminated_by: str | None   # "finish" | "max_iterations" | "parse_failed"
 
     # ── Audit trail (grows throughout pipeline) ───────────────────────
     audit_log: list[AuditEntry]
 
     # ── Pipeline control ──────────────────────────────────────────────
-    error: Optional[str]
+    error: str | None
     pipeline_status: str    # "running", "completed", "failed", "needs_clarification"

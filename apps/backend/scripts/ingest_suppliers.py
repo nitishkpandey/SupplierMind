@@ -1,12 +1,12 @@
 """
 apps/backend/scripts/ingest_suppliers.py — CLI script to ingest SupplierBench data.
 
-RUN THIS ONCE after Phase 1 setup:
+Run from apps/backend after database migrations:
     cd apps/backend
-    python scripts/ingest_suppliers.py
+    uv run python scripts/ingest_suppliers.py
 
 This populates both PostgreSQL and Milvus with all 100 synthetic suppliers.
-After running, the system is ready for agent queries.
+For the product-scale corpus, use scripts/bulk_ingest_synthetic.py.
 """
 
 import asyncio
@@ -35,7 +35,7 @@ async def main() -> None:
     if not dataset_path.exists():
         logger.error(
             "Dataset not found at %s\n"
-            "Run first: python data/generate_dataset.py",
+            "Run first: uv run python data/generate_dataset.py",
             dataset_path,
         )
         sys.exit(1)

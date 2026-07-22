@@ -6,18 +6,19 @@ The Discovery Agent uses this for hard-constraint filtering.
 The VectorStore handles SEMANTIC queries (similarity search).
 """
 
-import math
 import uuid
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-from sqlalchemy import and_, select, func, text
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Supplier
 from app.db.repositories.base import BaseRepository
+from app.utils.geo import haversine_km
+from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 
 class SupplierRepository(BaseRepository[Supplier]):
@@ -65,12 +66,12 @@ class SupplierRepository(BaseRepository[Supplier]):
 
     async def filter_by_constraints(
         self,
-        category: Optional[str] = None,
-        country: Optional[str] = None,
-        required_certifications: Optional[list[str]] = None,
-        min_capacity: Optional[float] = None,
-        capacity_unit: Optional[str] = None,
-        max_lead_time_days: Optional[int] = None,
+        category: str | None = None,
+        country: str | None = None,
+        required_certifications: list[str] | None = None,
+        min_capacity: float | None = None,
+        capacity_unit: str | None = None,
+        max_lead_time_days: int | None = None,
     ) -> list[Supplier]:
         """
         Structured filter search — used by Discovery Agent alongside semantic search.
@@ -91,7 +92,7 @@ class SupplierRepository(BaseRepository[Supplier]):
             conditions.append(Supplier.country == country)
 
         if required_certifications:
-            from sqlalchemy import cast, String
+            from sqlalchemy import String, cast
             # Check each certification by casting JSON to text for the LIKE operator
             for cert in required_certifications:
                 conditions.append(
@@ -143,7 +144,7 @@ class SupplierRepository(BaseRepository[Supplier]):
         # Apply Haversine filter
         nearby = []
         for supplier in all_suppliers:
-            distance = self._haversine(
+            distance = haversine_km(
                 center_lat, center_lng,
                 supplier.latitude, supplier.longitude  # type: ignore[arg-type]
             )
@@ -153,26 +154,6 @@ class SupplierRepository(BaseRepository[Supplier]):
         # Sort by distance (closest first)
         nearby.sort(key=lambda x: x[1])
         return nearby
-
-    @staticmethod
-    def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-        """
-        Calculate distance in km between two lat/lng coordinates.
-
-        Formula:
-        a = sin²(Δlat/2) + cos(lat1) × cos(lat2) × sin²(Δlng/2)
-        distance = 2R × arcsin(√a)   where R = 6371km (Earth radius)
-        """
-        R = 6371.0
-        dlat = math.radians(lat2 - lat1)
-        dlng = math.radians(lng2 - lng1)
-        a = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(math.radians(lat1))
-            * math.cos(math.radians(lat2))
-            * math.sin(dlng / 2) ** 2
-        )
-        return R * 2 * math.asin(math.sqrt(a))
 
     async def create_supplier(self, data: dict) -> Supplier:
         """Create a new supplier record."""
@@ -212,12 +193,12 @@ class SupplierRepository(BaseRepository[Supplier]):
     @staticmethod
     def filter_by_constraints_sync(
         db: "Session",
-        category: Optional[str] = None,
-        country: Optional[str] = None,
-        required_certifications: Optional[list[str]] = None,
-        min_capacity: Optional[float] = None,
-        capacity_unit: Optional[str] = None,
-        max_lead_time_days: Optional[int] = None,
+        category: str | None = None,
+        country: str | None = None,
+        required_certifications: list[str] | None = None,
+        min_capacity: float | None = None,
+        capacity_unit: str | None = None,
+        max_lead_time_days: int | None = None,
         limit: int = 50,
     ) -> list[Supplier]:
         """Sync version for use inside LangGraph agent nodes."""
@@ -230,7 +211,7 @@ class SupplierRepository(BaseRepository[Supplier]):
         if country:
             conditions.append(Supplier.country == country)
         if required_certifications:
-            from sqlalchemy import cast, String
+            from sqlalchemy import String, cast
             for cert in required_certifications:
                 conditions.append(cast(Supplier.certifications, String).contains(cert))
         if min_capacity and capacity_unit:
@@ -263,7 +244,7 @@ class SupplierRepository(BaseRepository[Supplier]):
 
         nearby = []
         for supplier in all_suppliers:
-            distance = SupplierRepository._haversine(
+            distance = haversine_km(
                 center_lat, center_lng,
                 supplier.latitude,  # type: ignore
                 supplier.longitude,  # type: ignore
@@ -288,3 +269,37 @@ class SupplierRepository(BaseRepository[Supplier]):
             )
         )
         return list(result.scalars().all())
+
+
+def supplier_to_dict(supplier: Supplier, *, clean: bool = False) -> dict:
+    """Shared Supplier row → plain dict (common keys across agents/baselines).
+
+    clean=True runs text fields through the null-sentinel cleaners
+    (agent pipeline); clean=False returns raw column values (baselines).
+    Call sites add any extra keys they need via dict.update().
+    """
+    if clean:
+        return {
+            "id": str(supplier.id),
+            "name": clean_optional_text(supplier.name),
+            "country": clean_optional_text(supplier.country),
+            "city": clean_optional_text(supplier.city),
+            "latitude": supplier.latitude,
+            "longitude": supplier.longitude,
+            "certifications": clean_text_list(supplier.certifications),
+            "capacity_value": supplier.capacity_value,
+            "capacity_unit": clean_optional_text(supplier.capacity_unit),
+            "lead_time_days": supplier.lead_time_days,
+        }
+    return {
+        "id": str(supplier.id),
+        "name": supplier.name,
+        "country": supplier.country,
+        "city": supplier.city,
+        "latitude": supplier.latitude,
+        "longitude": supplier.longitude,
+        "certifications": list(supplier.certifications or []),
+        "capacity_value": supplier.capacity_value,
+        "capacity_unit": supplier.capacity_unit,
+        "lead_time_days": supplier.lead_time_days,
+    }

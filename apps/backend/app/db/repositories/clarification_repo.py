@@ -10,8 +10,8 @@ Task 3.3 — Component B.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,11 +24,11 @@ from app.db.models import PendingClarification
 MAX_CLARIFICATION_TURNS = 3
 
 
-class MaxTurnsReached(ValueError):
+class MaxTurnsReached(ValueError):  # noqa: N818
     """Raised when the orchestrator tries to write a 4th turn for a query."""
 
 
-class ClarificationAlreadyResolved(ValueError):
+class ClarificationAlreadyResolved(ValueError):  # noqa: N818
     """Raised when an answer is submitted to a row that's already closed."""
 
 
@@ -43,7 +43,7 @@ class ClarificationRepository:
 
     async def get_by_id(
         self, clarification_id: uuid.UUID
-    ) -> Optional[PendingClarification]:
+    ) -> PendingClarification | None:
         result = await self.db.execute(
             select(PendingClarification).where(
                 PendingClarification.id == clarification_id
@@ -53,7 +53,7 @@ class ClarificationRepository:
 
     async def get_open_for_query(
         self, query_id: uuid.UUID
-    ) -> Optional[PendingClarification]:
+    ) -> PendingClarification | None:
         """The single open clarification for a query, if any.
 
         Multiple-turn dialogues mean a query can have many rows over its
@@ -79,7 +79,7 @@ class ClarificationRepository:
             update(PendingClarification)
             .where(PendingClarification.id == clarification_id)
             .values(
-                resolved_at=datetime.now(timezone.utc),
+                resolved_at=datetime.now(UTC),
                 user_answer=user_answer,
             )
         )
@@ -125,7 +125,7 @@ def persist_pending_clarification_sync(
 
 def get_pending_clarification_sync(
     db: Session, clarification_id: uuid.UUID
-) -> Optional[PendingClarification]:
+) -> PendingClarification | None:
     return db.get(PendingClarification, clarification_id)
 
 
@@ -139,7 +139,7 @@ def mark_resolved_sync(
         update(PendingClarification)
         .where(PendingClarification.id == clarification_id)
         .values(
-            resolved_at=datetime.now(timezone.utc),
+            resolved_at=datetime.now(UTC),
             user_answer=user_answer,
         )
     )

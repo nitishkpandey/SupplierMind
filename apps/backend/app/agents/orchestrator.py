@@ -1,7 +1,4 @@
-"""
-app/agents/orchestrator.py — LangGraph state machine wiring all agents.
-
-PRODUCTION V2 PIPELINE:
+"""LangGraph state machine wiring all SupplierMind agents.
 
   START
     │
@@ -9,7 +6,7 @@ PRODUCTION V2 PIPELINE:
   [parser_node]
     │ (clarification needed? → END)
     │
-    ├─ (scope == 'approved_only')
+    ├─ (scope == 'approved_only' OR fixed benchmark corpus)
     │      │
     │      ▼
     │   (skip external)
@@ -45,21 +42,30 @@ import asyncio
 import logging
 import time
 import uuid as _uuid
-from typing import Any, Literal, Optional
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from typing import Any, Literal
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 
-from app.agents.state import AgentState
 from app.agents.audit_log import append_audit_entry
-from app.agents.parser_agent import ParserAgent
-from app.agents.tools import build_user_registry
-from app.agents.external_discovery_agent import ExternalDiscoveryAgent
-from app.agents.discovery_agent import DiscoveryAgent
 from app.agents.compliance_agent import ComplianceAgent
-from app.agents.ranking_agent import RankingAgent
+from app.agents.discovery_agent import DiscoveryAgent
 from app.agents.evaluator_agent import EvaluatorAgent
+from app.agents.external_discovery_agent import ExternalDiscoveryAgent
+from app.agents.parser_agent import ParserAgent
+from app.agents.ranking_agent import RankingAgent
+from app.agents.state import AgentState, ParsedConstraints
+from app.agents.tools import build_user_registry
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+# ponytail: 2 workers so one stuck memory write can't block every later
+# query's finalize; grow (or add a queue) if timeouts become common.
+_query_memory_executor = ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="suppliermind-query-memory",
+)
 
 
 def _create_initial_state(
@@ -69,32 +75,35 @@ def _create_initial_state(
     search_scope: str,
     *,
     turn_number: int = 1,
-    previous_partial_constraints: Optional[dict] = None,
+    previous_partial_constraints: ParsedConstraints | None = None,
     exclude_pending: bool = False,
+    benchmark_supplier_ids: list[str] | None = None,
 ) -> AgentState:
     """Create initial AgentState with all defaults.
 
-    Task 3.3 — turn_number and previous_partial_constraints are populated
-    only on resume_pipeline() calls; first-turn submissions leave them at
-    their defaults.
+    turn_number and previous_partial_constraints are populated only on
+    resume_pipeline() calls; first-turn submissions leave them at defaults.
     """
     return AgentState(
         # Input
         raw_query=raw_query,
         query_id=query_id,
         user_id=user_id,
+        deadline_at=time.monotonic() + settings.QUERY_EXECUTION_TIMEOUT_SECONDS,
         search_scope=search_scope,
-        # Sprint A (HITL): eval path sets this True so pending_review suppliers
-        # never enter benchmark scoring, even though the UI flow includes them.
         exclude_pending=exclude_pending,
+        benchmark_supplier_ids=list(benchmark_supplier_ids or []),
 
         # Parser defaults
         parsed_constraints=None,
         detected_language="en",
         needs_clarification=False,
         clarification_question=None,
+        clarification_resumable=False,
+        react_trace=[],
+        react_terminated_by=None,
 
-        # Task 3.3 — clarification dialogue
+        # Clarification dialogue
         clarification_id=None,
         turn_number=turn_number,
         previous_partial_constraints=previous_partial_constraints,
@@ -107,6 +116,7 @@ def _create_initial_state(
         candidate_supplier_ids=[],
         semantic_scores={},
         geo_distances={},
+        geography_diagnostic=None,
         retry_count=0,
         relaxed_constraints=[],
         tier_assignments={},
@@ -131,7 +141,7 @@ def _create_initial_state(
 
 # ── Node functions ────────────────────────────────────────────────────
 def parser_node(state: AgentState) -> AgentState:
-    # Per-Task 3.2, the Parser is user-scoped at construction so the
+    # The Parser is user-scoped at construction so the
     # closure-bound `lookup_past_query` tool can only ever see this user's
     # memory. If memory infra is unreachable, fall back to the default
     # registry (whose lookup tool is the no-op stub) so the Parser still
@@ -150,15 +160,10 @@ def parser_node(state: AgentState) -> AgentState:
 
     state = agent.run(state)
 
-    # Task 3.3 — persist pause state when the Parser raised a clarification
-    # on a clean `finish` termination, or via the Task 3.4 pre-loop gate
-    # (contentless query, no ReAct run). The fallback/degraded paths also
-    # set needs_clarification=True but those carry no resumable state —
-    # they just degrade gracefully — so we skip persistence there.
-    if state.get("needs_clarification") and state.get("react_terminated_by") in (
-        "finish",
-        "pre_loop_clarification",
-    ):
+    # Persist clean, pre-loop, and deterministic degraded country-scope pauses.
+    # Other degraded messages are explicitly non-resumable and keep the API's
+    # existing fail-safe behavior instead of creating an unusable dialogue.
+    if state.get("needs_clarification") and state.get("clarification_resumable"):
         try:
             _persist_clarification_for_state(state)
         except Exception as e:  # noqa: BLE001 — persistence must never crash pipeline
@@ -177,11 +182,11 @@ def _persist_clarification_for_state(state: AgentState) -> None:
     Populates state["clarification_id"] in-place so the API layer can hand
     it back to the user.
     """
-    from app.db.session import SyncSessionLocal
     from app.db.repositories.clarification_repo import (
-        persist_pending_clarification_sync,
         MAX_CLARIFICATION_TURNS,
+        persist_pending_clarification_sync,
     )
+    from app.db.session import SyncSessionLocal
 
     query_id = state.get("query_id")
     user_id = state.get("user_id")
@@ -218,7 +223,7 @@ def _persist_clarification_for_state(state: AgentState) -> None:
 
 
 def finalize_node(state: AgentState) -> AgentState:
-    """Pipeline-completion hook (Task 3.2 / Component B).
+    """Pipeline-completion hook.
 
     Persists a query to long-term memory only when the Evaluator accepted
     the run. Memory write failures NEVER propagate — the user response is
@@ -237,12 +242,14 @@ def finalize_node(state: AgentState) -> AgentState:
 
     start = time.time()
     try:
-        from app.services.query_memory import get_memory_service
-
-        memory_id = get_memory_service().write(
-            user_id=str(user_id),
-            query_text=raw_query,
-            parsed_constraints=dict(constraints),
+        future = _query_memory_executor.submit(
+            _write_query_memory,
+            str(user_id),
+            raw_query,
+            dict(constraints),
+        )
+        memory_id = future.result(
+            timeout=max(0.0, settings.QUERY_MEMORY_WRITE_TIMEOUT_SECONDS)
         )
         duration_ms = int((time.time() - start) * 1000)
         logger.info(
@@ -261,6 +268,29 @@ def finalize_node(state: AgentState) -> AgentState:
             ),
             output_summary=f"memory_id={memory_id}",
         )
+    except FutureTimeoutError:
+        # cancel() only prevents a still-queued write from starting; a write
+        # already running cannot be cancelled and finishes in the background.
+        future.cancel()
+        duration_ms = int((time.time() - start) * 1000)
+        logger.warning(
+            "[finalize] query memory write timed out after %dms; response continues",
+            duration_ms,
+        )
+        _append_audit(
+            state,
+            agent_name="memory_service",
+            action="memory_write_timeout",
+            duration_ms=duration_ms,
+            reasoning=(
+                "Query memory write exceeded the non-critical timeout; "
+                "results were returned without waiting for semantic memory."
+            ),
+            output_summary=(
+                f"TIMEOUT after {duration_ms}ms "
+                f"(budget={settings.QUERY_MEMORY_WRITE_TIMEOUT_SECONDS}s)"
+            ),
+        )
     except Exception as e:  # noqa: BLE001 — memory write must be failsafe
         duration_ms = int((time.time() - start) * 1000)
         logger.warning("[finalize] memory_write_failed: %s", e)
@@ -273,6 +303,20 @@ def finalize_node(state: AgentState) -> AgentState:
             output_summary=f"FAILED: {type(e).__name__}",
         )
     return state
+
+
+def _write_query_memory(
+    user_id: str,
+    raw_query: str,
+    constraints: dict,
+) -> str:
+    from app.services.query_memory import get_memory_service
+
+    return get_memory_service().write(
+        user_id=user_id,
+        query_text=raw_query,
+        parsed_constraints=constraints,
+    )
 
 
 def _append_audit(
@@ -321,10 +365,10 @@ def evaluator_node(state: AgentState) -> AgentState:
 def after_parser(state: AgentState) -> Literal["external_discovery_node", "discovery_node", "__end__"]:
     if state.get("needs_clarification") or state.get("error"):
         logger.info("[orchestrator] Routing to END: clarification or error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
-    if state.get("search_scope") == "approved_only":
-        logger.info("[orchestrator] Scope is approved_only — skipping external discovery")
+    if state.get("search_scope") == "approved_only" or state.get("benchmark_supplier_ids"):
+        logger.info("[orchestrator] Internal-only search path selected")
         return "discovery_node"
 
     return "external_discovery_node"
@@ -333,22 +377,26 @@ def after_parser(state: AgentState) -> Literal["external_discovery_node", "disco
 def after_external_discovery(state: AgentState) -> Literal["discovery_node", "__end__"]:
     if state.get("error"):
         logger.info("[orchestrator] Routing to END: external discovery error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
     return "discovery_node"
 
 
 def after_discovery(state: AgentState) -> Literal["external_discovery_node", "compliance_node", "__end__"]:
     if state.get("error"):
         logger.info("[orchestrator] Routing to END: discovery error")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
     if not state.get("candidate_supplier_ids"):
         # On a retry pass (evaluator already looped us back once), never bounce
-        # to external_discovery again — re-running the web stage is the doubling
-        # cost Task 1.6 Component A caps. Accept the empty result and end.
+        # to external_discovery again; it doubles external API cost without
+        # adding new first-pass candidates. Accept the empty result and end.
         if state.get("evaluator_retries", 0) > 0:
             logger.info("[orchestrator] Routing to END: no candidates on retry pass (external_discovery not re-run)")
-            return END
+            return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
+
+        if state.get("benchmark_supplier_ids"):
+            logger.info("[orchestrator] Routing to END: fixed benchmark corpus has no candidates")
+            return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
         # First-pass auto-fallback: if we only searched approved and found
         # nothing, expand scope to 'both' and discover from the web once.
@@ -359,7 +407,7 @@ def after_discovery(state: AgentState) -> Literal["external_discovery_node", "co
             return "external_discovery_node"
 
         logger.info("[orchestrator] Routing to END: no candidates found even in 'both' scope")
-        return END
+        return END  # type: ignore[return-value]  # langgraph END is typed str, value is '__end__'
 
     return "compliance_node"
 
@@ -439,7 +487,7 @@ def get_pipeline():
     global _compiled_pipeline
     if _compiled_pipeline is None:
         _compiled_pipeline = build_pipeline()
-        logger.info("[orchestrator] Pipeline v3 compiled (production v2 architecture)")
+        logger.info("[orchestrator] SupplierMind agent pipeline compiled")
     return _compiled_pipeline
 
 
@@ -450,8 +498,9 @@ async def run_pipeline(
     search_scope: str = "approved_only",
     *,
     turn_number: int = 1,
-    previous_partial_constraints: Optional[dict] = None,
+    previous_partial_constraints: ParsedConstraints | None = None,
     exclude_pending: bool = False,
+    benchmark_supplier_ids: list[str] | None = None,
 ) -> AgentState:
     """
     Main entry point for running the full agent pipeline.
@@ -461,8 +510,9 @@ async def run_pipeline(
         query_id: UUID of the Query record in PostgreSQL
         user_id: UUID of the requesting user
         search_scope: 'approved_only' or 'both'
-        turn_number: Task 3.3 — 1 on first submission, 2/3 on resumed turns.
-        previous_partial_constraints: Task 3.3 — hint for the Parser on resume.
+        turn_number: 1 on first submission, 2/3 on resumed turns.
+        previous_partial_constraints: hint for the Parser on resume.
+        benchmark_supplier_ids: Optional fixed corpus for thesis evaluation.
 
     Returns:
         Final AgentState with ranked_suppliers and audit_log populated
@@ -480,6 +530,7 @@ async def run_pipeline(
         turn_number=turn_number,
         previous_partial_constraints=previous_partial_constraints,
         exclude_pending=exclude_pending,
+        benchmark_supplier_ids=benchmark_supplier_ids,
     )
     pipeline = get_pipeline()
 
@@ -505,7 +556,7 @@ async def resume_pipeline(
     clarification_id: str,
     user_answer: str,
 ) -> AgentState:
-    """Task 3.3 — Resume a paused pipeline after the user answers.
+    """Resume a paused pipeline after the user answers.
 
     Loads the persisted pending_clarifications row, marks it resolved,
     augments the original query with the user's answer, and re-enters
@@ -517,14 +568,14 @@ async def resume_pipeline(
         ValueError: if the clarification row is missing, already resolved,
             or would exceed the max-turns cap.
     """
-    from app.db.session import SyncSessionLocal
     from app.db.repositories.clarification_repo import (
+        MAX_CLARIFICATION_TURNS,
+        ClarificationAlreadyResolved,
+        MaxTurnsReached,
         get_pending_clarification_sync,
         mark_resolved_sync,
-        MAX_CLARIFICATION_TURNS,
-        MaxTurnsReached,
-        ClarificationAlreadyResolved,
     )
+    from app.db.session import SyncSessionLocal
 
     try:
         pc_uuid = _uuid.UUID(str(clarification_id))

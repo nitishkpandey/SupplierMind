@@ -16,7 +16,7 @@ from app.agents.tools.industry_context import infer_industry_context_tool
 from app.agents.tools.past_query_stub import lookup_past_query_tool
 from app.agents.tools.quantity_parser import parse_quantity_unit_tool
 from app.agents.tools.registry import Tool, ToolRegistry
-
+from app.services.geocoding import GeocodeResult
 
 # ── Registry contract ────────────────────────────────────────────────
 
@@ -51,6 +51,17 @@ def test_registry_list_for_prompt_includes_all_tools():
     assert "- b: beta" in rendered
     assert '"k": 1' in rendered
     assert '"k": 2' in rendered
+
+
+def test_registry_list_for_prompt_can_exclude_one_tool():
+    reg = ToolRegistry()
+    reg.register(Tool(name="keep", description="visible", args_schema={}, fn=lambda: None))
+    reg.register(Tool(name="hide", description="hidden", args_schema={}, fn=lambda: None))
+
+    rendered = reg.list_for_prompt(exclude_names={"hide"})
+
+    assert "- keep: visible" in rendered
+    assert "- hide: hidden" not in rendered
 
 
 def test_build_default_registry_has_five_tools():
@@ -96,6 +107,21 @@ def test_geocode_handles_empty_input():
     tool = geocode_location_tool(_geocoder=_FakeGeocoder((0, 0)))
     out = tool.fn(location_name="")
     assert out == {"found": False, "reason": "empty location_name"}
+
+
+def test_geocode_tool_exposes_region_bounds():
+    class _DetailsGeocoder:
+        def geocode_details(self, _name):
+            return GeocodeResult(
+                48.79,
+                11.50,
+                region="Bavaria",
+                bounds=(47.27, 8.98, 50.57, 13.84),
+            )
+
+    out = geocode_location_tool(_geocoder=_DetailsGeocoder()).fn(location_name="Bavaria")
+
+    assert out["bounds"] == [47.27, 8.98, 50.57, 13.84]
 
 
 # ── canonicalize_certification ───────────────────────────────────────
@@ -168,14 +194,14 @@ def test_infer_industry_context_empty_input_short_circuits():
     "text, value, normalized_unit",
     [
         ("10k units/month", 10000.0, "units/month"),
-        ("2.5M tons/year", 2_500_000.0, "tons/year"),
+        ("2.5M tons/year", 2_500_000.0, "metric_tons/year"),
         ("500 kg", 500.0, "kg"),
         ("1,200 units/year", 1200.0, "units/year"),
         ("42", 42.0, None),
         # 3.2 pre-flight regression — natural-language "per" must collapse to
         # "units/month", not "unitspermonth". Caught in the live 3.1 demo.
         ("10000 units per month", 10000.0, "units/month"),
-        ("500 tons per year", 500.0, "tons/year"),
+        ("500 tons per year", 500.0, "metric_tons/year"),
     ],
 )
 def test_parse_quantity_unit_known_shapes(text, value, normalized_unit):
@@ -190,6 +216,15 @@ def test_parse_quantity_unit_unparseable_returns_parsed_false():
     tool = parse_quantity_unit_tool()
     out = tool.fn(text="lots and lots")
     assert out["parsed"] is False
+
+
+def test_parse_quantity_unit_description_is_capacity_only():
+    description = parse_quantity_unit_tool().description.casefold()
+
+    assert "supplier capacity" in description
+    assert "never" in description
+    assert "buyer order" in description
+    assert "lead-time" not in description
 
 
 # ── lookup_past_query stub ───────────────────────────────────────────

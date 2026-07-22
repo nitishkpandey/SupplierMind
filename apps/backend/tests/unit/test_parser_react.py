@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from app.agents.parser_agent import MAX_REACT_ITERATIONS, ParserAgent
-from app.agents.tools import ToolRegistry
+from app.agents.tools import Tool, ToolRegistry
 from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
 from app.agents.tools.geocode import geocode_location_tool
 from app.agents.tools.industry_context import infer_industry_context_tool
@@ -103,6 +103,97 @@ def _make_parser(llm: _FakeLLM, registry: ToolRegistry) -> ParserAgent:
     return parser
 
 
+def _quantity_counting_registry(calls: list[str]) -> ToolRegistry:
+    registry = ToolRegistry()
+    real_tool = parse_quantity_unit_tool()
+
+    def run_quantity(text: str) -> dict[str, Any]:
+        calls.append(text)
+        return real_tool.fn(text=text)
+
+    registry.register(geocode_location_tool(_geocoder=None))
+    registry.register(canonicalize_certification_tool())
+    registry.register(infer_industry_context_tool(_llm=None))
+    registry.register(Tool(
+        name=real_tool.name,
+        description=real_tool.description,
+        args_schema=real_tool.args_schema,
+        fn=run_quantity,
+    ))
+    registry.register(lookup_past_query_tool())
+    return registry
+
+
+def _quantity_finish_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "product_type": "sparkling water",
+        "product_keywords": ["sparkling water"],
+        "industry_context": "beverages",
+        "buyer_intent": "any",
+        "category_hint": "food_ingredients",
+        "location_city": None,
+        "location_country": None,
+        "location_region": None,
+        "location_radius_km": None,
+        "certifications": [],
+        "capacity_min": None,
+        "capacity_unit": None,
+        "lead_time_max_days": None,
+        "query_type": "general",
+        "complexity": "simple",
+        "original_language": "en",
+        "confidence": 0.9,
+        "clarification_needed": False,
+        "clarification_question": None,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_buyer_order_quantity_is_hidden_and_not_executed():
+    quantity_calls: list[str] = []
+    finish_payload = _quantity_finish_payload()
+    llm = _FakeLLM([
+        'Thought: Parse the order amount.\nAction: parse_quantity_unit\n'
+        'Action Input: {"text": "1000 bottles"}',
+        f'Thought: Finish.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, _quantity_counting_registry(quantity_calls))
+
+    out = parser.execute(_make_state("buy 1000 bottles of sparkling water"))
+
+    assert quantity_calls == []
+    assert out["react_trace"][0]["observation"]["error"] == (
+        "quantity_tool_not_applicable"
+    )
+    assert "- parse_quantity_unit:" not in llm.calls[0][0]["content"]
+    assert out["parsed_constraints"]["capacity_min"] is None
+    assert out["parsed_constraints"]["capacity_unit"] is None
+
+
+def test_explicit_supplier_capacity_keeps_and_executes_quantity_tool():
+    quantity_calls: list[str] = []
+    finish_payload = _quantity_finish_payload(
+        capacity_min=None,
+        capacity_unit=None,
+    )
+    llm = _FakeLLM([
+        'Thought: Parse the capacity rate.\nAction: parse_quantity_unit\n'
+        'Action Input: {"text": "10k bottles/month"}',
+        f'Thought: Finish.\nAction: Finish\nAction Input: {json.dumps(finish_payload)}',
+    ])
+    parser = _make_parser(llm, _quantity_counting_registry(quantity_calls))
+
+    out = parser.execute(_make_state(
+        "find sparkling water suppliers with capacity of 10k bottles/month"
+    ))
+
+    assert quantity_calls == ["10k bottles/month"]
+    assert "- parse_quantity_unit:" in llm.calls[0][0]["content"]
+    assert out["parsed_constraints"]["capacity_min"] == 10000
+    assert out["parsed_constraints"]["capacity_unit"] == "units/month"
+
+
 # ── 1. Simple query — single tool call ───────────────────────────────
 
 
@@ -137,7 +228,9 @@ def test_simple_query_single_tool_then_finish():
     ])
     parser = _make_parser(llm, registry)
 
-    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
+    out = parser.execute(
+        _make_state("ISO 9001 packaging supplier throughout Germany")
+    )
 
     trace = out["react_trace"]
     assert [s["action"] for s in trace] == ["geocode_location", "Finish"]
@@ -370,7 +463,9 @@ def test_react_trace_lands_in_audit_log_output_snapshot():
     ])
     parser = _make_parser(llm, registry)
 
-    out = parser.execute(_make_state("ISO 9001 packaging supplier in Germany"))
+    out = parser.execute(
+        _make_state("ISO 9001 packaging supplier throughout Germany")
+    )
 
     audit = out["audit_log"]
     assert len(audit) == 1
@@ -483,10 +578,14 @@ def test_final_iteration_receives_force_finish_instruction():
 
 
 def test_fallback_proceeds_when_trace_recovered_product_and_constraint():
-    """Task 3.4: a max-iterations run whose trace holds a real product label
-    (infer_industry_context action_input) plus a concrete constraint must
-    proceed instead of asking the user again."""
-    registry = _build_registry(geocoder=_FakeGeocoder((50.9, 6.9)))
+    """A recovered product and country pauses for a usable geographic scope."""
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((50.9, 6.9)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"construction","common_certs":[],"typical_units":"units"}',
+            '{"industry":"construction","common_certs":[],"typical_units":"units"}',
+        ]),
+    )
     responses = [
         'Thought: industry.\nAction: infer_industry_context\nAction Input: {"product_description": "stainless steel fasteners"}',
         'Thought: where.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
@@ -499,9 +598,45 @@ def test_fallback_proceeds_when_trace_recovered_product_and_constraint():
     out = parser.execute(_make_state("we need fastener supply for construction in Germany"))
 
     assert out["react_terminated_by"] == "max_iterations"
-    assert out["needs_clarification"] is False
     assert out["parsed_constraints"]["product_type"] == "stainless steel fasteners"
     assert out["parsed_constraints"]["location_country"] == "Germany"
+    assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
+    assert out["clarification_question"] == (
+        "Which city or region should I search near, or should I search all of Germany?"
+    )
+
+
+def test_helles_pilsner_degraded_country_only_query_asks_for_scope():
+    registry = _build_registry(
+        geocoder=_FakeGeocoder((51.1657, 10.4515)),
+        industry_llm=_FakeJSONLLM([
+            '{"industry":"food_beverage","common_certs":[],"typical_units":"bottles"}'
+        ]),
+    )
+    responses = [
+        'Thought: locate.\nAction: geocode_location\nAction Input: {"location_name": "Germany"}',
+        'Thought: quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "1000 bottles"}',
+        'Thought: package size.\nAction: parse_quantity_unit\nAction Input: {"text": "0.5 l bottles"}',
+        'Thought: retry quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "1000 0.5l bottles"}',
+        'Thought: industry.\nAction: infer_industry_context\nAction Input: {"product_description": "Helles and Pilsner beer"}',
+        'Thought: retry quantity.\nAction: parse_quantity_unit\nAction Input: {"text": "1000 bottles of beer"}',
+    ]
+    parser = _make_parser(_FakeLLM(responses), registry)
+
+    out = parser.execute(_make_state(
+        "i want to buy 1000 (.5l) bottles of helles and Pilsner beer in "
+        "Germany for the client who is going to organise the summer party."
+    ))
+
+    assert out["react_terminated_by"] == "max_iterations"
+    assert out["parsed_constraints"]["product_type"] == "Helles and Pilsner beer"
+    assert out["parsed_constraints"]["location_country"] == "Germany"
+    assert out["needs_clarification"] is True
+    assert out["clarification_resumable"] is True
+    assert out["clarification_question"] == (
+        "Which city or region should I search near, or should I search all of Germany?"
+    )
 
 
 def test_fallback_treats_order_quantities_as_products_not_capacity():
@@ -589,8 +724,8 @@ def test_finish_payload_treats_purchase_quantities_as_products_not_capacity():
 
     out = parser.execute(_make_state(
         "I want to buy 1000 wrench, socket wrench, torque tools and many other "
-        "tools, can you find me the good and reliable suppliers for this inside "
-        "Germany."
+        "tools, can you find me the good and reliable suppliers for this anywhere "
+        "in Germany."
     ))
 
     constraints = out["parsed_constraints"]

@@ -9,12 +9,16 @@ same keys, same order, snapshots appended only when provided.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from copy import deepcopy
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.agents.state import AgentState, AuditEntry
 
 
 def append_audit_entry(
-    state: dict[str, Any],
+    state: AgentState,
     *,
     agent_name: str,
     action: str,
@@ -24,7 +28,7 @@ def append_audit_entry(
     reasoning: str | None = None,
     input_snapshot: dict | None = None,
     output_snapshot: dict | None = None,
-) -> dict[str, Any]:
+) -> AuditEntry:
     """Build one audit entry and append it to ``state["audit_log"]``.
 
     The entry's keys and order match what the three former call sites built
@@ -33,19 +37,19 @@ def append_audit_entry(
     matching base.py's richer entries. ``state["audit_log"]`` is initialised to
     an empty list when missing or None. Returns the entry for convenience.
     """
-    entry: dict[str, Any] = {
+    entry: AuditEntry = {
         "agent_name": agent_name,
         "action": action,
         "reasoning": reasoning,
         "input_summary": input_summary,
         "output_summary": output_summary,
         "duration_ms": duration_ms,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     if input_snapshot is not None:
-        entry["input_snapshot"] = input_snapshot
+        entry["input_snapshot"] = deepcopy(input_snapshot)
     if output_snapshot is not None:
-        entry["output_snapshot"] = output_snapshot
+        entry["output_snapshot"] = deepcopy(output_snapshot)
 
     if "audit_log" not in state or state["audit_log"] is None:
         state["audit_log"] = []

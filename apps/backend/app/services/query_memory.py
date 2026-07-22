@@ -1,4 +1,4 @@
-"""Semantic long-term memory for past procurement queries (Task 3.2).
+"""Semantic long-term memory for past procurement queries.
 
 Each successful query (Evaluator verdict == accepted/auto_accept) is embedded
 with Voyage and persisted to a Milvus collection alongside its parsed
@@ -32,7 +32,8 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from app.core.config import settings
 from app.core.embeddings import EMBEDDING_DIM, EmbeddingClient, get_embedding_client
@@ -139,7 +140,7 @@ def ensure_collection_exists(name: str = COLLECTION_NAME):
     ]
     schema = CollectionSchema(
         fields=fields,
-        description="Per-user query memory for semantic recall (Task 3.2)",
+        description="Per-user query memory for semantic recall",
     )
     collection = Collection(name=name, schema=schema)
 
@@ -172,7 +173,7 @@ class QueryMemoryService:
 
     def __init__(
         self,
-        embedding_client: Optional[EmbeddingClient] = None,
+        embedding_client: EmbeddingClient | None = None,
         collection_name: str = COLLECTION_NAME,
     ) -> None:
         self._embeddings = embedding_client or get_embedding_client()
@@ -330,7 +331,7 @@ def _escape_for_expr(value: str) -> str:
 
 # ── Module-level singleton (built lazily on first request) ─────────────
 
-_memory_service_singleton: Optional[QueryMemoryService] = None
+_memory_service_singleton: QueryMemoryService | None = None
 
 
 def get_memory_service() -> QueryMemoryService:

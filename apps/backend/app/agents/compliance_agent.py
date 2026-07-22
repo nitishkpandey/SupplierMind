@@ -24,11 +24,15 @@ import json
 import logging
 import re
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState, ComplianceResult, SupplierComplianceResult
+from app.core.llm import complete_json_dict
+from app.utils.capacity_units import compare_capacity
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
@@ -91,7 +95,7 @@ _CERT_ALIASES: dict[str, str] = {
 }
 
 
-def canonical_cert_key(raw: str) -> Optional[str]:
+def canonical_cert_key(raw: str) -> str | None:
     """Resolve a raw cert string to its canonical taxonomy key, or None.
 
     Exact normalized match first, then explicit aliases, then a length-guarded
@@ -115,7 +119,7 @@ def canonical_cert_key(raw: str) -> Optional[str]:
 
 def taxonomy_cert_verdict(
     required_cert: str, supplier_certs: list[str]
-) -> Optional[dict]:
+) -> dict | None:
     """Decide a required cert against a supplier's certs using the taxonomy only.
 
     Returns a verdict dict {status, reason, matched_via} when the taxonomy is
@@ -244,7 +248,7 @@ def build_evidence_pool(supplier: dict) -> str:
     return "\n".join(parts)
 
 
-def verify_evidence_quote(evidence_quote: Optional[str], evidence_pool: str) -> dict:
+def verify_evidence_quote(evidence_quote: str | None, evidence_pool: str) -> dict:
     """Check an LLM evidence_quote against the supplier's evidence pool.
 
     Returns {"ok": bool, "flag": Optional[str]}. flag is the machine reason when
@@ -265,8 +269,8 @@ def verify_evidence_quote(evidence_quote: Optional[str], evidence_pool: str) -> 
 
 
 def quote_or_fail_verdict(
-    status: str, confidence: float, evidence_quote: Optional[str], evidence_pool: str
-) -> tuple[str, Optional[str]]:
+    status: str, confidence: float, evidence_quote: str | None, evidence_pool: str
+) -> tuple[str, str | None]:
     """Apply the quote-or-fail rule to one LLM verdict.
 
     Returns (new_status, flag). flag is None when the verdict stands as-is, else a
@@ -325,6 +329,11 @@ _PRODUCT_TOKEN_STOPWORDS = {
     "bifma", "with", "without", "and", "or", "for", "the", "a", "an", "in",
     "near", "within", "under", "over", "above", "below", "days", "day", "km",
 }
+_GENERIC_PRODUCT_TOKENS = {
+    "equipment", "solution", "solutions", "system", "systems", "service",
+    "services", "product", "products", "part", "parts", "industrial",
+    "manufacturing", "workspace",
+}
 
 COMPLIANCE_BATCH_SYSTEM_PROMPT = """You are a procurement compliance expert. Return JSON only.
 
@@ -376,7 +385,7 @@ def _product_tokens(values: list[object]) -> set[str]:
     return tokens
 
 
-def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[ComplianceResult]:
+def product_fit_verdict(supplier: dict, constraints: Mapping[str, Any]) -> ComplianceResult | None:
     """Deterministically reject obvious product/category mismatches."""
     req_category = _normalise_category(
         constraints.get("category_hint") or constraints.get("category")
@@ -389,15 +398,32 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
         *(constraints.get("product_keywords") or []),
     ]
     required_tokens = _product_tokens(product_terms)
-    supplier_tokens = _product_tokens([
+    supplier_values = [
         supplier.get("name"),
         supplier.get("description"),
         supplier.get("category"),
         *(supplier.get("primary_products") or []),
-    ])
-    text_overlap = bool(required_tokens & supplier_tokens) if required_tokens else True
+    ]
+    supplier_tokens = _product_tokens(supplier_values)
 
-    if req_category and sup_category and not category_ok and not text_overlap:
+    required_distinctive = required_tokens - _GENERIC_PRODUCT_TOKENS
+    distinctive_overlap = required_distinctive & supplier_tokens
+    supplier_text = " ".join(str(value or "") for value in supplier_values).casefold()
+    supplier_text = " ".join(re.findall(r"[a-z0-9+.-]+", supplier_text))
+    phrase_match = False
+    for term in product_terms:
+        if not isinstance(term, str):
+            continue
+        phrase = " ".join(re.findall(r"[a-z0-9+.-]+", term.casefold()))
+        phrase_tokens = _product_tokens([phrase]) - _GENERIC_PRODUCT_TOKENS
+        if phrase and phrase_tokens and phrase in supplier_text:
+            phrase_match = True
+            break
+    strong_text_match = bool(distinctive_overlap) or phrase_match
+
+    category_exact = bool(req_category and sup_category and req_category == sup_category)
+
+    if req_category and sup_category and not category_ok and not strong_text_match:
         return {
             "constraint_name": "product_fit",
             "status": "FAIL",
@@ -408,7 +434,7 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
-    if req_category and sup_category and category_ok:
+    if category_exact:
         return {
             "constraint_name": "product_fit",
             "status": "PASS",
@@ -416,11 +442,34 @@ def product_fit_verdict(supplier: dict, constraints: dict) -> Optional[Complianc
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
-    if required_tokens and text_overlap:
+    if req_category and sup_category and category_ok and not strong_text_match and required_tokens:
+        return {
+            "constraint_name": "product_fit",
+            "status": "FAIL",
+            "reason": (
+                f"Supplier category '{supplier.get('category')}' is only broadly related "
+                "and the profile does not mention requested product "
+                f"'{constraints.get('product_type')}'"
+            ),
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if required_tokens and strong_text_match:
         return {
             "constraint_name": "product_fit",
             "status": "PASS",
             "reason": "Supplier text overlaps requested product terms",
+            "confidence": PRODUCT_FIT_CONFIDENCE,
+        }
+
+    if required_tokens and supplier_tokens:
+        return {
+            "constraint_name": "product_fit",
+            "status": "FAIL",
+            "reason": (
+                "Supplier profile does not mention the requested product "
+                f"'{constraints.get('product_type')}'"
+            ),
             "confidence": PRODUCT_FIT_CONFIDENCE,
         }
 
@@ -449,6 +498,7 @@ class ComplianceAgent(BaseAgent):
     _short_circuit_count: int = 0
 
     def execute(self, state: AgentState) -> AgentState:
+        self._deadline_state = state
         candidate_ids = state.get("candidate_supplier_ids", [])
         constraints = state.get("parsed_constraints") or {}
 
@@ -530,8 +580,8 @@ class ComplianceAgent(BaseAgent):
     def _check_supplier(
         self,
         supplier: dict,
-        constraints: dict,
-        geo_distance: Optional[float],
+        constraints: Mapping[str, Any],
+        geo_distance: float | None,
     ) -> SupplierComplianceResult:
         """Run all compliance checks for one supplier."""
         results: list[ComplianceResult] = []
@@ -574,8 +624,7 @@ class ComplianceAgent(BaseAgent):
         req_country = (req_country_text or "").casefold()
         sup_country = (sup_country_text or "").casefold()
         if not has_radius_constraint \
-                and req_country and sup_country and req_country != sup_country \
-                and req_country not in sup_country and sup_country not in req_country:
+                and req_country and sup_country and req_country != sup_country:
             results.append({
                 "constraint_name": "country",
                 "status": "FAIL",
@@ -652,7 +701,7 @@ class ComplianceAgent(BaseAgent):
             self._llm_supplier_count += 1
 
         # ── Numeric check: Capacity ───────────────────────────────────
-        if constraints.get("capacity_min") and constraints.get("capacity_unit"):
+        if constraints.get("capacity_min") is not None and constraints.get("capacity_unit"):
             cap_result = self._check_capacity(
                 supplier,
                 constraints["capacity_min"],
@@ -664,9 +713,9 @@ class ComplianceAgent(BaseAgent):
         # Bug 2 (Phase D): a specified lead-time constraint must always produce a
         # verdict. Previously the gate only fired when the supplier reported a
         # lead time, so suppliers with no lead_time_days silently passed. Use
-        # `is not None` so a genuine 0-day (same-day) lead time is not mistaken
-        # for a missing value.
-        if constraints.get("lead_time_max_days"):
+        # `is not None` on both the constraint gate and the supplier value so a
+        # genuine 0-day (same-day) lead time is not mistaken for a missing value.
+        if constraints.get("lead_time_max_days") is not None:
             max_lt = constraints["lead_time_max_days"]
             actual_lt = supplier.get("lead_time_days")
             if actual_lt is None:
@@ -772,14 +821,21 @@ Return JSON object:
 ]}}"""
 
         try:
-            raw = self.llm.complete_json(
+            llm_kwargs: dict = {"temperature": 0.0}
+            deadline_state = getattr(self, "_deadline_state", {})
+            if deadline_state.get("deadline_at") is not None:
+                llm_kwargs["timeout"] = remaining_seconds(
+                    deadline_state,
+                    reserve=2.0,
+                )
+            data = complete_json_dict(
+                self.llm,
                 [
                     {"role": "system", "content": COMPLIANCE_BATCH_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.0,
+                **llm_kwargs,
             )
-            data = json.loads(raw)
             items = data.get("results", [])
             if not isinstance(items, list):
                 raise ValueError("LLM returned non-list results")
@@ -865,42 +921,17 @@ Return JSON object:
     ) -> ComplianceResult:
         """Check if supplier meets minimum capacity requirement."""
         supplier_cap = supplier.get("capacity_value")
-        supplier_unit = supplier.get("capacity_unit", "")
-
-        if supplier_cap is None:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": "Capacity data not available in supplier profile",
-                "confidence": 0.5,
-            }
-
-        if supplier_unit != cap_unit:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": f"Capacity unit mismatch: supplier has {supplier_unit}, required {cap_unit}",
-                "confidence": 0.6,
-            }
-
-        if supplier_cap >= min_cap:
-            return {
-                "constraint_name": "capacity",
-                "status": "PASS",
-                "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} meets minimum {min_cap:,.0f}",
-                "confidence": 1.0,
-            }
-        elif supplier_cap >= min_cap * CAPACITY_PARTIAL_THRESHOLD:
-            return {
-                "constraint_name": "capacity",
-                "status": "PARTIAL",
-                "reason": f"Capacity {supplier_cap:,.0f} is slightly below minimum {min_cap:,.0f} {supplier_unit}",
-                "confidence": 0.9,
-            }
-        else:
-            return {
-                "constraint_name": "capacity",
-                "status": "FAIL",
-                "reason": f"Capacity {supplier_cap:,.0f} {supplier_unit} is below minimum {min_cap:,.0f}",
-                "confidence": 1.0,
-            }
+        supplier_unit = supplier.get("capacity_unit")
+        status, reason = compare_capacity(
+            supplier_cap,
+            supplier_unit,
+            min_cap,
+            cap_unit,
+        )
+        confidence = 0.5 if supplier_cap is None else (0.6 if status == "PARTIAL" else 1.0)
+        return {
+            "constraint_name": "capacity",
+            "status": status,
+            "reason": reason,
+            "confidence": confidence,
+        }

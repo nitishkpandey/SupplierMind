@@ -1,4 +1,4 @@
-"""Paradigm 2 — minimal RAG baseline (Development Plan, Phase 2).
+"""Paradigm 2 — minimal RAG baseline.
 
 Retrieve-then-read, nothing else: Voyage embeddings + Milvus top-k retrieval
 over the existing supplier corpus, one templated prompt to the LLM, top-5
@@ -18,6 +18,7 @@ import json
 import logging
 import sys
 import time
+from collections.abc import Iterable
 from typing import Any
 
 from experiments.paradigm1_singleprompt import ParadigmResult
@@ -50,7 +51,11 @@ def _supplier_doc(s: dict) -> str:
     )
 
 
-async def _fetch_suppliers(ids: list[str]) -> list[dict]:
+async def _fetch_suppliers(
+    ids: list[str],
+    *,
+    allowed_supplier_ids: Iterable[str] | None = None,
+) -> list[dict]:
     """Load supplier rows for the retrieved ids, preserving retrieval order.
 
     Only approved + active suppliers are materialised: pending_review /
@@ -65,14 +70,26 @@ async def _fetch_suppliers(ids: list[str]) -> list[dict]:
 
     if not ids:
         return []
+    allowed_ids_list = (
+        list(dict.fromkeys(str(sid) for sid in allowed_supplier_ids if sid))
+        if allowed_supplier_ids is not None
+        else None
+    )
+    if allowed_supplier_ids is not None:
+        allowed_ids = set(allowed_ids_list or [])
+        ids = [sid for sid in ids if sid in allowed_ids]
+        if not ids:
+            return []
+
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Supplier).where(
-                Supplier.id.in_(ids),
-                Supplier.status == SupplierStatus.approved,
-                Supplier.is_active == True,  # noqa: E712
-            )
-        )
+        filters = [
+            Supplier.id.in_(ids),
+            Supplier.status == SupplierStatus.approved,
+            Supplier.is_active == True,  # noqa: E712
+        ]
+        if allowed_ids_list is not None:
+            filters.append(Supplier.id.in_(allowed_ids_list))
+        result = await db.execute(select(Supplier).where(*filters))
         rows = {str(s.id): s for s in result.scalars().all()}
     out = []
     for sid in ids:
@@ -130,6 +147,7 @@ async def run_paradigm2(
     llm: Any = None,
     vector_store: Any = None,
     fetch_suppliers: Any = None,
+    allowed_supplier_ids: Iterable[str] | None = None,
 ) -> ParadigmResult:
     """Run one query through the RAG baseline.
 
@@ -149,14 +167,33 @@ async def run_paradigm2(
         vector_store = get_vector_store()
     if fetch_suppliers is None:
         fetch_suppliers = _fetch_suppliers
+    allowed_ids_list = (
+        list(dict.fromkeys(str(sid) for sid in allowed_supplier_ids if sid))
+        if allowed_supplier_ids is not None
+        else None
+    )
 
     start = time.time()
     # Over-fetch, then filter to approved+active and truncate to top_k, so a
     # pending/discovered/quarantined vector can never occupy a top_k candidate
     # slot. Use a 3x buffer; raise if the index ever holds >2/3 non-approved.
-    hits = vector_store.search(query, top_k=top_k * 3)
+    search_kwargs = {}
+    if allowed_ids_list is not None:
+        search_kwargs["allowed_supplier_ids"] = allowed_ids_list
+    hits = vector_store.search(query, top_k=top_k * 3, **search_kwargs)
     retrieved_ids = [h.supplier_id for h in hits]
-    suppliers = (await fetch_suppliers(retrieved_ids))[:top_k]
+    if allowed_ids_list is not None:
+        allowed_ids = set(allowed_ids_list)
+        retrieved_ids = [sid for sid in retrieved_ids if sid in allowed_ids]
+    if fetch_suppliers is _fetch_suppliers:
+        suppliers = (
+            await fetch_suppliers(
+                retrieved_ids,
+                allowed_supplier_ids=allowed_ids_list,
+            )
+        )[:top_k]
+    else:
+        suppliers = (await fetch_suppliers(retrieved_ids))[:top_k]
     ids = [s["id"] for s in suppliers]
 
     if not suppliers:

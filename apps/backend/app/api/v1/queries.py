@@ -7,10 +7,12 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import Query as QueryParam  # DB model already owns the name `Query`
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,9 +38,73 @@ from app.schemas.query import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory store for SSE progress updates {query_id: list of events}
-# In production this would be Redis pub/sub
+# Process-local SSE event buffer {query_id: list of events}. A multi-instance
+# deployment should replace this with Redis pub/sub or a worker/event bus.
 _sse_events: dict[str, list[dict]] = {}
+
+
+def _hard_constraint_labels(constraints: dict | None) -> list[str]:
+    constraints = constraints or {}
+    labels: list[str] = []
+    labels.extend(str(cert) for cert in constraints.get("certifications") or [])
+    if constraints.get("location_radius_km") is not None:
+        centre = constraints.get("location_city") or constraints.get("location_name") or "centre"
+        labels.append(f"within {constraints['location_radius_km']} km of {centre}")
+    elif constraints.get("location_region"):
+        labels.append(str(constraints["location_region"]))
+    elif constraints.get("location_city"):
+        labels.append(str(constraints["location_city"]))
+    elif constraints.get("location_country"):
+        labels.append(str(constraints["location_country"]))
+    if constraints.get("lead_time_max_days") is not None:
+        labels.append(f"delivery within {constraints['lead_time_max_days']} days")
+    if constraints.get("capacity_min") is not None:
+        capacity = f"capacity >= {constraints['capacity_min']}"
+        if constraints.get("capacity_unit"):
+            capacity += f" {constraints['capacity_unit']}"
+        labels.append(capacity)
+    return labels
+
+
+def _build_query_diagnostics(query: Query) -> dict:
+    """Derive a stable, credential-free explanation for the result state."""
+    constraints = getattr(query, "parsed_constraints", None) or {}
+    results = list(getattr(query, "results", None) or [])
+    error = str(getattr(query, "error_message", None) or "")
+    audit_logs = list(getattr(query, "audit_logs", None) or [])
+    external_ran = any(
+        getattr(log, "agent_name", None) == "external_discovery"
+        and not str(getattr(log, "action", "")).startswith("skipped")
+        for log in audit_logs
+    )
+
+    code = None
+    message = None
+    partial = False
+    if not results:
+        lower_error = error.casefold()
+        if "deadline" in lower_error or "timeout" in lower_error:
+            code = "deadline_exceeded"
+            message = "The search reached its execution deadline; completed checks were preserved."
+            partial = True
+        elif constraints.get("location_region") and not constraints.get("location_bounds"):
+            code = "region_bounds_unverified"
+            message = "The requested region could not be verified with geographic bounds."
+        elif any(token in lower_error for token in ("unavailable", "connection", "infrastructure")):
+            code = "infrastructure_failure"
+            message = "A required search dependency was unavailable during this run."
+            partial = True
+        else:
+            code = "strict_constraints_no_match"
+            message = "No verified suppliers satisfied all hard constraints."
+
+    return {
+        "hard_constraints": _hard_constraint_labels(constraints),
+        "external_discovery_ran": external_ran,
+        "partial": partial,
+        "code": code,
+        "message": message,
+    }
 
 
 @router.post(
@@ -71,17 +137,19 @@ async def submit_query(
             detail=f"Query too long. Maximum {settings.QUERY_MAX_LENGTH} characters.",
         )
 
-    # Check for prompt injection
+    # Check for prompt injection.
+    # ponytail: heuristic tripwire only — substring matching is trivially
+    # bypassed; the real defense is the downstream prompt/tool design.
+    # Broad single-word patterns ("act as", "disregard") were dropped:
+    # they flagged legitimate procurement queries without stopping anyone.
     injection_patterns = [
         "ignore previous instructions",
         "ignore all instructions",
         "you are now",
-        "act as",
-        "disregard",
         "new persona",
     ]
-    query_lower = body.raw_query.lower()
-    if any(p in query_lower for p in injection_patterns):
+    normalized_query = " ".join(body.raw_query.casefold().split())
+    if any(p in normalized_query for p in injection_patterns):
         logger.warning(
             "Prompt injection detected from user=%s: %r",
             current_user.id,
@@ -157,13 +225,13 @@ async def stream_query_progress(
         from app.core.security import decode_access_token
         payload = decode_access_token(token)
         user_id = uuid.UUID(payload["sub"])
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token") from e
 
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     query_repo = QueryRepository(db)
     query = await query_repo.get_by_id(qid)
@@ -231,9 +299,9 @@ async def stream_query_progress(
     summary="Get query history for current user",
 )
 async def list_queries(
-    offset: int = 0,
-    limit: int = 20,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
+    current_user: Annotated[User, Depends(get_current_user)],
+    offset: int = QueryParam(0, ge=0),
+    limit: int = QueryParam(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get paginated query history for the authenticated user."""
@@ -243,6 +311,14 @@ async def list_queries(
 
     query_repo = QueryRepository(db)
     queries = await query_repo.get_user_queries(current_user.id, offset=offset, limit=limit)
+    open_clarification_ids = (
+        await query_repo.get_open_clarification_query_ids(
+            current_user.id,
+            [q.id for q in queries],
+        )
+        if queries
+        else set()
+    )
 
     # Count total
     result = await db.execute(
@@ -255,7 +331,11 @@ async def list_queries(
             {
                 "id": str(q.id),
                 "raw_query": q.raw_query,
-                "status": q.status.value,
+                "status": (
+                    "needs_clarification"
+                    if q.status == QueryStatus.pending and q.id in open_clarification_ids
+                    else q.status.value
+                ),
                 "execution_time_ms": q.execution_time_ms,
                 "created_at": q.created_at.isoformat(),
                 "results": [{"rank": r.rank} for r in (q.results or [])],
@@ -307,8 +387,8 @@ async def get_query(
     """Get the current status and results of a query."""
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     query_repo = QueryRepository(db)
     query = await query_repo.get_with_results(qid)
@@ -392,6 +472,10 @@ async def get_query(
         "status": query.status.value,
         "detected_language": query.detected_language,
         "parsed_constraints": query.parsed_constraints,
+        "search_scope": getattr(query, "search_scope", "approved_only"),
+        "evaluator_retries": getattr(query, "evaluator_retries", 0),
+        "evaluator_verdict": getattr(query, "evaluator_verdict", None),
+        "diagnostics": _build_query_diagnostics(query),
         "execution_time_ms": query.execution_time_ms,
         "error_message": query.error_message,
         "created_at": query.created_at.isoformat(),
@@ -412,8 +496,8 @@ async def get_audit_trail(
     """Returns the complete agent decision log for transparency."""
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID") from e
 
     from sqlalchemy import case, select
     query_repo = QueryRepository(db)
@@ -484,8 +568,8 @@ async def get_pending_clarification(
     """
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     repo = ClarificationRepository(db)
     pc = await repo.get_open_for_query(qid)
@@ -531,8 +615,8 @@ async def submit_clarification_answer(
     """
     try:
         qid = uuid.UUID(query_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid query ID format")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid query ID format") from e
 
     repo = ClarificationRepository(db)
     pc = await repo.get_open_for_query(qid)
@@ -607,7 +691,7 @@ async def _resume_pipeline_background(
                 .values(
                     status=QueryStatus.failed,
                     error_message="Max clarification turns reached.",
-                    completed_at=datetime.now(timezone.utc),
+                    completed_at=datetime.now(UTC),
                 )
             )
             await db.commit()
@@ -618,7 +702,9 @@ async def _resume_pipeline_background(
         return
     except Exception as e:  # noqa: BLE001
         logger.exception("[resume] pipeline failed for query=%s", query_id)
-        _push("error", {"message": f"Resume error: {str(e)[:200]}"})
+        message = f"Resume error: {str(e)[:200]}"
+        _push("error", {"message": message})
+        await _mark_query_failed(query_id, message)
         return
 
     execution_time_ms = int((time.time() - start_time) * 1000)
@@ -666,7 +752,7 @@ async def _resume_pipeline_background(
                 detected_language=final_state.get("detected_language", "en"),
                 parsed_constraints=final_state.get("parsed_constraints"),
                 execution_time_ms=execution_time_ms,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
                 error_message=final_state.get("error"),
             )
         )
@@ -727,6 +813,9 @@ async def _run_pipeline_background(
     from app.db.session import AsyncSessionLocal
 
     start_time = time.time()
+    # Remember which buffer this run owns so the finally-cleanup can't pop
+    # a fresh buffer that a clarification resume re-mounted meanwhile.
+    owned_buffer = _sse_events.get(query_id)
 
     def _push(event_type: str, data: dict) -> None:
         if query_id in _sse_events:
@@ -841,7 +930,7 @@ async def _run_pipeline_background(
                     evaluator_retries=final_state.get("evaluator_retries", 0),
                     evaluator_verdict=final_state.get("evaluator_verdict"),
                     execution_time_ms=execution_time_ms,
-                    completed_at=datetime.now(timezone.utc),
+                    completed_at=datetime.now(UTC),
                     error_message=final_state.get("error"),
                 )
             )
@@ -896,21 +985,30 @@ async def _run_pipeline_background(
 
     except Exception as e:
         logger.exception("[background] Pipeline failed for query_id=%s", query_id)
-        _push("error", {"message": f"Pipeline error: {str(e)[:200]}"})
-
-        async with AsyncSessionLocal() as db:
-            from sqlalchemy import update
-            await db.execute(
-                update(Query)
-                .where(Query.id == uuid.UUID(query_id))
-                .values(
-                    status=QueryStatus.failed,
-                    error_message=str(e)[:500],
-                    completed_at=datetime.now(timezone.utc),
-                )
-            )
-            await db.commit()
+        message = f"Pipeline error: {str(e)[:200]}"
+        _push("error", {"message": message})
+        await _mark_query_failed(query_id, message)
 
     finally:
         await asyncio.sleep(settings.SSE_CLEANUP_DELAY_SECONDS)
-        _sse_events.pop(query_id, None)
+        if _sse_events.get(query_id) is owned_buffer:
+            _sse_events.pop(query_id, None)
+
+
+async def _mark_query_failed(query_id: str, message: str) -> None:
+    """Move a query to a terminal failed state from any background path."""
+    from sqlalchemy import update
+
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(Query)
+            .where(Query.id == uuid.UUID(query_id))
+            .values(
+                status=QueryStatus.failed,
+                error_message=message[:500],
+                completed_at=datetime.now(UTC),
+            )
+        )
+        await db.commit()

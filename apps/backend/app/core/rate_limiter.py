@@ -18,6 +18,8 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from typing import Any
 
+from app.agents.deadline import QueryDeadlineExceeded
+
 logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 60.0
@@ -90,15 +92,24 @@ class ModelRateLimiter:
         while tlog and tlog[0][0] <= cutoff:
             tlog.popleft()
 
-    def acquire(self, model: str, estimated_tokens: int = 0) -> float:
+    def acquire(
+        self,
+        model: str,
+        estimated_tokens: int = 0,
+        max_wait_seconds: float | None = None,
+    ) -> float:
         """
         Block until issuing one request of `estimated_tokens` stays within the
         paced limits. Returns the request timestamp (pass it to
         update_actual_tokens once the real usage is known).
         """
         rpm_cap, tpm_cap = self._caps(model)
-        with self._lock:
-            while True:
+        # ponytail: one global lock, but held only for window bookkeeping — the
+        # pacing sleep and the audit DB write happen with the lock released so
+        # one paced model never stalls the others. Per-model locks if the
+        # bookkeeping itself ever shows contention.
+        while True:
+            with self._lock:
                 now = self._monotonic()
                 self._prune(model, now)
                 rlog = self._request_log[model]
@@ -108,48 +119,54 @@ class ModelRateLimiter:
                 token_sum = sum(entry[1] for entry in tlog)
                 tok_blocked = token_sum + estimated_tokens > tpm_cap
 
-                if not req_blocked and not tok_blocked:
-                    break
-
                 waits: list[float] = []
                 if req_blocked and rlog:
                     waits.append(rlog[0] + WINDOW_SECONDS - now)
                 if tok_blocked and tlog:
                     waits.append(tlog[0][0] + WINDOW_SECONDS - now)
-                if not waits:
-                    # Nothing to age out (e.g. a single request larger than the
-                    # whole token budget). Let it through; the retry backstop
-                    # handles the rare 429.
-                    break
+
+                if (not req_blocked and not tok_blocked) or not waits:
+                    # Under budget, or nothing to age out (e.g. a single request
+                    # larger than the whole token budget — let it through; the
+                    # retry backstop handles the rare 429).
+                    now = self._monotonic()
+                    self._request_log[model].append(now)
+                    self._token_log[model].append([now, estimated_tokens])
+                    return now
 
                 wait = max(0.0, min(waits))
-                wait_ms = int(wait * 1000)
-                logger.info(
-                    "[ratelimit] Pacing call: sleeping %dms for model %s "
-                    "(current: %d rpm, %d tpm)",
-                    wait_ms, model, len(rlog), token_sum,
-                )
-                self._sleep(wait)
-                if self._audit_writer is not None:
-                    try:
-                        self._audit_writer(
-                            {
-                                "model": model,
-                                "wait_ms": wait_ms,
-                                "rpm": len(rlog),
-                                "tpm": token_sum,
-                            }
-                        )
-                    except Exception:
-                        logger.warning(
-                            "[ratelimit] audit_writer failed; pacing event not persisted",
-                            exc_info=True,
-                        )
+                rpm_now = len(rlog)
 
-            now = self._monotonic()
-            self._request_log[model].append(now)
-            self._token_log[model].append([now, estimated_tokens])
-            return now
+            # Lock released: sleep and persist without blocking other models.
+            # The loop re-checks the window after waking, so concurrent
+            # acquisitions during the pause are accounted for.
+            if max_wait_seconds is not None and wait > max(0.0, max_wait_seconds):
+                raise QueryDeadlineExceeded(
+                    f"Rate-limit wait {wait:.3f}s exceeds remaining budget "
+                    f"{max_wait_seconds:.3f}s"
+                )
+            wait_ms = int(wait * 1000)
+            logger.info(
+                "[ratelimit] Pacing call: sleeping %dms for model %s "
+                "(current: %d rpm, %d tpm)",
+                wait_ms, model, rpm_now, token_sum,
+            )
+            self._sleep(wait)
+            if self._audit_writer is not None:
+                try:
+                    self._audit_writer(
+                        {
+                            "model": model,
+                            "wait_ms": wait_ms,
+                            "rpm": rpm_now,
+                            "tpm": token_sum,
+                        }
+                    )
+                except Exception:
+                    logger.warning(
+                        "[ratelimit] audit_writer failed; pacing event not persisted",
+                        exc_info=True,
+                    )
 
     def update_actual_tokens(self, model: str, timestamp: float, actual_tokens: int) -> None:
         """Replace the pre-call estimate with the real usage from the response."""
@@ -163,10 +180,10 @@ class ModelRateLimiter:
 def _default_audit_writer(event: dict[str, Any]) -> None:
     """
     Persist one pacing event to audit_logs so the admin metrics page can
-    surface throttle activity. Runs in the same thread as the limiter (we
-    are already sleeping when this fires, so the DB write is hidden inside
-    the pause). Swallows DB failures — observability must never break the
-    pipeline.
+    surface throttle activity. Runs in the same thread as the limiter, after
+    the pacing sleep and with the limiter lock released, so the DB write never
+    blocks other models. Swallows DB failures — observability must never break
+    the pipeline.
     """
     # Late imports avoid a circular import: rate_limiter is pulled in by
     # llm.py very early in startup, before the DB layer is fully resolved.

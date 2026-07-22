@@ -8,6 +8,6 @@
     "dev:frontend": "cd apps/frontend && npm run dev"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.4"
   }
 }

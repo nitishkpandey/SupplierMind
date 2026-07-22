@@ -10,20 +10,27 @@ OAUTH2 FLOW (Google example):
   6. Backend: exchanges code for user profile
   7. Backend: creates/updates User in database
   8. Backend: issues JWT access token + refresh token
-  9. Backend: redirects to frontend with tokens in URL params
+  9. Backend: redirects to frontend with tokens in the URL fragment
   10. Frontend: stores JWT in memory (Zustand store), starts using API
 
 WHY REDIRECT AT THE END (step 9)?
 OAuth happens in the browser. The callback URL is hit by the browser.
 We can't return JSON to a browser redirect — we send a redirect to
-the frontend with tokens as URL params, and the frontend extracts them.
+the frontend with tokens in the URL fragment (#...), which the browser
+keeps client-side (never sent in requests, Referer, or server logs),
+and the frontend extracts them.
+
+CSRF: the authorize step generates a random `state`, stores it in a
+short-lived HttpOnly cookie, and the callback verifies the provider
+echoed the same value before issuing tokens.
 """
 
 import logging
+import secrets
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,27 +44,53 @@ from app.core.security import (
 from app.db.models import User, UserRole
 from app.db.repositories.user_repo import UserRepository
 from app.db.session import get_db
-from app.schemas.auth import RefreshRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    DevLoginRequest,
+    DevLoginResponse,
+    RefreshRequest,
+    TokenResponse,
+    UserResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+_STATE_COOKIE = "oauth_state"
+
+
+def _set_state_cookie(response: RedirectResponse, state: str) -> None:
+    """Store the OAuth CSRF state in a short-lived HttpOnly cookie."""
+    response.set_cookie(
+        _STATE_COOKIE,
+        state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        secure=not settings.is_development,
+    )
+
+
+def _state_matches(state: str, cookie_state: str | None) -> bool:
+    """Verify the provider echoed the state we set at the authorize step."""
+    return cookie_state is not None and secrets.compare_digest(state, cookie_state)
+
 
 # ── Dev Login (development only) ───────────────────────────────────────
-@router.get("/dev-login", summary="Dev-only login bypass")
+@router.post(
+    "/dev-login",
+    response_model=DevLoginResponse,
+    summary="Dev-only login bypass",
+)
 async def dev_login(
-    email: str = Query(default="dev@suppliermind.local"),
-    role: str = Query(
-        default="procurement_manager",
-        description="Role to assign in dev. Allowed: procurement_manager (default), admin. Dev-only.",
-    ),
+    body: DevLoginRequest,
     db: AsyncSession = Depends(get_db),
-) -> RedirectResponse:
+) -> DevLoginResponse:
     """
     Available in development environment only. Returns 404 elsewhere.
 
     Issues a JWT without OAuth. Only works when APP_ENV=development.
-    Redirects to /auth/callback like OAuth, so AuthCallbackPage handles it.
+    Returns tokens and user identity as JSON; it never redirects or puts
+    credentials in a URL.
 
     The `role` query parameter lets local testing exercise the admin-only
     flows (e.g. supplier approve/reject) without a manual DB role bump.
@@ -69,19 +102,19 @@ async def dev_login(
             detail="Endpoint not available in this environment",
         )
 
-    if role not in ("procurement_manager", "admin"):
+    if body.role not in ("procurement_manager", "admin"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid role. Allowed: procurement_manager, admin.",
         )
-    target_role = UserRole.admin if role == "admin" else UserRole.procurement_manager
+    target_role = UserRole.admin if body.role == "admin" else UserRole.procurement_manager
 
     user = await _get_or_create_user(
         db,
-        email=email,
-        name=email.split("@")[0].replace(".", " ").title(),
+        email=body.email,
+        name=body.email.split("@")[0].replace(".", " ").title(),
         provider="dev",
-        oauth_id=f"dev-{email}",
+        oauth_id=f"dev-{body.email}",
     )
 
     # Apply requested dev role (idempotent if already matching).
@@ -102,13 +135,14 @@ async def dev_login(
     )
     refresh = create_refresh_token(subject=str(user.id))
 
-    return RedirectResponse(
-        url=(
-            f"{settings.FRONTEND_URL}/auth/callback"
-            f"?access_token={jwt_token}"
-            f"&refresh_token={refresh}"
-            f"&role={user.role.value}"
-        )
+    return DevLoginResponse(
+        access_token=jwt_token,
+        refresh_token=refresh,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role.value,
     )
 
 
@@ -127,27 +161,37 @@ async def google_authorize() -> RedirectResponse:
 
     backend_base = settings.BACKEND_URL.rstrip("/")
     redirect_uri = f"{backend_base}/api/v1/auth/google/callback"
+    state = secrets.token_urlsafe(32)
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
+        "state": state,
     }
     query_string = "&".join(f"{k}={v}" for k, v in params.items())
     google_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
-    return RedirectResponse(url=google_url)
+    response = RedirectResponse(url=google_url)
+    _set_state_cookie(response, state)
+    return response
 
 
 @router.get("/google/callback", summary="Handle Google OAuth callback")
 async def google_callback(
     code: str = Query(..., description="Authorization code from Google"),
+    state: str = Query(..., description="CSRF state echoed back by Google"),
+    oauth_state: str | None = Cookie(None, alias=_STATE_COOKIE),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """
     Step 2: Exchange authorization code for user profile and issue JWT.
     Google redirects here after the user approves access.
     """
+    if not _state_matches(state, oauth_state):
+        logger.warning("Google OAuth callback with invalid state")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=invalid_state")
+
     backend_base = settings.BACKEND_URL.rstrip("/")
     redirect_uri = f"{backend_base}/api/v1/auth/google/callback"
 
@@ -198,14 +242,16 @@ async def google_callback(
     )
     refresh = create_refresh_token(subject=str(user.id))
 
-    # Redirect to frontend with tokens
+    # Redirect to frontend with tokens in the fragment (never sent to servers)
     frontend_callback = (
         f"{settings.FRONTEND_URL}/auth/callback"
-        f"?access_token={jwt_token}"
+        f"#access_token={jwt_token}"
         f"&refresh_token={refresh}"
         f"&role={user.role.value}"
     )
-    return RedirectResponse(url=frontend_callback)
+    response = RedirectResponse(url=frontend_callback)
+    response.delete_cookie(_STATE_COOKIE)
+    return response
 
 
 # ── GitHub OAuth ───────────────────────────────────────────────────────
@@ -220,21 +266,31 @@ async def github_authorize() -> RedirectResponse:
 
     backend_base = settings.BACKEND_URL.rstrip("/")
     redirect_uri = f"{backend_base}/api/v1/auth/github/callback"
+    state = secrets.token_urlsafe(32)
     github_url = (
         f"https://github.com/login/oauth/authorize"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
         f"&redirect_uri={redirect_uri}"
         f"&scope=user:email"
+        f"&state={state}"
     )
-    return RedirectResponse(url=github_url)
+    response = RedirectResponse(url=github_url)
+    _set_state_cookie(response, state)
+    return response
 
 
 @router.get("/github/callback", summary="Handle GitHub OAuth callback")
 async def github_callback(
     code: str = Query(..., description="Authorization code from GitHub"),
+    state: str = Query(..., description="CSRF state echoed back by GitHub"),
+    oauth_state: str | None = Cookie(None, alias=_STATE_COOKIE),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Exchange GitHub code for user profile and issue JWT."""
+    if not _state_matches(state, oauth_state):
+        logger.warning("GitHub OAuth callback with invalid state")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=invalid_state")
+
     backend_base = settings.BACKEND_URL.rstrip("/")
     redirect_uri = f"{backend_base}/api/v1/auth/github/callback"
     async with httpx.AsyncClient() as client:
@@ -291,11 +347,13 @@ async def github_callback(
 
     frontend_callback = (
         f"{settings.FRONTEND_URL}/auth/callback"
-        f"?access_token={jwt_token}"
+        f"#access_token={jwt_token}"
         f"&refresh_token={refresh}"
         f"&role={user.role.value}"
     )
-    return RedirectResponse(url=frontend_callback)
+    response = RedirectResponse(url=frontend_callback)
+    response.delete_cookie(_STATE_COOKIE)
+    return response
 
 
 # ── Refresh + Me ───────────────────────────────────────────────────────
@@ -305,16 +363,17 @@ async def refresh_access_token(
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Exchange a refresh token for a new access token."""
-    from jose import JWTError
     import uuid
+
+    from jose import JWTError
 
     try:
         payload = decode_refresh_token(body.refresh_token)
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token.",
-        )
+        ) from e
 
     user_id = uuid.UUID(payload["sub"])
     user_repo = UserRepository(db)
@@ -329,8 +388,6 @@ async def refresh_access_token(
     new_token = create_access_token(
         subject=str(user.id), role=user.role.value, email=user.email
     )
-    new_refresh = create_refresh_token(subject=str(user.id))
-
     return TokenResponse(
         access_token=new_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,

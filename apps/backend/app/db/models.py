@@ -14,14 +14,12 @@ Better than creating a separate certifications table for this use case.
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SAEnum,
     Float,
     ForeignKey,
     Index,
@@ -29,9 +27,13 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy import (
+    Enum as SAEnum,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.sql import func, text as sa_text
+from sqlalchemy.sql import func
+from sqlalchemy.sql import text as sa_text
 
 
 class Base(DeclarativeBase):
@@ -94,25 +96,25 @@ class Supplier(Base):
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    category: Mapped[Optional[str]] = mapped_column(String(100))
-    country: Mapped[Optional[str]] = mapped_column(String(100))
-    city: Mapped[Optional[str]] = mapped_column(String(100))
-    address: Mapped[Optional[str]] = mapped_column(Text)
-    latitude: Mapped[Optional[float]] = mapped_column(Float)
-    longitude: Mapped[Optional[float]] = mapped_column(Float)
-    certifications: Mapped[Optional[list]] = mapped_column(JSON, default=list)
-    certification_details: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
-    capacity_value: Mapped[Optional[float]] = mapped_column(Float)
-    capacity_unit: Mapped[Optional[str]] = mapped_column(String(50))
-    lead_time_days: Mapped[Optional[int]] = mapped_column(Integer)
-    website: Mapped[Optional[str]] = mapped_column(String(500))
-    contact_email: Mapped[Optional[str]] = mapped_column(String(255))
-    embedding_id: Mapped[Optional[str]] = mapped_column(String(255))
-    source: Mapped[Optional[str]] = mapped_column(String(50), default="manual")
-    # source values: "manual" | "web_discovery" | "imported"
+    description: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+    city: Mapped[str | None] = mapped_column(String(100))
+    address: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    certifications: Mapped[list | None] = mapped_column(JSON, default=list)
+    certification_details: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    capacity_value: Mapped[float | None] = mapped_column(Float)
+    capacity_unit: Mapped[str | None] = mapped_column(String(50))
+    lead_time_days: Mapped[int | None] = mapped_column(Integer)
+    website: Mapped[str | None] = mapped_column(String(500))
+    contact_email: Mapped[str | None] = mapped_column(String(255))
+    embedding_id: Mapped[str | None] = mapped_column(String(255))
+    source: Mapped[str | None] = mapped_column(String(50), default="manual")
+    # Typical provenance values: manual, web_discovery, imported, synthetic_10k.
 
-    # ── Production v2: tier classification ─────────────────────────
+    # ── Supplier governance status ─────────────────────────────────
     status: Mapped[SupplierStatus] = mapped_column(
         SAEnum(SupplierStatus, name="supplierstatus"),
         default=SupplierStatus.approved,
@@ -121,26 +123,26 @@ class Supplier(Base):
     )
 
     # Provenance URL (where on the web did we find this?)
-    source_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Citation tracking: per-field source URLs for verifiability
     # Example: {"certifications": {"url": "...", "source_phrase": "..."}, ...}
-    source_citations: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    source_citations: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
     # Approval workflow (who promoted this supplier to Tier 1?)
-    approved_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    approved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
-    approved_at: Mapped[Optional[datetime]] = mapped_column(
+    approved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
-    # HITL approval rationale (Task 2.4). Captured every time an admin
+    # HITL approval rationale. Captured every time an admin
     # promotes (approves) or removes (rejects) a supplier — the *why*
     # behind the human decision, persisted next to who+when.
-    approval_justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    approval_action: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    approval_decided_at: Mapped[Optional[datetime]] = mapped_column(
+    approval_justification: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approval_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    approval_decided_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -188,7 +190,7 @@ class UserSupplierSave(Base):
     supplier_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("suppliers.id"), nullable=False
     )
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     saved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -216,14 +218,14 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="userrole"), default=UserRole.analyst, nullable=False
     )
-    oauth_provider: Mapped[Optional[str]] = mapped_column(String(50))
-    oauth_id: Mapped[Optional[str]] = mapped_column(String(255))
-    hashed_password: Mapped[Optional[str]] = mapped_column(String(255))
+    oauth_provider: Mapped[str | None] = mapped_column(String(50))
+    oauth_id: Mapped[str | None] = mapped_column(String(255))
+    hashed_password: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     queries: Mapped[list["Query"]] = relationship(back_populates="user", lazy="select")
 
@@ -259,8 +261,8 @@ class Query(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     raw_query: Mapped[str] = mapped_column(Text, nullable=False)
-    detected_language: Mapped[Optional[str]] = mapped_column(String(10))
-    parsed_constraints: Mapped[Optional[dict]] = mapped_column(JSON)
+    detected_language: Mapped[str | None] = mapped_column(String(10))
+    parsed_constraints: Mapped[dict | None] = mapped_column(JSON)
     status: Mapped[QueryStatus] = mapped_column(
         SAEnum(QueryStatus, name="querystatus"),
         default=QueryStatus.pending,
@@ -272,14 +274,14 @@ class Query(Base):
         String(20), default="approved_only", nullable=False
     )
     evaluator_retries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    evaluator_verdict: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    evaluator_verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    execution_time_ms: Mapped[Optional[int]] = mapped_column(Integer)
-    error_message: Mapped[Optional[str]] = mapped_column(Text)
+    execution_time_ms: Mapped[int | None] = mapped_column(Integer)
+    error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User"] = relationship(back_populates="queries")
     results: Mapped[list["QueryResult"]] = relationship(
@@ -325,11 +327,11 @@ class QueryResult(Base):
     total_score: Mapped[float] = mapped_column(Float, nullable=False)
     constraint_score: Mapped[float] = mapped_column(Float, default=0.0)
     semantic_score: Mapped[float] = mapped_column(Float, default=0.0)
-    proximity_score: Mapped[Optional[float]] = mapped_column(Float)
+    proximity_score: Mapped[float | None] = mapped_column(Float)
     completeness_score: Mapped[float] = mapped_column(Float, default=0.0)
-    compliance_matrix: Mapped[Optional[dict]] = mapped_column(JSON)
-    explanation: Mapped[Optional[str]] = mapped_column(Text)
-    distance_km: Mapped[Optional[float]] = mapped_column(Float)
+    compliance_matrix: Mapped[dict | None] = mapped_column(JSON)
+    explanation: Mapped[str | None] = mapped_column(Text)
+    distance_km: Mapped[float | None] = mapped_column(Float)
 
     query: Mapped["Query"] = relationship(back_populates="results")
     supplier: Mapped["Supplier"] = relationship(back_populates="query_results")
@@ -352,17 +354,17 @@ class AuditLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    # Nullable because human-admin entries (Task 2.4) are not query-scoped.
+    # Nullable because human-admin entries are not query-scoped.
     # Agent rows still set query_id; human_admin rows leave it NULL.
-    query_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    query_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=True
     )
     agent_name: Mapped[str] = mapped_column(String(50), nullable=False)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
-    input_snapshot: Mapped[Optional[dict]] = mapped_column(JSON)
-    output_snapshot: Mapped[Optional[dict]] = mapped_column(JSON)
-    reasoning: Mapped[Optional[str]] = mapped_column(Text)
-    duration_ms: Mapped[Optional[int]] = mapped_column(Integer)
+    input_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    output_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    reasoning: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -378,7 +380,7 @@ class AuditLog(Base):
 # ── PendingClarification ──────────────────────────────────────────────
 class PendingClarification(Base):
     """
-    Task 3.3 — Pause-and-resume state for multi-turn clarification dialogues.
+    Pause-and-resume state for multi-turn clarification dialogues.
 
     One row per open clarification (resolved_at IS NULL). When the Parser
     decides a query is too ambiguous to proceed, the orchestrator persists
@@ -410,10 +412,10 @@ class PendingClarification(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+    resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint("turn_number <= 3", name="max_turns"),
@@ -423,28 +425,4 @@ class PendingClarification(Base):
             "user_id",
             postgresql_where=sa_text("resolved_at IS NULL"),
         ),
-    )
-
-
-# ── GeocodeCache ──────────────────────────────────────────────────────
-class GeocodeCache(Base):
-    """
-    Caches geocoding results so we don't hit Nominatim repeatedly.
-    "Bremen" → (53.0793, 8.8017) stored here after first lookup.
-    Nominatim rate limit is 1 req/sec — caching prevents hitting it.
-    """
-    __tablename__ = "geocode_cache"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    query_string: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
-    latitude: Mapped[float] = mapped_column(Float, nullable=False)
-    longitude: Mapped[float] = mapped_column(Float, nullable=False)
-    cached_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    __table_args__ = (
-        Index("ix_geocode_cache_query_string", "query_string", unique=True),
     )

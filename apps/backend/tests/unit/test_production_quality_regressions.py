@@ -7,10 +7,15 @@ fixes to the benchmark query numbers.
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
-from app.agents.compliance_agent import ComplianceAgent, canonical_cert_key
+from app.agents.compliance_agent import (
+    ComplianceAgent,
+    canonical_cert_key,
+    product_fit_verdict,
+)
 from app.agents.evaluator_agent import EvaluatorAgent
 from app.agents.external_discovery_agent import (
     ExternalDiscoveryAgent,
@@ -22,6 +27,156 @@ from app.core.config import settings
 from app.services import supplier_extraction
 from app.services.supplier_extraction import SupplierExtractionService
 from app.services.web_search import WebSearchService
+
+
+def test_parser_preserves_certification_explicitly_named_in_query_when_finish_loses_it():
+    raw_query = (
+        "Find ISO 9001 certified office furniture manufacturers in Germany "
+        "that can deliver within 30 days"
+    )
+    llm_payload = {
+        "product_type": "office furniture",
+        "product_keywords": ["office furniture"],
+        "category_hint": "office_supplies",
+        "location_country": "Germany",
+        "certifications": [],
+        "lead_time_max_days": 30,
+    }
+    trace = [
+        {
+            "action": "canonicalize_certification",
+            "observation": {
+                "resolved": True,
+                "input": "ISO 9001",
+                "canonical": "ISO 9001",
+            },
+        }
+    ]
+
+    constraints = ParserAgent.__new__(ParserAgent)._normalise_constraints(
+        llm_payload,
+        trace=trace,
+        raw_query=raw_query,
+    )
+
+    assert constraints["certifications"] == ["ISO 9001"]
+
+
+def test_evaluator_never_drops_explicit_hard_constraints_on_retry():
+    class FakeLLM:
+        def complete_json(self, messages, **kwargs):
+            return json.dumps(
+                {
+                    "verdict": "retry",
+                    "reasoning": "No exact result yet.",
+                    "retry_strategy": "relax_constraints",
+                }
+            )
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = FakeLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": (
+            "Find ISO 9001 certified office furniture manufacturers in Germany "
+            "that can deliver within 30 days"
+        ),
+        "parsed_constraints": {
+            "product_type": "office furniture",
+            "location_country": "Germany",
+            "certifications": ["ISO 9001"],
+            "lead_time_max_days": 30,
+            "query_type": "compliance_critical",
+        },
+        "search_scope": "both",
+        "ranked_suppliers": [],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    out = agent.execute(state)
+
+    assert out["evaluator_should_retry"] is False
+    assert out["pipeline_status"] == "completed"
+    assert out["parsed_constraints"]["certifications"] == ["ISO 9001"]
+    assert out["parsed_constraints"]["lead_time_max_days"] == 30
+    assert out["relaxed_constraints"] == []
+
+
+def test_evaluator_zero_results_with_hard_constraints_does_not_wait_for_llm():
+    class ExplodingLLM:
+        def complete_json(self, messages, **kwargs):
+            raise AssertionError("strict zero-result searches should finish deterministically")
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = ExplodingLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": (
+            "Find ISO 9001 certified office furniture manufacturers in Germany "
+            "that can deliver within 30 days"
+        ),
+        "parsed_constraints": {
+            "product_type": "office furniture",
+            "location_country": "Germany",
+            "certifications": ["ISO 9001"],
+            "lead_time_max_days": 30,
+        },
+        "search_scope": "both",
+        "ranked_suppliers": [],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    out = agent.execute(state)
+
+    assert out["evaluator_should_retry"] is False
+    assert out["evaluator_verdict"] == "fail"
+    assert out["pipeline_status"] == "completed"
+    assert out["parsed_constraints"]["certifications"] == ["ISO 9001"]
+    assert out["parsed_constraints"]["lead_time_max_days"] == 30
+
+
+def test_evaluator_llm_timeout_fails_closed_without_blocking(monkeypatch):
+    monkeypatch.setattr(settings, "EVALUATOR_LLM_TIMEOUT_SECONDS", 0.01, raising=False)
+    seen_timeouts: list[float | None] = []
+
+    class TimeoutAwareLLM:
+        def complete_json(self, messages, **kwargs):
+            timeout = kwargs.get("timeout")
+            seen_timeouts.append(timeout)
+            if timeout == 0.01:
+                raise TimeoutError("evaluator LLM call timed out")
+            time.sleep(0.05)
+            return json.dumps(
+                {
+                    "verdict": "retry",
+                    "reasoning": "Too slow to be user-critical.",
+                    "retry_strategy": "expand_scope",
+                }
+            )
+
+    agent = EvaluatorAgent.__new__(EvaluatorAgent)
+    agent.llm = TimeoutAwareLLM()
+    agent._log_audit = lambda *args, **kwargs: None
+    state = {
+        "raw_query": "Find suppliers for industrial packaging",
+        "parsed_constraints": {"product_type": "industrial packaging"},
+        "search_scope": "approved_only",
+        "ranked_suppliers": [{"total_score": 0.2, "semantic_score": 0.2, "supplier_id": "s1", "tier": "approved", "explanation": "weak"}],
+        "evaluator_retries": 0,
+        "audit_log": [],
+    }
+
+    start = time.monotonic()
+    out = agent.execute(state)
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 0.04
+    assert seen_timeouts == [0.01]
+    assert out["evaluator_should_retry"] is False
+    assert out["evaluator_verdict"] == "accept"
+    assert out["pipeline_status"] == "completed"
 
 
 def test_parser_recovers_office_furniture_from_constraint_soup_product():
@@ -115,6 +270,42 @@ def test_compliance_rejects_office_furniture_query_for_foundry_candidate():
         r["constraint_name"] == "product_fit" and r["status"] == "FAIL"
         for r in result["compliance_results"]
     )
+
+
+@pytest.mark.parametrize(
+    "supplier",
+    [
+        {
+            "id": "packaging",
+            "name": "Frankfurt Pack Solutions GmbH",
+            "description": "Manufactures industrial packaging solutions and corrugated cardboard.",
+            "category": "packaging",
+        },
+        {
+            "id": "automation",
+            "name": "Broetje-Automation",
+            "description": "Aerospace automation and manufacturing equipment.",
+            "category": "machinery",
+        },
+    ],
+)
+def test_product_fit_rejects_generic_word_overlap_for_office_furniture(supplier):
+    verdict = product_fit_verdict(
+        supplier,
+        {
+            "product_type": "office furniture",
+            "product_keywords": [
+                "office furniture",
+                "furniture",
+                "office equipment",
+                "workspace solutions",
+            ],
+            "category_hint": "office_supplies",
+        },
+    )
+
+    assert verdict is not None
+    assert verdict["status"] == "FAIL"
 
 
 def test_product_fit_reason_uses_verdict_reason_not_certification_template():
@@ -273,24 +464,19 @@ def test_ranking_dedupes_visible_results_by_normalized_supplier_name(monkeypatch
 
 
 def test_web_search_city_is_in_every_query_and_runs_basic_depth(monkeypatch):
-    queries_seen: list[tuple[str, str]] = []
-
-    class FakeClient:
-        def search(self, **kwargs):
-            queries_seen.append((kwargs["query"], kwargs["search_depth"]))
-            return {
-                "results": [
-                    {
-                        "url": f"https://example{len(queries_seen)}.de",
-                        "title": "Example",
-                        "content": "Berlin office furniture supplier",
-                        "score": 0.9,
-                    }
-                ]
-            }
+    queries_seen: list[str] = []
 
     service = WebSearchService.__new__(WebSearchService)
-    service._client = FakeClient()
+    service._client = object()
+    service._search_raw = lambda query, max_results=10, timeout_seconds=None: (
+        queries_seen.append(query)
+        or [{
+            "url": f"https://example{len(queries_seen)}.de",
+            "title": "Example",
+            "content": "Berlin office furniture supplier",
+            "score": 0.9,
+        }]
+    )
 
     results = service.search_suppliers(
         category="office_supplies",
@@ -304,9 +490,70 @@ def test_web_search_city_is_in_every_query_and_runs_basic_depth(monkeypatch):
 
     assert len(results) == 2
     assert queries_seen
-    assert all("Berlin" in query for query, _ in queries_seen)
-    assert all("Germany" in query for query, _ in queries_seen)
-    assert all(depth == "basic" for _, depth in queries_seen)
+    assert all("Berlin" in query for query in queries_seen)
+    assert all("Germany" in query for query in queries_seen)
+
+
+def test_web_search_compacts_overlapping_product_terms_generically():
+    assert WebSearchService._compact_product_terms([
+        "beer",
+        "beer",
+        "bottled beer",
+        "Helles",
+        "Pilsner",
+        "German beer",
+    ]) == ["beer", "Helles", "Pilsner"]
+
+
+def test_web_search_builds_compact_distinct_query_families():
+    queries = WebSearchService._build_supplier_queries(
+        category="office_supplies",
+        industry_context="workplace interiors",
+        country="Germany",
+        city="Berlin",
+        certifications=["ISO 9001"],
+        product_terms=["office furniture", "furniture", "desk", "chair"],
+        raw_query="office furniture, desks, and chairs in Berlin",
+    )
+
+    by_family = dict(queries)
+    assert "manufacturer" in by_family
+    assert "distributor" in by_family
+    assert "certification" in by_family
+    assert all("Berlin" in query and "Germany" in query for query in by_family.values())
+    assert any("workplace interiors" in query for query in by_family.values())
+    assert "manufacturer" in by_family["manufacturer"]
+    assert "distributor" in by_family["distributor"]
+    assert "wholesaler" in by_family["distributor"]
+    assert not any(
+        all(term in query.casefold() for term in ("office furniture", "desk", "chair"))
+        for query in by_family.values()
+    )
+
+
+def test_certification_query_runs_before_global_cap_is_applied():
+    service = WebSearchService.__new__(WebSearchService)
+    seen: list[str] = []
+    service._client = object()
+    service._search_raw = lambda query, max_results=10, timeout_seconds=None: (
+        seen.append(query)
+        or [{
+            "url": f"https://example{len(seen)}.de",
+            "title": "Company",
+            "content": query,
+            "score": 0.9,
+        }]
+    )
+
+    service.search_suppliers(
+        category="office_supplies",
+        country="Germany",
+        certifications=["ISO 9001"],
+        product_terms=["office furniture"],
+        max_results=2,
+    )
+
+    assert any("ISO 9001" in query for query in seen)
 
 
 def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch):
@@ -315,9 +562,11 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
 
         def __init__(self):
             self.max_results: int | None = None
+            self.industry_context: str | None = None
 
         def search_suppliers(self, **kwargs):
             self.max_results = kwargs["max_results"]
+            self.industry_context = kwargs["industry_context"]
             return []
 
     fake_search = FakeWebSearch()
@@ -332,6 +581,7 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
         "raw_query": "hand tools suppliers in Germany",
         "parsed_constraints": {
             "product_type": "hand tools",
+            "industry_context": "industrial maintenance",
             "category_hint": "tools_hardware",
             "location_country": "Germany",
         },
@@ -339,6 +589,7 @@ def test_external_discovery_caps_web_results_even_when_env_is_higher(monkeypatch
     })
 
     assert fake_search.max_results == 6
+    assert fake_search.industry_context == "industrial maintenance"
 
 
 def test_supplier_extraction_bounds_optional_fallback_page_probes(monkeypatch):
@@ -393,7 +644,15 @@ def test_evaluator_prompt_does_not_claim_approved_only_when_scope_is_both():
         "raw_query": "office furniture suppliers in Berlin",
         "parsed_constraints": {"product_type": "office furniture", "location_city": "Berlin"},
         "search_scope": "both",
-        "ranked_suppliers": [],
+        "ranked_suppliers": [
+            {
+                "supplier_id": "supplier-1",
+                "tier": "pending_review",
+                "total_score": 0.45,
+                "semantic_score": 0.3,
+                "explanation": "Limited semantic match to office furniture.",
+            }
+        ],
         "evaluator_retries": 0,
         "audit_log": [],
     }

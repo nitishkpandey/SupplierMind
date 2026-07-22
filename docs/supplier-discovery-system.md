@@ -1,6 +1,6 @@
 # SupplierMind Supplier Discovery System
 
-Last updated: 2026-07-08
+Last updated: 2026-07-17
 
 This document explains the current SupplierMind supplier discovery system as implemented in this repository. It is written for thesis, product, and engineering use. All implementation details here are grounded in the current codebase. When a behavior is not implemented yet, it is marked explicitly.
 
@@ -284,16 +284,16 @@ Technologies:
 - SQLAlchemy.
 - PostgreSQL.
 - Milvus vector database.
-- Redis for cache/session-related services.
+- Redis-compatible cache abstraction for runtime support, with in-memory fallback.
 - LangGraph for the agent state machine.
 - OpenAI for LLM reasoning.
-- Voyage AI or OpenAI embeddings depending on settings.
+- Voyage AI for supplier/query embeddings.
 
 ### Data Stores
 
 - PostgreSQL stores suppliers, users, queries, results, audit logs, clarifications, saves, geocode cache.
 - Milvus stores supplier embeddings for semantic search.
-- Redis is configured for caching.
+- Redis is configured as the shared async cache backend when available.
 
 ### External Services
 
@@ -323,7 +323,7 @@ Key fields:
 - `capacity_value`, `capacity_unit`: structured capacity.
 - `lead_time_days`: structured lead-time signal.
 - `website`, `contact_email`: supplier contact/profile fields.
-- `source`: `manual`, `web_discovery`, or `imported`.
+- `source`: supplier provenance such as `manual`, `web_discovery`, `imported`, or `synthetic_10k`.
 - `status`: approved/saved/discovered/pending_review/rejected.
 - `source_url`: provenance URL.
 - `source_citations`: per-field citation metadata.
@@ -861,7 +861,11 @@ Signals:
 - Fresh external rank.
 - Geospatial rank.
 
-The top 10 candidate IDs are passed to compliance.
+The discovery agent now uses a balanced handoff instead of a pure top-10 RRF
+cut. Fresh web, geospatial, structured SQL, and semantic candidates each get
+protected slots before the remaining RRF ordering fills the downstream pool.
+This prevents a stale or partial vector index from crowding exact SQL or fresh
+web matches out before compliance and ranking can score them.
 
 ### Discovery Retry And Relaxation
 
@@ -1590,6 +1594,20 @@ Many real variants are supported, but unknown or niche certifications may need t
 ### 7. Corpus Gaps Still Matter
 
 Internal search quality depends on supplier data quality, category coverage, structured fields, and Milvus index freshness.
+
+If PostgreSQL has more active suppliers than Milvus has supplier vectors,
+the dashboard shows `reindex needed`, backend startup logs the mismatch, and
+semantic retrieval is degraded. Structured SQL and fresh web carry-forward
+still work, but the full semantic path should be rebuilt with:
+
+```bash
+cd apps/backend
+uv run python scripts/bulk_ingest_synthetic.py --skip-pg --reset-milvus
+```
+
+That command drops and rebuilds only the supplier vector collection. It does
+not delete PostgreSQL suppliers, but it does call the embedding provider for
+the full synthetic corpus.
 
 ### 8. History Shows Final Results, Not Full Candidate Funnel
 

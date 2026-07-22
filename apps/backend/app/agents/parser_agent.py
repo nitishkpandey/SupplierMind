@@ -20,13 +20,20 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.base import BaseAgent
-from app.agents.state import AgentState
+from app.agents.country_scope import (
+    country_scope_question,
+    needs_country_scope_clarification,
+)
+from app.agents.deadline import remaining_seconds
+from app.agents.state import AgentState, ParsedConstraints
 from app.agents.tools import ToolRegistry, build_default_registry
+from app.db.repositories.clarification_repo import MAX_CLARIFICATION_TURNS
 from app.db.repositories.query_repo import QueryRepository
 from app.db.session import SyncSessionLocal
 
@@ -79,7 +86,27 @@ _PLACEHOLDER_PRODUCT_RE = re.compile(
 
 def _is_placeholder_product(value: object) -> bool:
     """True when a product_type value is a contentless placeholder."""
-    return isinstance(value, str) and bool(_PLACEHOLDER_PRODUCT_RE.match(value.strip()))
+    if not isinstance(value, str):
+        return False
+    cleaned = value.strip()
+    if not cleaned:
+        return True
+    if _PLACEHOLDER_PRODUCT_RE.match(cleaned):
+        return True
+
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9+.-]*", cleaned.lower())
+    procurement_nouns = {
+        "supplier", "suppliers", "vendor", "vendors", "manufacturer",
+        "manufacturers", "provider", "providers", "source", "sources",
+        "product", "products", "item", "items", "material", "materials",
+        "supply", "supplies",
+    }
+    return bool(tokens) and all(
+        token in _SUPPLIER_QUALITY_WORDS
+        or token in procurement_nouns
+        or token in _QUERY_STOPWORDS
+        for token in tokens
+    )
 
 
 # Generic procurement nouns the LLM occasionally drops into location_country
@@ -190,9 +217,9 @@ _PREFERENCE_SIGNAL_RE = re.compile(
     re.IGNORECASE,
 )
 _SUPPLIER_QUALITY_WORDS = frozenset({
-    "approved", "best", "big", "cheap", "cheapest", "genuine", "global",
+    "approved", "best", "big", "cheap", "cheapest", "genuine", "global", "good",
     "large", "leading", "local", "nearby", "qualified", "reliable",
-    "reasonable", "rating", "ratings", "review", "reviews", "small",
+    "quality", "reasonable", "rating", "ratings", "review", "reviews", "small",
     "strategic", "support", "trusted", "verified",
 })
 _RANKING_PREFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -343,7 +370,7 @@ def _raw_query_states_capacity(raw_query: str) -> bool:
 def _capacity_value_matches(left: object, right: object) -> bool:
     """Loose numeric equality for capacity values copied through JSON memory."""
     try:
-        return float(left) == float(right)
+        return float(left) == float(right)  # type: ignore[arg-type]  # TypeError from non-numerics handled below
     except (TypeError, ValueError):
         return left == right
 
@@ -400,7 +427,7 @@ def _clear_non_capacity_quantity(
     raw["capacity_unit"] = None
 
 
-def _extract_lead_time_days(raw_query: str) -> Optional[int]:
+def _extract_lead_time_days(raw_query: str) -> int | None:
     """Recover a lead-time ceiling from common delivery phrasings."""
     for pattern in _LEAD_TIME_PATTERNS:
         match = pattern.search(raw_query or "")
@@ -523,7 +550,7 @@ def _constraint_location_tokens(raw: dict) -> set[str]:
     return tokens
 
 
-def _clean_product_phrase(value: object, raw: dict) -> Optional[str]:
+def _clean_product_phrase(value: object, raw: dict) -> str | None:
     """Strip constraint/cert/location debris from a candidate product phrase."""
     text = _clean_optional_text(value)
     if not text:
@@ -569,7 +596,7 @@ def _is_constraint_soup_product(value: object, raw: dict) -> bool:
     )
 
 
-def _extract_product_from_raw_query(raw_query: str, raw: dict) -> Optional[str]:
+def _extract_product_from_raw_query(raw_query: str, raw: dict) -> str | None:
     """Recover the requested product from common 'X supplier' phrasing."""
     text = " ".join((raw_query or "").replace("\n", " ").split())
     if not text:
@@ -588,7 +615,7 @@ def _extract_product_from_raw_query(raw_query: str, raw: dict) -> Optional[str]:
     return None
 
 
-def _merge_product_keyword(raw_keywords: list[object], product_type: Optional[str], raw: dict) -> list[str]:
+def _merge_product_keyword(raw_keywords: list[object], product_type: str | None, raw: dict) -> list[str]:
     keywords: list[str] = []
     seen: set[str] = set()
     for value in ([product_type] if product_type else []) + list(raw_keywords or []):
@@ -615,7 +642,84 @@ def _raw_query_mentions_any(raw_query: str, values: list[object]) -> bool:
     return False
 
 
-def _clean_optional_text(value: object) -> Optional[str]:
+def _same_place_text(left: object, right: object) -> bool:
+    left_text = _clean_optional_text(left)
+    right_text = _clean_optional_text(right)
+    return bool(left_text and right_text and left_text.casefold() == right_text.casefold())
+
+
+def _geocode_step_applies(
+    *,
+    step: dict,
+    raw_query: str,
+    prior_partial: Mapping[str, Any] | None,
+) -> bool:
+    obs = step.get("observation") or {}
+    if step.get("action") != "geocode_location" or not obs.get("found"):
+        return False
+    action_name = (step.get("action_input") or {}).get("location_name")
+    if _raw_query_mentions_any(
+        raw_query,
+        [obs.get("city"), obs.get("country"), obs.get("region"), action_name],
+    ):
+        return True
+    return any(
+        (prior_partial or {}).get(k)
+        for k in ("location_city", "location_country", "location_region")
+    )
+
+
+def _merge_geocode_location_observations(
+    raw: dict,
+    trace: list[dict],
+    raw_query: str,
+    prior_partial: Mapping[str, Any] | None,
+) -> None:
+    """Use geocode observations to correct city/country fields before search.
+
+    The LLM can misbucket one-word city names as countries. The geocoder is a
+    stronger source for address parts, so normalized constraints should follow
+    its city/country split whenever the observation belongs to this query.
+    """
+    for step in trace:
+        if not _geocode_step_applies(
+            step=step,
+            raw_query=raw_query,
+            prior_partial=prior_partial,
+        ):
+            continue
+        obs = step.get("observation") or {}
+        action_name = (step.get("action_input") or {}).get("location_name")
+        obs_city = _clean_optional_text(obs.get("city"))
+        obs_country = _clean_optional_text(obs.get("country"))
+        obs_region = _clean_optional_text(obs.get("region"))
+        raw_city = _clean_optional_text(raw.get("location_city"))
+        raw_country = _clean_optional_text(raw.get("location_country"))
+
+        if obs_city and obs_country:
+            if not raw_city or _same_place_text(raw_country, obs_city):
+                raw["location_city"] = obs_city
+            if (
+                not raw_country
+                or _same_place_text(raw_country, obs_city)
+                or _same_place_text(raw_country, action_name)
+            ):
+                raw["location_country"] = obs_country
+        elif obs_region and obs_country:
+            if not raw.get("location_region"):
+                raw["location_region"] = obs_region
+            if (
+                not raw_country
+                or _same_place_text(raw_country, obs_region)
+                or _same_place_text(raw_country, action_name)
+            ):
+                raw["location_country"] = obs_country
+
+        if obs_region and not raw.get("location_region"):
+            raw["location_region"] = obs_region
+
+
+def _clean_optional_text(value: object) -> str | None:
     """Convert common LLM null sentinels into real None values."""
     if not isinstance(value, str):
         return None if value is None else str(value)
@@ -738,8 +842,13 @@ def _parse_react_response(text: str) -> _ReActStep:
 # ── Prompt builder ───────────────────────────────────────────────────
 
 
-def _build_system_prompt(tool_registry: ToolRegistry) -> str:
-    tools_block = tool_registry.list_for_prompt()
+def _build_system_prompt(
+    tool_registry: ToolRegistry,
+    *,
+    allow_quantity_tool: bool = True,
+) -> str:
+    excluded_tools = () if allow_quantity_tool else ("parse_quantity_unit",)
+    tools_block = tool_registry.list_for_prompt(exclude_names=excluded_tools)
     schema_block = json.dumps(FINISH_SCHEMA, indent=2)
     return f"""You are a procurement-query parser running a ReAct loop. Your job is to
 convert a natural-language procurement query into a structured set of
@@ -781,6 +890,9 @@ Rules:
   came back from `infer_industry_context` as commonly-required-in-this-industry
   go in `industry_typical_certs` instead. Never copy inferred certs into
   `certifications`; doing so wrongly rejects every supplier that lacks them.
+- Buyer purchase quantities and package sizes describe demand, not supplier
+  capacity. Only use a quantity tool when the query explicitly asks for
+  supplier capacity, throughput, production rate, or a per-period minimum.
 - The Finish Action Input MUST be a single JSON object matching this schema:
 
 {schema_block}
@@ -823,7 +935,11 @@ class ParserAgent(BaseAgent):
         if prior_partial is None and not memory_context and _is_contentless_query(raw_query):
             return self._raise_pre_loop_clarification(state, raw_query, start)
 
-        system_prompt = _build_system_prompt(self.tools)
+        allow_quantity_tool = _raw_query_states_capacity(raw_query)
+        system_prompt = _build_system_prompt(
+            self.tools,
+            allow_quantity_tool=allow_quantity_tool,
+        )
         user_open = self._build_initial_user_message(
             raw_query, memory_context, prior_partial
         )
@@ -863,6 +979,11 @@ class ParserAgent(BaseAgent):
                     # Some models hallucinate Observation inside their own
                     # completion; cut generation before it gets the chance.
                     stop=["\nObservation:", "Observation:"],
+                    timeout=(
+                        remaining_seconds(state, reserve=2.0)
+                        if state.get("deadline_at") is not None
+                        else None
+                    ),
                 )
             except Exception as e:
                 loop_error = f"llm_call_failed: {type(e).__name__}: {e}"
@@ -906,6 +1027,23 @@ class ParserAgent(BaseAgent):
                 trace.append(entry)
                 terminated_by = "finish"
                 break
+
+            if step.action == "parse_quantity_unit" and not allow_quantity_tool:
+                entry["observation"] = {
+                    "error": "quantity_tool_not_applicable",
+                    "detail": (
+                        "The query has no explicit supplier capacity or rate "
+                        "requirement. Treat purchase quantities and package sizes "
+                        "as demand context and finish."
+                    ),
+                }
+                trace.append(entry)
+                messages.append({"role": "assistant", "content": response})
+                messages.append({
+                    "role": "user",
+                    "content": f"Observation: {json.dumps(entry['observation'])}",
+                })
+                continue
 
             # Same-args dedup: refuse a repeat of (tool, args) we already saw.
             args_key = json.dumps(step.action_input, sort_keys=True, default=str)
@@ -971,7 +1109,7 @@ class ParserAgent(BaseAgent):
                         }
                     else:
                         result = tool.fn(**step.action_input)
-                    entry["observation"] = result if isinstance(result, (dict, list)) else {"value": result}
+                    entry["observation"] = result if isinstance(result, dict | list) else {"value": result}
                 except TypeError as e:
                     entry["observation"] = {"error": "bad_args", "detail": str(e)}
                 except Exception as e:  # noqa: BLE001 — surface any tool failure as observation
@@ -997,21 +1135,40 @@ class ParserAgent(BaseAgent):
         constraints = self._normalise_constraints(
             final_constraints, trace, raw_query=raw_query, prior_partial=prior_partial
         )
-        confidence = float(final_constraints.get("confidence", 0.5) or 0.5)
+        try:
+            confidence = float(final_constraints.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5  # non-numeric confidence (e.g. "high") — use default
         finish_payload_requested_clarification = bool(
             final_constraints.get("clarification_needed")
         )
         legacy_clarification_needed = (
             finish_payload_requested_clarification or confidence < CLARIFICATION_THRESHOLD
         )
-        legacy_clarification_question = final_constraints.get("clarification_question")
+        legacy_question_value = final_constraints.get("clarification_question")
+        legacy_clarification_question = (
+            legacy_question_value if isinstance(legacy_question_value, str) else None
+        )
 
-        # Task 3.3 — Post-loop clarification decision. Only fires on a clean
-        # `finish` termination; the fallback/degraded paths already emit
-        # their own clarification text and we don't override them.
-        composed_question: Optional[str] = None
+        turn_number = int(state.get("turn_number") or 1)
+        country_scope_needed = needs_country_scope_clarification(
+            constraints=constraints,
+            raw_query=raw_query,
+            benchmark_supplier_ids=state.get("benchmark_supplier_ids") or [],
+            turn_number=turn_number,
+            max_turns=MAX_CLARIFICATION_TURNS,
+        )
+        scope_question = (
+            country_scope_question(constraints.get("location_country"))
+            if country_scope_needed
+            else None
+        )
+
+        # Existing semantic clarification rules run only after a clean Finish.
+        # The deterministic country-scope policy above is intentionally
+        # termination-agnostic so a useful degraded parse can also pause.
+        composed_question: str | None = None
         if terminated_by == "finish":
-            turn_number = int(state.get("turn_number") or 1)
             composed_question = self._decide_clarification(
                 constraints=constraints,
                 trace=trace,
@@ -1021,24 +1178,41 @@ class ParserAgent(BaseAgent):
                 turn_number=turn_number,
             )
 
-        if (
+        use_legacy_location_question = (
             finish_payload_requested_clarification
             and legacy_clarification_question
             and constraints.get("product_type")
             and not self._has_any_constraint(constraints, _LOCATION_CONSTRAINT_KEYS)
             and _question_mentions_location(legacy_clarification_question)
-        ):
+        )
+
+        clarification_question: str | None
+        if scope_question is not None:
+            clarification_needed = True
+            clarification_question = scope_question
+            composed_question = None
+        elif use_legacy_location_question:
             clarification_needed = True
             clarification_question = legacy_clarification_question
             composed_question = None
         elif composed_question is not None:
             clarification_needed = True
             clarification_question = composed_question
+        elif terminated_by == "finish":
+            # If deterministic post-loop rules say the query is good enough,
+            # let the pipeline run. This prevents the LLM's legacy
+            # clarification flag from causing repeated popups on resumed turns.
+            clarification_needed = False
+            clarification_question = None
         else:
             clarification_needed = legacy_clarification_needed
             clarification_question = (
                 legacy_clarification_question if clarification_needed else None
             )
+
+        clarification_resumable = clarification_needed and (
+            terminated_by == "finish" or scope_question is not None
+        )
 
         duration_ms = int((time.time() - start) * 1000)
         tools_used = [t["action"] for t in trace if t.get("action") and t["action"] != "Finish"]
@@ -1079,6 +1253,7 @@ class ParserAgent(BaseAgent):
         state["detected_language"] = constraints.get("original_language") or "en"
         state["needs_clarification"] = clarification_needed
         state["clarification_question"] = clarification_question
+        state["clarification_resumable"] = clarification_resumable
         state["pipeline_status"] = (
             "needs_clarification" if clarification_needed else "running"
         )
@@ -1089,13 +1264,15 @@ class ParserAgent(BaseAgent):
         # Both origins are audited: the post-loop composer AND the legacy
         # path where the LLM set clarification_needed in its Finish payload
         # (Task 3.4 smoke found the latter raised a resumable dialogue with
-        # no audit row). Degraded paths are excluded — they don't pause.
-        if clarification_needed and terminated_by == "finish":
-            origin = (
-                "Post-loop trigger fired"
-                if composed_question is not None
-                else "LLM Finish payload requested clarification"
-            )
+        # no audit row). Deterministic degraded country-scope questions are
+        # resumable and therefore audited; other degraded messages are not.
+        if clarification_needed and clarification_resumable:
+            if scope_question is not None:
+                origin = "Deterministic country-scope gate fired"
+            elif composed_question is not None:
+                origin = "Post-loop trigger fired"
+            else:
+                origin = "LLM Finish payload requested clarification"
             self._append_audit_entry(
                 state,
                 agent_name="clarification_handler",
@@ -1170,18 +1347,19 @@ class ParserAgent(BaseAgent):
         state["detected_language"] = "en"
         state["needs_clarification"] = True
         state["clarification_question"] = question
+        state["clarification_resumable"] = True
         state["pipeline_status"] = "needs_clarification"
         return state
 
     def _decide_clarification(
         self,
-        constraints: dict,
+        constraints: Mapping[str, Any],
         trace: list[dict],
         raw_query: str,
         confidence: float,
-        memory_context: Optional[str],
+        memory_context: str | None,
         turn_number: int = 1,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Task 3.3 — decide whether to interrupt the pipeline with a question.
 
         Three trigger rules, evaluated in priority order. The first rule that
@@ -1239,13 +1417,6 @@ class ParserAgent(BaseAgent):
             constraints, _OPERATIONAL_CONSTRAINT_KEYS
         )
         has_ranking_preference = self._raw_query_has_preference_signal(raw_query)
-        has_precise_location = bool(
-            self._has_any_constraint(
-                constraints,
-                ("location_city", "location_region", "location_radius_km"),
-            )
-        )
-
         # Rule 1c — do not run open-ended web discovery without a search
         # geography unless the user explicitly asks for a global/unbounded
         # search. This remains true on resumed turns: if the first answer only
@@ -1274,20 +1445,6 @@ class ParserAgent(BaseAgent):
         ):
             return None
 
-        # Rule 1e — product + country is still broad when the user gives no
-        # certification, delivery, capacity, radius, city/region, or ranking
-        # preference. Ask what should drive the result quality.
-        if (
-            has_product
-            and self._has_any_constraint(constraints, ("location_country",))
-            and not has_precise_location
-            and not has_operational_constraint
-            and not has_ranking_preference
-        ):
-            return self._compose_clarification_question(
-                raw_query, constraints, missing="operational_preference"
-            )
-
         # Rule 2 — low confidence AND sparse constraints.
         if confidence < CLARIFICATION_CONFIDENCE_FLOOR and constraint_count < CLARIFICATION_MIN_CONSTRAINTS:
             return self._compose_clarification_question(
@@ -1305,7 +1462,7 @@ class ParserAgent(BaseAgent):
         return None
 
     @staticmethod
-    def _has_any_constraint(constraints: dict, keys: tuple[str, ...]) -> bool:
+    def _has_any_constraint(constraints: Mapping[str, Any], keys: tuple[str, ...]) -> bool:
         """True when any named constraint is present and meaningful."""
         for key in keys:
             value = constraints.get(key)
@@ -1336,7 +1493,7 @@ class ParserAgent(BaseAgent):
         )
 
     @staticmethod
-    def _raw_query_has_product_signal(raw_query: str, constraints: dict) -> bool:
+    def _raw_query_has_product_signal(raw_query: str, constraints: Mapping[str, Any]) -> bool:
         """True when the raw query names a product/service beyond location,
         certification, capacity, or generic supplier-search words."""
         tokens = re.findall(r"[a-zA-Z0-9]+", (raw_query or "").lower())
@@ -1379,7 +1536,7 @@ class ParserAgent(BaseAgent):
     def _compose_clarification_question(
         self,
         raw_query: str,
-        partial_constraints: dict,
+        partial_constraints: Mapping[str, Any],
         missing: str,
     ) -> str:
         """Single focused LLM call: render ONE short question for the user.
@@ -1421,7 +1578,7 @@ class ParserAgent(BaseAgent):
         return self._tidy_clarification_question(raw) or self._fallback_clarification(missing)
 
     @staticmethod
-    def _format_constraints_for_clarification(constraints: dict) -> str:
+    def _format_constraints_for_clarification(constraints: Mapping[str, Any]) -> str:
         """Render the small subset of fields the LLM needs to write a question.
 
         Kept minimal on purpose — handing the LLM the full schema invites it
@@ -1509,7 +1666,7 @@ class ParserAgent(BaseAgent):
         input_summary: str,
         output_summary: str,
         duration_ms: int,
-        reasoning: Optional[str] = None,
+        reasoning: str | None = None,
     ) -> None:
         """Audit-log appender that lets us record entries under a different
         agent_name than self (e.g. 'clarification_handler' is not a real
@@ -1527,8 +1684,8 @@ class ParserAgent(BaseAgent):
     def _build_initial_user_message(
         self,
         raw_query: str,
-        memory_context: Optional[str],
-        prior_partial: Optional[dict] = None,
+        memory_context: str | None,
+        prior_partial: Mapping[str, Any] | None = None,
     ) -> str:
         parts: list[str] = []
         if memory_context:
@@ -1554,7 +1711,7 @@ class ParserAgent(BaseAgent):
         )
         return "\n\n".join(parts)
 
-    def _load_user_memory(self, user_id: str) -> Optional[str]:
+    def _load_user_memory(self, user_id: str) -> str | None:
         if not user_id:
             return None
         try:
@@ -1604,7 +1761,7 @@ class ParserAgent(BaseAgent):
         raw: dict,
         trace: list[dict],
         raw_query: str,
-        prior_partial: Optional[dict],
+        prior_partial: Mapping[str, Any] | None,
     ) -> tuple[list[str], list[str]]:
         """Split the LLM's cert list by provenance — the cert-hallucination fix.
 
@@ -1702,8 +1859,8 @@ class ParserAgent(BaseAgent):
         raw: dict,
         trace: list[dict],
         raw_query: str = "",
-        prior_partial: Optional[dict] = None,
-    ) -> dict:
+        prior_partial: Mapping[str, Any] | None = None,
+    ) -> ParsedConstraints:
         """Map the LLM's Finish payload to the ParsedConstraints shape.
 
         Tolerant of missing keys and of legacy "location" nesting. Promotes
@@ -1718,6 +1875,7 @@ class ParserAgent(BaseAgent):
             raw.setdefault("location_country", loc.get("country"))
             raw.setdefault("location_region", loc.get("region"))
             raw.setdefault("location_radius_km", loc.get("radius_km"))
+            raw.setdefault("location_bounds", loc.get("bounds"))
         if isinstance(raw.get("capacity"), dict):
             cap = raw.pop("capacity")
             raw.setdefault("capacity_min", cap.get("min_value"))
@@ -1781,26 +1939,34 @@ class ParserAgent(BaseAgent):
             for step in trace:
                 if step.get("action") == "geocode_location":
                     obs = step.get("observation") or {}
-                    if obs.get("found") and (
-                        _raw_query_mentions_any(
-                            raw_query,
-                            [
-                                obs.get("city"),
-                                obs.get("country"),
-                                (step.get("action_input") or {}).get("location_name"),
-                            ],
-                        )
-                        or any(
-                            (prior_partial or {}).get(k)
-                            for k in ("location_city", "location_country", "location_region")
-                        )
+                    if _geocode_step_applies(
+                        step=step,
+                        raw_query=raw_query,
+                        prior_partial=prior_partial,
                     ):
                         raw.setdefault("location_lat", obs.get("lat"))
                         raw.setdefault("location_lng", obs.get("lng"))
+                        raw.setdefault("location_bounds", obs.get("bounds"))
                         raw.setdefault("location_city", raw.get("location_city") or obs.get("city"))
                         raw.setdefault(
                             "location_country", raw.get("location_country") or obs.get("country")
                         )
+                        raw.setdefault("location_region", raw.get("location_region") or obs.get("region"))
+
+        if raw.get("location_bounds") is None:
+            for step in trace:
+                if step.get("action") != "geocode_location":
+                    continue
+                obs = step.get("observation") or {}
+                if _geocode_step_applies(
+                    step=step,
+                    raw_query=raw_query,
+                    prior_partial=prior_partial,
+                ) and obs.get("bounds"):
+                    raw["location_bounds"] = list(obs["bounds"])
+                    break
+
+        _merge_geocode_location_observations(raw, trace, raw_query, prior_partial)
 
         # Same trick for canonicalize_certification: if the LLM kept the raw
         # cert name but the canonical key is known, swap to canonical.
@@ -1959,6 +2125,7 @@ class ParserAgent(BaseAgent):
             "location_lat": raw.get("location_lat"),
             "location_lng": raw.get("location_lng"),
             "location_radius_km": raw.get("location_radius_km"),
+            "location_bounds": raw.get("location_bounds"),
 
             "certifications": hard_certs,
             "industry_typical_certs": inferred_certs,

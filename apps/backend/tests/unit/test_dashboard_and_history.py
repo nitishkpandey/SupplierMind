@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user
-from app.db.models import UserRole
+from app.db.models import QueryStatus, UserRole
 from app.db.session import get_db
 from app.main import app
 
@@ -97,3 +97,51 @@ def test_clear_history_deletes_only_current_users_query_artifacts():
     assert response.json() == {"deleted": 12}
     assert fake_session.execute.await_count == 4
     fake_session.commit.assert_awaited_once()
+
+
+def test_history_rejects_zero_limit():
+    user = _fake_user()
+    app.dependency_overrides[get_current_user] = lambda: user
+
+    async def session_override():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = session_override
+
+    response = TestClient(app).get("/api/v1/queries", params={"limit": 0})
+
+    assert response.status_code == 422  # was ZeroDivisionError → 500
+
+
+def test_history_marks_open_pending_query_as_needs_clarification():
+    user = _fake_user()
+    query_id = uuid4()
+    query = SimpleNamespace(
+        id=query_id,
+        raw_query="Find office furniture suppliers in Germany",
+        status=QueryStatus.pending,
+        execution_time_ms=None,
+        created_at=SimpleNamespace(isoformat=lambda: "2026-07-21T00:00:00"),
+        results=[],
+    )
+    app.dependency_overrides[get_current_user] = lambda: user
+    fake_repo = MagicMock()
+    fake_repo.get_user_queries = AsyncMock(return_value=[query])
+    fake_repo.get_open_clarification_query_ids = AsyncMock(return_value={query_id})
+
+    fake_count = MagicMock()
+    fake_count.scalar_one.return_value = 1
+    fake_session = AsyncMock()
+    fake_session.execute = AsyncMock(return_value=fake_count)
+
+    async def session_override():
+        yield fake_session
+
+    app.dependency_overrides[get_db] = session_override
+    with patch(
+        "app.db.repositories.query_repo.QueryRepository", return_value=fake_repo
+    ):
+        response = TestClient(app).get("/api/v1/queries")
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["status"] == "needs_clarification"

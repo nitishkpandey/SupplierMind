@@ -24,9 +24,8 @@ from __future__ import annotations
 import json
 import math
 import re
-import time
 import uuid
-from typing import Any
+from contextlib import suppress
 
 import pytest
 
@@ -39,7 +38,6 @@ from app.agents.tools.past_query import make_lookup_past_query_tool
 from app.agents.tools.quantity_parser import parse_quantity_unit_tool
 from app.core.embeddings import EMBEDDING_DIM
 from app.services.query_memory import QueryMemoryService
-
 
 # ── Fakes ────────────────────────────────────────────────────────────────
 
@@ -104,10 +102,8 @@ def memory_service():
     svc._reset_for_tests()
     yield svc
     # Best-effort cleanup; don't fail the suite if Milvus already gone.
-    try:
+    with suppress(Exception):
         svc._reset_for_tests()
-    except Exception:
-        pass
 
 
 # ── 1. Empty memory → empty result ──────────────────────────────────────

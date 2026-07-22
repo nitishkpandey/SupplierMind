@@ -11,14 +11,227 @@ Useful repo references:
 - [Detailed Supplier Discovery System](supplier-discovery-system.md)
 - [Benchmark Findings](../results/run_20260710/findings.md)
 
-External context used for market comparison:
+External context used for market comparison, verified on 2026-07-21:
 
 - [Supplier.io supplier intelligence platform](https://supplier.io/)
 - [Scoutbee](https://www.scoutbee.com/)
 - [Craft.co supplier intelligence](https://global.craft.co/)
 - [Levelpath AI procurement agents](https://www.levelpath.com/)
+- [SAP Ariba Supplier Management](https://www.sap.com/products/spend-management/supplier-management.html)
+- [Coupa AI for total spend management](https://coupa.co.jp/en/platform/ai)
+- [Ivalua Supplier Management](https://www.ivalua.com/solutions/process/strategic-sourcing/supplier-management/)
+- [JAGGAER Supplier Management & Performance](https://www.jaggaer.com/solutions/supplier-management)
 - [Supplier Recommendation in Online Procurement](https://arxiv.org/abs/2403.01301)
 - [Coverage-Aware Supplier Discovery Research](https://arxiv.org/abs/2602.24262)
+
+---
+
+## Interview-Ready Direct Answers To The 10 Questions
+
+Use this section for quick revision before an interview. The longer sections below give deeper follow-up answers.
+
+### 1. What Is The Functioning Of The Web Application?
+
+SupplierMind is an AI-powered supplier discovery web application. A procurement user enters a natural-language sourcing request, such as:
+
+```text
+Find ISO 9001 certified office furniture suppliers in Germany that can deliver within 30 days.
+```
+
+The system converts that sentence into structured procurement constraints, searches internal approved suppliers, optionally discovers new suppliers from the web, validates evidence, ranks suppliers, and shows an auditable result list. New web suppliers are visible in the originating results, but they stay in `pending_review` until a human approves or rejects them.
+
+```mermaid
+flowchart TD
+    USER["Procurement user"] --> FE["React frontend"]
+    FE --> API["FastAPI API + SSE progress"]
+    API --> LG["LangGraph orchestrator"]
+
+    LG --> P["Parser agent"]
+    P --> CLARIFY{"Need more details?"}
+    CLARIFY -->|Yes| ASK["Ask user clarification"]
+    ASK --> P
+    CLARIFY -->|No| EXT{"Search scope"}
+
+    EXT -->|Discover new suppliers| WEB["External discovery: Tavily + web pages"]
+    WEB --> GEO["Geoapify location validation"]
+    GEO --> SAN["OpenSanctions screening"]
+    SAN --> PENDING["Save as pending_review"]
+
+    EXT -->|Approved only or after web| INT["Internal discovery"]
+    PENDING --> INT
+    INT --> PG["PostgreSQL + PostGIS filters"]
+    INT --> MV["Milvus vector search"]
+    PG --> CAND["Candidate suppliers"]
+    MV --> CAND
+
+    CAND --> COMP["Compliance agent"]
+    COMP --> RANK["Ranking agent"]
+    RANK --> EVAL["Evaluator agent"]
+    EVAL -->|Retry if weak| INT
+    EVAL -->|Accept| OUT["Results + audit trail + history"]
+    OUT --> FE
+```
+
+### 2. What Business Problem Does It Solve And What Business Value Does It Create?
+
+Supplier discovery is usually slow, manual, and hard to audit. Buyers search Google, check supplier pages, compare certifications, ask whether a supplier is approved, and record decisions in spreadsheets. This creates delays, inconsistent supplier shortlists, weak evidence, and supplier-risk exposure.
+
+SupplierMind creates value by:
+
+- Reducing sourcing time through natural-language search.
+- Improving supplier quality through hybrid search and constraint validation.
+- Reducing risk through sanctions checks, certification normalization, and evidence checks.
+- Improving governance through pending review, RBAC, and approval justifications.
+- Improving auditability through agent-level logs, reasoning snapshots, and result history.
+- Reusing knowledge through query history and user-scoped semantic memory.
+
+Interview summary:
+
+> SupplierMind turns supplier discovery from a manual search process into an auditable AI-assisted workflow. It helps procurement teams find better supplier shortlists faster while keeping compliance, evidence, and human approval in the loop.
+
+### 3. What Tech Stack Has Been Used?
+
+| Layer | Current Stack | Why It Is Used |
+|---|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Radix/shadcn UI | Fast interactive UI, type safety, reusable components, production build. |
+| API | FastAPI, Uvicorn, Pydantic | Async APIs, OpenAPI docs, typed request/response contracts. |
+| Database | PostgreSQL + PostGIS | Supplier source of truth, transactions, relational modeling, radius search. |
+| Vector search | Milvus | Semantic search over supplier profiles and query memory. |
+| Cache/runtime support | Redis with in-memory fallback | Fast shared cache abstraction and runtime support. |
+| Agent orchestration | LangGraph | Stateful multi-agent workflow, pause/resume, retries, conditional routing. |
+| LLM | OpenAI GPT-4o-mini pinned snapshot | Structured reasoning/extraction with reproducible behavior. |
+| Embeddings | Voyage AI `voyage-3-lite` | Semantic matching for natural-language queries and suppliers. |
+| Web discovery | Tavily, HTTP page fetching, BeautifulSoup/lxml | Finds new supplier candidates beyond the internal database. |
+| Location validation | Geoapify Geocoding + Places | Mandatory city/country/coordinate validation for web suppliers. |
+| Compliance signal | OpenSanctions | Sanctions-screening metadata for discovered suppliers. |
+| Auth | OAuth2, JWT, RBAC | Secure user sessions and controlled approval permissions. |
+| Infra | Docker Compose, Nginx, optional Kubernetes manifests | Local services, reverse proxy, and production-style deployment templates. |
+| Evaluation | Pytest, benchmark runner, SupplierBench-25, P1/P2/P3 baselines | Reproducible thesis and engineering validation. |
+
+### 4. What Data Engineering, Software Engineering, And AI/ML Concepts Are Used?
+
+| Area | Concept | Justification | Alternative |
+|---|---|---|---|
+| Data Engineering | Relational modeling | Suppliers, users, queries, results, audit logs need strong relationships and transactions. | MongoDB, DynamoDB. |
+| Data Engineering | PostGIS geospatial search | Procurement often cares about city/radius proximity. | Elasticsearch geo queries, Google Maps distance API. |
+| Data Engineering | Vector indexing | Natural-language supplier search needs semantic similarity. | pgvector, Qdrant, Weaviate, Pinecone, Elasticsearch vector search. |
+| Data Engineering | Hybrid retrieval | Combines semantic recall with structured filters for better practical results. | Pure SQL search, pure RAG, BM25 only. |
+| Data Engineering | Data quality gates | Web suppliers without verified location/evidence should not pollute approved data. | Allow all web results and only score confidence later. |
+| Data Engineering | Audit logs and lineage | Procurement decisions need traceability. | Plain app logs only. |
+| Software Engineering | Modular backend layers | API, services, agents, repositories, schemas, and core utilities are separated. | One large service/controller layer. |
+| Software Engineering | Async API design | LLM, web, database, and external API calls are I/O-heavy. | Sync Flask/Django plus worker queue. |
+| Software Engineering | SSE progress streaming | The UI can show agent progress during long-running discovery. | Polling or WebSockets. |
+| Software Engineering | RBAC and HITL | Supplier approval is a governed business action. | Everyone can approve, or fully automatic onboarding. |
+| Software Engineering | Deterministic tests and lint/build gates | AI systems still need stable software guardrails. | Manual demo-only validation. |
+| AI/ML | Agentic workflow | Multiple agents decompose parsing, discovery, compliance, ranking, and evaluation. | Single prompt or simple RAG chain. |
+| AI/ML | ReAct tool use | Parser can call geocoding, memory, quantity parsing, and taxonomy tools. | LLM-only extraction. |
+| AI/ML | RAG and embeddings | Retrieves supplier candidates before validation/ranking. | Fine-tuning, keyword search. |
+| AI/ML | Quote-or-fail evidence | Reduces hallucinated compliance claims. | Trust LLM confidence without citations. |
+| AI/ML | Deterministic ranking | Makes scores explainable and repeatable. | LLM ranking, learning-to-rank. |
+| AI/ML | Benchmarking P1/P2/P3 | Shows the trade-off between simple RAG and governed agentic workflows. | No benchmark, only screenshots. |
+
+### 5. Is This Web Application Agentic?
+
+Yes. SupplierMind is agentic because it has a goal-directed, stateful workflow that uses multiple specialized agents and tools instead of one static LLM prompt.
+
+It is agentic because:
+
+- The parser reasons over the query and uses tools.
+- The system can ask clarification questions and resume execution.
+- LangGraph routes state between agents.
+- External discovery, internal discovery, compliance, ranking, and evaluation have separate responsibilities.
+- The evaluator can trigger bounded retries.
+- The system has memory for accepted past queries.
+- New suppliers require human approval before becoming approved.
+
+It is not a fully autonomous self-learning system because it does not silently onboard suppliers, self-train on its own, or run open-ended business actions. It is better described as a governed agentic workflow.
+
+### 6. What Makes It Special For Data Engineering / AI Engineering Interviews?
+
+SupplierMind is interview-worthy because it is not just a chatbot. It demonstrates full-stack ownership and production-style AI engineering:
+
+- Natural-language procurement interface.
+- Structured supplier data modeling.
+- Hybrid SQL, vector, and geospatial retrieval.
+- Web data extraction and enrichment.
+- Evidence-based compliance checks.
+- Multi-agent orchestration with LangGraph.
+- Human-in-the-loop supplier governance.
+- Audit logs and operational metrics.
+- P1/P2/P3 benchmark comparison.
+- Honest trade-off analysis where simple RAG can outperform agentic retrieval on some metrics, while the agentic system gives stronger governance and explainability.
+
+For Data Engineering roles, emphasize data modeling, enrichment, vector indexing, geospatial search, data quality gates, and reproducible benchmark corpora.
+
+For AI Engineering roles, emphasize agents, RAG, embeddings, tool use, model pinning, hallucination control, evaluation metrics, and HITL governance.
+
+For Software Engineering roles, emphasize APIs, auth/RBAC, async background execution, SSE, frontend UX, tests, Docker, and deployment structure.
+
+### 7. Do Other Platforms Do Similar Work?
+
+Yes, there are commercial platforms in adjacent spaces:
+
+| Platform | Similarity | Difference From SupplierMind |
+|---|---|---|
+| Supplier.io | Supplier intelligence, supplier discovery, supplier data enrichment, diversity and sustainability sourcing. | Commercial proprietary supplier-data platform; SupplierMind is a transparent thesis/product system with visible agent steps and benchmarked architecture. |
+| Scoutbee | AI-powered buyer-supplier network and supplier discovery marketplace. | Broader marketplace/network play; SupplierMind is focused on query-driven discovery, evidence, and internal approval workflow. |
+| Coupa | Enterprise spend-management platform with AI capabilities across procurement workflows. | Broader source-to-pay suite; SupplierMind is narrower but more transparent for agentic supplier discovery. |
+| Craft.co | Supplier intelligence, risk evaluation, monitoring, and supplier data fabric. | More risk-intelligence focused; SupplierMind focuses on discovery plus compliance-ranked recommendations. |
+| Levelpath | AI procurement agents across sourcing, contracts, and supplier risk. | Broader procurement-agent suite; SupplierMind is a focused supplier discovery and thesis benchmark system. |
+| SAP Ariba / Coupa / Ivalua / Jaggaer | Enterprise procurement and supplier management suites. | Mature suites with broad workflows; SupplierMind showcases a transparent agentic discovery architecture. |
+
+The key differentiator is not that SupplierMind has more data than enterprise vendors. The differentiator is that it is transparent, auditable, benchmarked, and built end-to-end.
+
+### 8. What Difficulties Were Faced During Development?
+
+The main difficulties were:
+
+- Natural-language procurement parsing was messy because users can omit product, location, lead time, certification, or quantity.
+- Clarification had to be agentic without becoming annoying or looping forever.
+- Web discovery returned noisy suppliers, directories, distributors, and incomplete pages.
+- Location quality was a real issue, so suppliers without verified city/country/coordinates had to be rejected.
+- Certification extraction required normalization because real sites use many variants like `ISO 9001:2015`, `DIN EN ISO 9001`, `AS9100D`, and `IATF 16949-2016`.
+- LLMs can claim a supplier matches without proof, so evidence checks were needed.
+- Ranking had to balance recall with strict product, location, certification, lead-time, and capacity constraints.
+- Pending-review suppliers had to appear in the current result list without becoming approved vendors automatically.
+- The thesis benchmark had to avoid contamination from the 10k product-scale synthetic corpus.
+- External APIs introduced latency, credentials, rate limits, and partial-failure behavior.
+- Debugging agents required structured audit trails because failures can happen at parser, discovery, compliance, ranking, or evaluator stages.
+
+### 9. What Are The Trade-Offs?
+
+| Trade-Off | Benefit | Cost |
+|---|---|---|
+| Multi-agent workflow vs simple RAG | Better governance, clarification, auditability, and evidence handling. | More latency and more moving parts. |
+| Strict evidence checks vs broad recall | Higher trust in returned suppliers. | Some good suppliers may be missed if evidence is incomplete. |
+| Human review vs automatic onboarding | Safer supplier governance. | Slower approval flow. |
+| Web discovery vs internal-only search | Finds new suppliers beyond the database. | Web search is noisy and slower. |
+| Milvus vs pgvector | Stronger standalone vector-search infrastructure. | More operational complexity because Milvus needs etcd/MinIO. |
+| Pinned OpenAI model vs always-latest model | Reproducible benchmark and stable behavior. | May miss newer model improvements. |
+| One LLM provider vs fallback providers | Avoids silent benchmark contamination. | Provider outage becomes more visible. |
+| Deterministic ranking vs LLM ranking | Explainable and repeatable scores. | Less adaptive than learned ranking. |
+| Docker Compose plus optional Kubernetes manifests | Easy local demo and production-style templates. | Real production would still need managed secrets, observability, and deployment hardening. |
+
+The most important trade-off:
+
+> SupplierMind prioritizes procurement governance, auditability, and evidence over raw retrieval speed. That makes it more production-aligned, but also more complex than a simple RAG demo.
+
+### 10. What Planned Add-On Features Can Be Implemented In Future?
+
+These are future improvements, not claims about the current implementation:
+
+1. Supplier comparison view for side-by-side capacity, lead time, certifications, location, and evidence.
+2. Certificate expiry tracking and document upload for supplier certificates.
+3. Candidate ledger storing every web candidate, rejected result, and rejection reason.
+4. Learning from approval/rejection feedback to tune ranking and parsing rules.
+5. ERP/procurement integrations with SAP Ariba, Coupa, Ivalua, Jaggaer, or Mercanis workflows.
+6. RFQ/RFP generation and controlled supplier outreach drafts.
+7. Advanced supplier risk scoring using ESG, financial, cyber, adverse media, and geopolitical signals.
+8. Better crawler pipeline with supplier homepage detection and page-level citations.
+9. Cost and latency dashboard per query, agent, and external API.
+10. Knowledge graph for supplier relationships, parent companies, categories, locations, and risk links.
+11. Multi-document RAG over certificates, brochures, quality manuals, and audit reports.
+12. Learning-to-rank model trained from historical procurement outcomes, once real company feedback data exists.
 
 ---
 
@@ -39,7 +252,7 @@ The application then:
 1. Understands the product, location, certifications, capacity, and lead-time constraints.
 2. Searches internal supplier records using semantic search and structured filters.
 3. Optionally searches the web for new suppliers.
-4. validates whether each supplier really satisfies the constraints.
+4. Validates whether each supplier really satisfies the constraints.
 5. Ranks the best suppliers.
 6. Shows evidence, explanations, and an audit trail.
 7. Sends newly discovered suppliers to human review before they become approved vendors.
@@ -170,12 +383,12 @@ flowchart LR
     subgraph Stores
         PG["PostgreSQL"]
         MV["Milvus"]
-        REDIS["Redis"]
+        REDIS["Redis-compatible cache"]
     end
 
     D --> PG
     D --> MV
-    Q --> REDIS
+    API["Backend runtime"] --> REDIS
 ```
 
 ---
@@ -256,7 +469,7 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Alembic | Database migrations. |
 | PostgreSQL | Relational source of truth. |
 | PostGIS | Geospatial/radius search support. |
-| Redis | Cache and lightweight runtime support. |
+| Redis | Shared async cache abstraction and lightweight runtime support. |
 | LangGraph | Stateful multi-agent orchestration. |
 | OpenAI GPT-4o-mini pinned snapshot | LLM reasoning, extraction, and evaluation. |
 | Voyage AI embeddings | Semantic embeddings. |
@@ -295,6 +508,18 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Bootstrap CIs | Gives uncertainty ranges for benchmark metrics. |
 | Output gallery | Side-by-side qualitative comparison. |
 
+### Product And Thesis Branch Intent
+
+SupplierMind is maintained for two related use cases:
+
+| Use Case | What It Optimizes For | Data Mode |
+|---|---|---|
+| Production/product branch | Product-quality supplier discovery, human review, approval workflow, and 10k+ supplier search | Full active supplier database plus eligible pending-review web discoveries |
+| Master's thesis branch | Reproducible P1/P2/P3 evaluation and reporting | Frozen curated SupplierBench supplier IDs |
+
+The evaluation code now explicitly filters benchmark retrieval to the curated
+SupplierBench IDs, so product-scale data does not contaminate thesis metrics.
+
 ---
 
 ## 4. Data Engineering, Software Engineering, And AI/ML Concepts Used
@@ -312,7 +537,7 @@ This creates wasted time, inconsistent decisions, weak auditability, and higher 
 | Data quality gates | Reject web suppliers without verified city/country/coordinates | Prevents dirty supplier records from polluting search results. | Allow all extracted suppliers and mark confidence later. |
 | Data lineage and audit logs | Every agent stores reasoning, input/output snapshots, duration | Procurement decisions need explainability and traceability. | Application logs only, no structured audit table. |
 | Human-in-the-loop curation | Pending-review suppliers need approval/rejection | Prevents unverified web data from becoming company-approved supplier data. | Fully automatic ingestion, admin-only manual CSV import. |
-| Benchmark data control | Curated-100 corpus, inactive quarantine of 10k scale data | Makes thesis evaluation reproducible and avoids contamination. | Evaluate on full dynamic production data, but less reproducible. |
+| Benchmark data control | Curated-100 allowlist for thesis evaluation; 10k scale set for product search | Makes thesis evaluation reproducible while preserving product-scale discovery. | Evaluate on full dynamic production data, but less reproducible. |
 | Soft delete / active flag | `is_active` controls benchmark and search eligibility | Keeps data reversible and auditable. | Hard delete rows, separate archive database. |
 
 ### Software Engineering Concepts
@@ -549,7 +774,7 @@ SupplierMind is not trying to beat enterprise platforms on proprietary data size
 
 4. **Location validation was necessary**
    - Without validation, suppliers could appear with missing or wrong locations.
-   - Geoapify/Nominatim style geocoding introduced latency and failure cases.
+   - Geoapify geocoding and places validation introduced latency and failure cases.
 
 5. **Compliance evidence was difficult**
    - It is easy for an LLM to say a supplier matches.

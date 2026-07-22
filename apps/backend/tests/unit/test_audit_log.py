@@ -5,13 +5,13 @@ from app.agents.audit_log import append_audit_entry
 
 
 def _kwargs(**over):
-    base = dict(
-        agent_name="parser",
-        action="parse",
-        input_summary="in",
-        output_summary="out",
-        duration_ms=12,
-    )
+    base = {
+        "agent_name": "parser",
+        "action": "parse",
+        "input_summary": "in",
+        "output_summary": "out",
+        "duration_ms": 12,
+    }
     base.update(over)
     return base
 
@@ -79,3 +79,17 @@ def test_snapshots_added_only_when_provided():
     )
     assert rich["input_snapshot"] == {"a": 1}
     assert rich["output_snapshot"] == {"b": 2}
+
+
+def test_snapshots_are_immutable_after_append():
+    state: dict = {}
+    output_snapshot = {"parsed_constraints": {"certifications": ["ISO 9001"]}}
+
+    entry = append_audit_entry(
+        state,
+        output_snapshot=output_snapshot,
+        **_kwargs(),
+    )
+    output_snapshot["parsed_constraints"]["certifications"].clear()
+
+    assert entry["output_snapshot"]["parsed_constraints"]["certifications"] == ["ISO 9001"]

@@ -3,6 +3,7 @@ app/db/repositories/user_repo.py — All database operations for User model.
 """
 
 import uuid
+from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,10 +62,11 @@ class UserRepository(BaseRepository[User]):
 
     async def update_last_login(self, user_id: uuid.UUID) -> None:
         """Update the last_login timestamp for a user."""
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from sqlalchemy import update
         await self.db.execute(
             update(User)
             .where(User.id == user_id)
-            .values(last_login=datetime.now(timezone.utc))
+            .values(last_login=datetime.now(UTC))
         )

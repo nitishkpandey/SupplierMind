@@ -1,22 +1,69 @@
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { AppLayout } from "@/features/layout/AppLayout";
-import LoginPage from "@/pages/LoginPage";
-import AuthCallbackPage from "@/pages/AuthCallbackPage";
-import DashboardPage from "@/pages/DashboardPage";
-import QueryPage from "@/pages/QueryPage";
-import ResultsPage from "@/pages/ResultsPage";
-import HistoryPage from "@/pages/HistoryPage";
-import AdminPage from "@/pages/AdminPage";
-import AdminMetricsPage from "@/pages/AdminMetricsPage";
-import MySuppliersPage from "@/pages/MySuppliersPage";
+import { refreshSession } from "@/services/api";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const AuthCallbackPage = lazy(() => import("@/pages/AuthCallbackPage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const QueryPage = lazy(() => import("@/pages/QueryPage"));
+const ResultsPage = lazy(() => import("@/pages/ResultsPage"));
+const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const AdminMetricsPage = lazy(() => import("@/pages/AdminMetricsPage"));
+const MySuppliersPage = lazy(() => import("@/pages/MySuppliersPage"));
+
+function PageSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, clearAuth } = useAuthStore();
+  const [isCheckingSession, setIsCheckingSession] = useState(
+    () => !isAuthenticated && Boolean(sessionStorage.getItem("sm_refresh_token"))
+  );
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      return;
+    }
+
+    const refreshToken = sessionStorage.getItem("sm_refresh_token");
+    if (!refreshToken) {
+      return;
+    }
+
+    let cancelled = false;
+    refreshSession(refreshToken)
+      .catch(() => {
+        if (cancelled) return;
+        clearAuth();
+        sessionStorage.removeItem("sm_refresh_token");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsCheckingSession(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearAuth, isAuthenticated]);
+
+  if (isCheckingSession) {
+    return <PageSpinner />;
+  }
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
+function AdminRoute({ children }: { children: ReactNode }) {
   const { user } = useAuthStore();
   return user?.role === "admin" ? (
     <>{children}</>
@@ -28,44 +75,45 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-        {/* Protected routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="query" element={<QueryPage />} />
-          <Route path="query/:queryId/results" element={<ResultsPage />} />
-          <Route path="history" element={<HistoryPage />} />
-          <Route path="my-suppliers" element={<MySuppliersPage />} />
           <Route
-            path="admin"
+            path="/"
             element={
-              <AdminRoute>
-                <AdminPage />
-              </AdminRoute>
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
             }
-          />
-          <Route
-            path="admin/metrics"
-            element={
-              <AdminRoute>
-                <AdminMetricsPage />
-              </AdminRoute>
-            }
-          />
-        </Route>
-      </Routes>
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="query" element={<QueryPage />} />
+            <Route path="query/:queryId/results" element={<ResultsPage />} />
+            <Route path="history" element={<HistoryPage />} />
+            <Route path="my-suppliers" element={<MySuppliersPage />} />
+            <Route
+              path="admin"
+              element={
+                <AdminRoute>
+                  <AdminPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/metrics"
+              element={
+                <AdminRoute>
+                  <AdminMetricsPage />
+                </AdminRoute>
+              }
+            />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

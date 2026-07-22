@@ -10,10 +10,13 @@ Tavily is built for AI agents:
 """
 
 import logging
+import math
+import re
+from collections.abc import Sequence
 from functools import lru_cache
-from typing import Optional
 from urllib.parse import urlparse
 
+import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 _CATEGORY_SEARCH_TERMS = {
     "tools_hardware": "hand tools industrial tools hardware",
-    "office_supplies": "office supplies workplace equipment",
+    "office_supplies": "office furniture office supplies workplace equipment",
     "construction_materials": "construction materials building materials",
     "food_ingredients": "food ingredients",
     "software_services": "software services",
@@ -61,8 +64,9 @@ class WebSearchService:
             logger.warning("TAVILY_API_KEY not set. External discovery will be disabled.")
             self._client = None
         else:
-            from tavily import TavilyClient
-            self._client = TavilyClient(api_key=settings.TAVILY_API_KEY)
+            # Availability marker. Calls use httpx directly so each query can
+            # honor the remaining end-to-end request budget.
+            self._client = object()
             logger.info("Web search service initialized (Tavily)")
 
     @property
@@ -74,28 +78,41 @@ class WebSearchService:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def _search_raw(self, query: str, max_results: int = 10) -> list[dict]:
-        """Raw Tavily search call with retry."""
+    def _search_raw(
+        self,
+        query: str,
+        max_results: int = 10,
+        timeout_seconds: float | None = None,
+    ) -> list[dict]:
+        """Raw Tavily HTTP search call with retry and a call-level timeout."""
         if not self._client:
             return []
-        result = self._client.search(
-            query=query,
-            search_depth="basic",
-            max_results=max_results,
-            include_answer=False,
-            include_raw_content=False,
-        )
+        timeout = max(0.1, float(timeout_seconds or settings.EXTERNAL_DISCOVERY_TIMEOUT))
+        payload = {
+            "api_key": settings.TAVILY_API_KEY,
+            "query": query,
+            "search_depth": "basic",
+            "max_results": max_results,
+            "include_answer": False,
+            "include_raw_content": False,
+        }
+        with httpx.Client(timeout=timeout) as client:
+            response = client.post(settings.TAVILY_API_BASE_URL, json=payload)
+            response.raise_for_status()
+            result = response.json()
         return result.get("results", [])
 
     def search_suppliers(
         self,
-        category: Optional[str] = None,
-        country: Optional[str] = None,
-        city: Optional[str] = None,
-        certifications: Optional[list[str]] = None,
-        product_terms: Optional[list[str]] = None,
-        raw_query: Optional[str] = None,
+        category: str | None = None,
+        industry_context: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        certifications: list[str] | None = None,
+        product_terms: list[str] | None = None,
+        raw_query: str | None = None,
         max_results: int = 10,
+        timeout_seconds: float | None = None,
     ) -> list[WebSearchResult]:
         """
         Search the web for suppliers matching constraints.
@@ -110,6 +127,7 @@ class WebSearchService:
         target_results = max(1, max_results)
         queries = self._build_supplier_queries(
             category=category,
+            industry_context=industry_context,
             country=country,
             city=city,
             certifications=certifications,
@@ -119,13 +137,17 @@ class WebSearchService:
 
         all_results: list[WebSearchResult] = []
         seen_urls: set[str] = set()
-        per_query_limit = max(5, min(target_results, 10))
+        per_query_limit = max(1, min(5, math.ceil(target_results / max(1, len(queries)))))
 
-        for query in queries:
+        for _family, query in queries:
             logger.info("[web_search] Searching: %r", query)
 
             try:
-                raw = self._search_raw(query, max_results=per_query_limit)
+                raw = self._search_raw(
+                    query,
+                    max_results=per_query_limit,
+                    timeout_seconds=timeout_seconds,
+                )
             except Exception as e:
                 logger.error("[web_search] Tavily search failed for %r: %s", query, e)
                 continue
@@ -147,100 +169,126 @@ class WebSearchService:
                         score=float(r.get("score", 0.0)),
                     )
                 )
-                if len(all_results) >= target_results:
-                    logger.info("[web_search] Found %d unique results", len(all_results))
-                    return all_results
-
-        logger.info("[web_search] Found %d unique results", len(all_results))
-        return all_results
+        all_results.sort(key=lambda result: result.score, reverse=True)
+        selected = all_results[:target_results]
+        logger.info("[web_search] Found %d unique results", len(selected))
+        return selected
 
     @classmethod
     def _build_supplier_queries(
         cls,
         *,
-        category: Optional[str],
-        country: Optional[str],
-        city: Optional[str],
-        certifications: Optional[list[str]],
-        product_terms: Optional[list[str]],
-        raw_query: Optional[str],
-    ) -> list[str]:
+        category: str | None,
+        industry_context: str | None,
+        country: str | None,
+        city: str | None,
+        certifications: list[str] | None,
+        product_terms: list[str] | None,
+        raw_query: str | None,
+    ) -> list[tuple[str, str]]:
         location = " ".join(cls._dedupe_terms([city, country]))
         cert_text = " ".join(cls._dedupe_terms(certifications or []))
-        product_text = " ".join(cls._dedupe_terms(product_terms or [])[:6])
+        product_phrases = cls._compact_product_terms(product_terms or [])
+        primary_product = product_phrases[0] if product_phrases else ""
+        product_variants = product_phrases[1:]
 
         category_text = ""
         if category:
             category_text = _CATEGORY_SEARCH_TERMS.get(category, category.replace("_", " "))
+        industry_text = " ".join(str(industry_context or "").replace("_", " ").split())
+        context_text = industry_text or category_text
 
-        query_parts: list[list[str]] = []
+        query_parts: list[tuple[str, list[str]]] = []
 
-        if product_text and country and country.casefold() in {"germany", "deutschland"}:
-            query_parts.append([
+        if primary_product and country and country.casefold() in {"germany", "deutschland"}:
+            query_parts.append(("country_domain", [
                 "site:.de",
-                product_text,
-                category_text,
+                primary_product,
+                context_text,
                 location,
-                "manufacturer supplier GmbH",
-            ])
-            query_parts.append([
-                product_text,
-                "German",
-                category_text,
-                location,
-                "manufacturer official website GmbH",
-            ])
+                "manufacturer supplier",
+            ]))
 
-        if product_text:
-            query_parts.append([
-                cert_text,
-                product_text,
-                category_text,
-                "supplier manufacturer distributor",
+        if primary_product:
+            query_parts.append(("manufacturer", [
+                primary_product,
+                context_text,
+                "manufacturer",
                 location,
-                "company website",
-            ])
+                "company",
+            ]))
+            distributor_product = product_variants[0] if product_variants else primary_product
+            query_parts.append(("distributor", [
+                distributor_product,
+                "distributor wholesaler",
+                location,
+                "company",
+            ]))
+            if len(product_variants) > 1:
+                query_parts.append(("wholesaler_variant", [
+                    product_variants[1],
+                    "wholesaler distributor",
+                    location,
+                    "company",
+                ]))
 
         if certifications:
-            query_parts.append([
+            query_parts.append(("certification", [
                 cert_text,
-                product_text or category_text,
-                "certified supplier manufacturer",
+                primary_product or context_text,
+                "certified supplier",
                 location,
-                "official website",
-            ])
+            ]))
 
-        if category:
-            query_parts.append([
-                category_text,
-                "supplier manufacturer",
+        if context_text:
+            query_parts.append(("category", [
+                context_text,
+                primary_product,
+                "supplier",
                 location,
-                "company website",
-            ])
-
-        if raw_query and product_text:
-            query_parts.append([
-                product_text,
-                location,
-                "manufacturer supplier official website",
-            ])
+            ]))
 
         if not query_parts:
-            query_parts.append([location, "supplier manufacturer company website"])
+            query_parts.append(("fallback", [location, "supplier manufacturer company"]))
 
-        queries: list[str] = []
+        queries: list[tuple[str, str]] = []
         seen: set[str] = set()
-        for parts in query_parts:
+        for family, parts in query_parts:
             query = " ".join(p for p in parts if p).strip()
             query = " ".join(query.split())
             if not query or query.casefold() in seen:
                 continue
             seen.add(query.casefold())
-            queries.append(query)
-        return queries[:3]
+            queries.append((family, query))
+        return queries
+
+    @classmethod
+    def _compact_product_terms(
+        cls,
+        values: Sequence[str | None],
+        *,
+        max_terms: int = 3,
+    ) -> list[str]:
+        """Keep an ordered primary phrase plus genuinely distinct variants."""
+        selected: list[str] = []
+        selected_tokens: list[set[str]] = []
+        for cleaned in cls._dedupe_terms(values):
+            tokens = set(re.findall(r"[\w+.-]+", cleaned.casefold()))
+            if not tokens:
+                continue
+            if any(
+                tokens <= existing or existing <= tokens
+                for existing in selected_tokens
+            ):
+                continue
+            selected.append(cleaned)
+            selected_tokens.append(tokens)
+            if len(selected) >= max(1, max_terms):
+                break
+        return selected
 
     @staticmethod
-    def _dedupe_terms(values: list[str | None]) -> list[str]:
+    def _dedupe_terms(values: Sequence[str | None]) -> list[str]:
         terms: list[str] = []
         seen: set[str] = set()
         for value in values:

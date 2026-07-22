@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { SSEEvent } from "@/types";
 import { useAuthStore } from "@/store/authStore";
+import { apiBaseUrl } from "@/lib/utils";
 
 export interface ClarificationSignal {
   clarification_id: string;
@@ -26,7 +27,6 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
   const sourceRef = useRef<EventSource | null>(null);
   const terminalEventRef = useRef(false);
   const { accessToken } = useAuthStore();
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   useEffect(() => {
     if (!queryId) return;
@@ -125,7 +125,6 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
       source.close();
       sourceRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryId, accessToken, resumeKey]);
 
   const reset = () => {

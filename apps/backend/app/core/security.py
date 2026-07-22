@@ -8,7 +8,7 @@ ONLY import this from:
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
@@ -55,7 +55,7 @@ def create_access_token(
       "exp": 1716086400    <- expires at (24h later)
     }
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload: dict[str, Any] = {
@@ -75,10 +75,10 @@ def create_access_token(
 def create_refresh_token(subject: str) -> str:
     """
     Create a refresh token.
-    Contains only the user ID — minimal data for security.
-    Stored in Redis server-side (can be invalidated on logout).
+    Contains only the user ID and expiry; the current implementation validates
+    it statelessly as a signed JWT.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = {

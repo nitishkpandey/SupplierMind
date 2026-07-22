@@ -47,8 +47,8 @@ React Frontend (TypeScript + Tailwind)
          │
     ┌────┼──────────────────────────┐
     │    │                          │
- PostgreSQL  Milvus Vector DB   Redis Cache
- (supplier   (semantic search)  (LLM resp.)
+ PostgreSQL  Milvus Vector DB   Redis-compatible cache
+ (supplier   (semantic search)  (runtime support)
   data)
 ```
 
@@ -61,7 +61,7 @@ React Frontend (TypeScript + Tailwind)
 | Vector DB | Milvus 2.4 | Semantic similarity search |
 | Database | PostgreSQL 16 + PostGIS | Supplier data, queries, audit logs |
 | Location | Geoapify Geocoding + Places | Mandatory city/country validation for web suppliers |
-| Cache | Redis 7 | LLM response cache, sessions |
+| Cache | Redis 7 with in-memory fallback | Shared async cache abstraction and runtime support |
 | Agents | LangGraph 0.2 | Stateful agent graph with cycles |
 | Backend | FastAPI + Python 3.11 | REST API + SSE streaming |
 | Frontend | React 19 + TypeScript + Vite | Production UI |
@@ -108,6 +108,9 @@ uv run python scripts/bulk_ingest_synthetic.py --force-pg --skip-milvus
 # Optional: build/rebuild the full semantic Milvus index.
 # This calls the embedding provider and can take a long time on free tiers.
 uv run python scripts/bulk_ingest_synthetic.py --skip-pg --resume
+# If the checkpoint says complete but Milvus has fewer entities than Postgres,
+# rebuild the supplier collection from scratch:
+uv run python scripts/bulk_ingest_synthetic.py --skip-pg --reset-milvus
 uv run uvicorn app.main:app --reload --port 8000
 
 # 5. Frontend (separate terminal)
@@ -152,6 +155,18 @@ Design decisions and the shared output contract are documented in
 [ARCHITECTURE.md](ARCHITECTURE.md). Benchmark protocol and reproduction:
 [BENCHMARK.md](BENCHMARK.md).
 
+## Production vs Thesis Data Modes
+
+SupplierMind is maintained for two related but separate goals:
+
+| Mode | Branch intent | Supplier corpus |
+|---|---|---|
+| Product / production | Active product UX and company-ready discovery workflow | All active suppliers in PostgreSQL, including the 10k synthetic scale set and eligible web-discovered pending-review rows |
+| Master's thesis | Reproducible P1/P2/P3 evaluation | Frozen curated SupplierBench supplier IDs from `apps/backend/data/suppliers_synthetic.json` |
+
+The evaluation runner enforces the curated thesis corpus explicitly, so loading
+the 10k product corpus does not silently contaminate benchmark metrics.
+
 ## Repository Map
 
 ```
@@ -191,5 +206,6 @@ Link to the thesis document: _placeholder — added on submission._
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the five agents, data flow, three-tier governance, audit log
 - [BENCHMARK.md](BENCHMARK.md) — SupplierBench-25, metrics, end-to-end reproduction
+- [docs/agentic-e2e-test-plan.md](docs/agentic-e2e-test-plan.md) — 25-query acceptance matrix for agentic behavior, retrieval, web discovery, compliance, and known index health checks
 - [CONTRIBUTING.md](CONTRIBUTING.md) — code style, tests, commit conventions
 - [LICENSE](LICENSE) — MIT

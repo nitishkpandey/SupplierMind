@@ -7,6 +7,9 @@ stops fighting 429s with reactive backoff.
 
 import logging
 
+import pytest
+
+from app.agents.deadline import QueryDeadlineExceeded
 from app.core.llm import estimate_message_tokens
 from app.core.rate_limiter import ModelRateLimiter
 
@@ -88,6 +91,17 @@ def test_unknown_model_uses_default_limit():
     # Never configured "other" explicitly — must fall back to default, not crash.
     ts = rl.acquire("other-model", 10)
     assert isinstance(ts, float)
+
+
+def test_rate_limiter_refuses_wait_beyond_budget():
+    clock = FakeClock()
+    limiter = make_limiter(rpm=1, tpm=100, clock=clock)
+    limiter.acquire("m", 1)
+
+    with pytest.raises(QueryDeadlineExceeded):
+        limiter.acquire("m", 1, max_wait_seconds=0.5)
+
+    assert clock.t == 1000.0
 
 
 # ── token estimator ──────────────────────────────────────────────────

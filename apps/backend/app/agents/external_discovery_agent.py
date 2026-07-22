@@ -3,9 +3,11 @@
 import logging
 import time
 import uuid
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any
 
 from app.agents.base import BaseAgent
+from app.agents.deadline import remaining_seconds
 from app.agents.state import AgentState
 from app.core.config import settings
 from app.core.vector_store import get_vector_store
@@ -20,6 +22,7 @@ from app.utils.text_normalization import normalise_supplier_name_for_dedupe
 logger = logging.getLogger(__name__)
 
 _WEB_RESULT_CEILING = 6
+_EXTRACTION_DEADLINE_MARGIN_SECONDS = 3.0
 
 
 class ExternalDiscoveryAgent(BaseAgent):
@@ -40,6 +43,11 @@ class ExternalDiscoveryAgent(BaseAgent):
 
     def execute(self, state: AgentState) -> AgentState:
         start = time.time()
+        deadline_at = float(
+            state.get("deadline_at")
+            or (time.monotonic() + max(1, settings.EXTERNAL_DISCOVERY_TIMEOUT))
+        )
+        deadline_exceeded = False
 
         state.setdefault("newly_discovered_supplier_ids", [])
         state.setdefault("external_discovery_stats", {})
@@ -65,7 +73,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             )
             return state
 
-        constraints = state.get("parsed_constraints") or {}
+        constraints: Mapping[str, Any] = state.get("parsed_constraints") or {}
 
         # ── Step 1: Web search ───────────────────────────────────────
         max_web_results = min(
@@ -74,12 +82,16 @@ class ExternalDiscoveryAgent(BaseAgent):
         )
         web_results = self.web_search.search_suppliers(
             category=constraints.get("category_hint") or constraints.get("category"),
+            industry_context=constraints.get("industry_context"),
             country=self._extract_country_from_constraints(constraints),
             city=constraints.get("location_city"),
             certifications=constraints.get("certifications"),
             product_terms=self._product_terms_from_constraints(constraints),
             raw_query=state.get("raw_query"),
             max_results=max_web_results,
+            timeout_seconds=(
+                remaining_seconds({"deadline_at": deadline_at}, reserve=1.0)
+            ),
         )
 
         logger.info("[external_discovery] Web search: %d candidates", len(web_results))
@@ -103,6 +115,13 @@ class ExternalDiscoveryAgent(BaseAgent):
         extracted: list[dict] = []
 
         for result in web_results:
+            if self._deadline_exceeded(deadline_at, _EXTRACTION_DEADLINE_MARGIN_SECONDS):
+                deadline_exceeded = True
+                logger.warning(
+                    "[external_discovery] Deadline reached before extracting all web candidates"
+                )
+                break
+
             # Stage 1: Cheap classification
             classification = self.extractor.stage1_classify(
                 title=result.title,
@@ -121,7 +140,10 @@ class ExternalDiscoveryAgent(BaseAgent):
             stage1_passed += 1
 
             # Stage 2: Rich extraction from full page
-            data = self.extractor.stage2_extract(url=result.url)
+            data = self.extractor.stage2_extract(
+                url=result.url,
+                deadline_at=deadline_at,
+            )
             if data:
                 extracted.append(data)
                 logger.debug("[external_discovery] Extracted: %r", data["name"])
@@ -140,6 +162,14 @@ class ExternalDiscoveryAgent(BaseAgent):
 
         with SyncSessionLocal() as db:
             for s in extracted:
+                if self._deadline_exceeded(deadline_at, _EXTRACTION_DEADLINE_MARGIN_SECONDS):
+                    deadline_exceeded = True
+                    logger.warning(
+                        "[external_discovery] Deadline reached before validating "
+                        "all extracted suppliers"
+                    )
+                    break
+
                 location = self.location_enricher.enrich(s, constraints)
                 if location is None:
                     logger.info(
@@ -200,6 +230,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             "pending_sanctions": pending_sanctions,
             "rejected_duplicates": rejected_duplicate,
             "rejected_missing_location": rejected_missing_location,
+            "deadline_exceeded": deadline_exceeded,
             "ingested": len(newly_added_ids),
         }
 
@@ -216,7 +247,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                 f"extracted={len(extracted)}, validated={len(validated)}, "
                 f"ingested={len(newly_added_ids)}, "
                 f"rejected_sanctions={rejected_sanctions}, pending_sanctions={pending_sanctions}, "
-                f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}"
+                f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}, "
+                f"deadline_exceeded={deadline_exceeded}"
             ),
             duration_ms=duration_ms,
             reasoning=(
@@ -226,6 +258,10 @@ class ExternalDiscoveryAgent(BaseAgent):
         )
 
         return state
+
+    @staticmethod
+    def _deadline_exceeded(deadline_at: float, margin_seconds: float = 0.0) -> bool:
+        return time.monotonic() + margin_seconds >= deadline_at
 
     @staticmethod
     def _apply_verified_location(supplier: dict, location: VerifiedLocation) -> None:
@@ -243,7 +279,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         supplier["source_citations"] = citations
 
     @staticmethod
-    def _product_terms_from_constraints(constraints: dict) -> list[str]:
+    def _product_terms_from_constraints(constraints: Mapping[str, Any]) -> list[str]:
         terms: list[str] = []
         if constraints.get("product_type"):
             terms.append(str(constraints["product_type"]))
@@ -260,7 +296,7 @@ class ExternalDiscoveryAgent(BaseAgent):
             cleaned_terms.append(cleaned)
         return cleaned_terms[:8]
 
-    def _is_duplicate(self, db, name: str, country: Optional[str]) -> bool:
+    def _is_duplicate(self, db, name: str, country: str | None) -> bool:
         """Check if a supplier already exists by normalized name + country."""
         from sqlalchemy import select
 
@@ -308,8 +344,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                         contact_email=s.get("contact_email"),
                         source="web_discovery",
                         # Web-discovered suppliers enter a pending-review state
-                        # so they never bypass manager approval. They are still
-                        # embedded after commit and shown with a badge in search.
+                        # so they never bypass manager approval. They are
+                        # embedded before commit and shown with a badge in search.
                         status=SupplierStatus.pending_review,
                         source_url=s.get("source_url"),
                         source_citations=s.get("source_citations") or {},
@@ -319,19 +355,27 @@ class ExternalDiscoveryAgent(BaseAgent):
                     supplier_objects.append((supplier_id, s))
                     new_ids.append(str(supplier_id))
 
-                db.commit()
+                # Embed BEFORE commit: a Milvus failure raises here, the
+                # session exit rolls back the uncommitted Postgres rows, and
+                # both stores stay in sync.
+                # ponytail: if commit fails after the vector add, Milvus keeps
+                # orphan vectors (harmless — search resolves via Postgres);
+                # add reconciliation if that ever matters.
+                vs = get_vector_store()
+                embed_dicts = [
+                    {**s, "id": new_ids[i]}
+                    for i, (sid, s) in enumerate(supplier_objects)
+                ]
+                vs.add_suppliers(embed_dicts)
 
-            vs = get_vector_store()
-            embed_dicts = [
-                {**s, "id": new_ids[i]}
-                for i, (sid, s) in enumerate(supplier_objects)
-            ]
-            vs.add_suppliers(embed_dicts)
+                db.commit()
 
             logger.debug("[external_discovery] Ingested %d new suppliers", len(new_ids))
 
         except Exception as e:
             logger.error("[external_discovery] Ingestion failed: %s", e)
+            # Rows were rolled back — never report IDs that don't exist.
+            return []
 
         return new_ids
 
@@ -340,7 +384,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         certifications = supplier.get("certifications") or []
         citations = supplier.get("source_citations") or {}
         cert_citation = citations.get("certifications") if isinstance(citations, dict) else None
-        per_cert = {}
+        per_cert: dict[str, Any] = {}
         if isinstance(cert_citation, dict):
             per_cert = cert_citation.get("certifications") or {}
 

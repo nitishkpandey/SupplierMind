@@ -1,4 +1,4 @@
-"""Tool registry pattern for the ReAct Parser (Task 3.1).
+"""Tool registry pattern for the ReAct Parser.
 
 A Tool is a side-effect-free callable plus its self-description for the LLM
 (name, prose description, JSON-schema for arguments). The ToolRegistry holds
@@ -16,8 +16,9 @@ Design choices (see Yao et al. 2022, arXiv:2210.03629):
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass
@@ -61,31 +62,38 @@ class ToolRegistry:
     def __len__(self) -> int:
         return len(self._tools)
 
-    def list_for_prompt(self) -> str:
+    def list_for_prompt(
+        self,
+        *,
+        exclude_names: Collection[str] = (),
+    ) -> str:
         """Render the registered tools as a string the LLM can read."""
+        excluded = set(exclude_names)
         lines: list[str] = []
         for tool in self._tools.values():
+            if tool.name in excluded:
+                continue
             lines.append(f"- {tool.name}: {tool.description}")
             lines.append(f"  arguments: {json.dumps(tool.args_schema)}")
         return "\n".join(lines)
 
 
 def build_default_registry() -> ToolRegistry:
-    """Wire the five standard Parser tools — no user context (stub memory).
+    """Wire the five standard Parser tools without user-specific memory.
 
     Kept here (not in __init__) so callers that need an empty registry for
     tests can construct one without triggering the imports of every tool
     module (some pull in services that touch the network on import).
 
-    The `lookup_past_query` tool wired in here is the no-op stub. Production
+    The `lookup_past_query` tool wired here is the no-op fallback. Production
     paths route through `build_user_registry()` which binds a real memory
-    service to the request's `user_id` (Task 3.2 / Component C).
+    service to the request's `user_id`.
     """
-    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.industry_context import infer_industry_context_tool
-    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.agents.tools.past_query_stub import lookup_past_query_tool
+    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
 
     reg = ToolRegistry()
     reg.register(geocode_location_tool())
@@ -104,23 +112,23 @@ def build_user_registry(
 ) -> ToolRegistry:
     """Wire the five Parser tools with a real, per-user `lookup_past_query`.
 
-    Task 3.2: the Parser is user-scoped at construction. `current_user_id` is
+    The Parser is user-scoped at construction. `current_user_id` is
     closure-bound on the lookup tool so the LLM cannot search another user's
     memory regardless of the Action Input it emits.
 
     `lookup_min_similarity` is an optional override of the cosine threshold
-    on the memory search. The default (0.65 in past_query.py) is intentionally
-    conservative; the live demo uses a lower value while the threshold is
-    being tuned against real query distributions.
+    on the memory search. The default (0.45 in past_query.py) was tuned
+    against a measured Voyage cosine distribution — see the comment on
+    `_DEFAULT_MIN_SIMILARITY` there.
     """
-    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.cert_taxonomy import canonicalize_certification_tool
+    from app.agents.tools.geocode import geocode_location_tool
     from app.agents.tools.industry_context import infer_industry_context_tool
-    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.agents.tools.past_query import (
         _DEFAULT_MIN_SIMILARITY,
         make_lookup_past_query_tool,
     )
+    from app.agents.tools.quantity_parser import parse_quantity_unit_tool
     from app.services.query_memory import get_memory_service
 
     svc = memory_service if memory_service is not None else get_memory_service()

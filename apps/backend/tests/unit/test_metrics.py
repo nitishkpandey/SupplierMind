@@ -13,7 +13,7 @@ Bounds on window_hours (1..168) are pinned via FastAPI's built-in Query
 validation, so out-of-range values return 422.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -25,7 +25,6 @@ from app.api.deps import get_current_user
 from app.db.models import UserRole
 from app.db.session import get_db
 from app.main import app
-
 
 METRICS_URL = "/api/v1/admin/metrics"
 
@@ -109,7 +108,7 @@ def _default_rows():
         "sanctions": SimpleNamespace(cnt=9),
         "errors": [
             SimpleNamespace(
-                timestamp=datetime(2026, 6, 2, 19, 45, 12, tzinfo=timezone.utc),
+                timestamp=datetime(2026, 6, 2, 19, 45, 12, tzinfo=UTC),
                 agent_name="external_discovery",
                 action="no_web_results",
                 query_id=uuid4(),

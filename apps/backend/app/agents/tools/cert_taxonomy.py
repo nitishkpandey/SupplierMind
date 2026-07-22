@@ -1,4 +1,4 @@
-"""canonicalize_certification tool — wraps Task 1.3 cert taxonomy lookup."""
+"""canonicalize_certification tool — wraps the certification taxonomy lookup."""
 
 from __future__ import annotations
 
