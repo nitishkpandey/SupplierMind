@@ -41,6 +41,16 @@ class QueryMetrics:
     cost_usd: Optional[float] = field(default=None)        # LLM spend attributed to this call
     raw_names: Optional[list[str]] = field(default=None)   # Names as the model emitted them (P1/P2)
     reasoning: Optional[str] = field(default=None)         # Model-stated reasoning (P1/P2)
+    would_clarify: Optional[bool] = field(default=None)    # P3 would have paused for clarification (non-interactive eval)
+    # Instrumentation for the diagnostic experiments (intent resolution, error
+    # taxonomy, tool access, prompt efficiency, clean latency).
+    parsed_constraints: Optional[dict] = field(default=None)   # P3 parser output
+    tools_used: Optional[list[str]] = field(default=None)      # tools the parser called
+    react_terminated_by: Optional[str] = field(default=None)   # finish | max_iterations | parse_failed
+    llm_calls: Optional[int] = field(default=None)             # LLM calls attributed to this query
+    prompt_tokens: Optional[int] = field(default=None)
+    completion_tokens: Optional[int] = field(default=None)
+    pacing_ms: Optional[int] = field(default=None)             # ms slept for provider rate limits
 
 
 @dataclass

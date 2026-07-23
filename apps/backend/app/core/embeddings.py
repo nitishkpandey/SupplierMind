@@ -134,6 +134,13 @@ class EmbeddingClient:
         free-tier throttle (transient), only a permanent upstream fault would
         surface, and that is caught below as a loud EmbeddingUpstreamError.
         """
+        # Proactively pace to the free-tier limit (sleeps if the RPM/TPM window
+        # is full) so we stay under Voyage's 3 RPM instead of 429-storming and
+        # relying on the reactive backoff below. No payment method required.
+        from app.core.rate_limiter import get_rate_limiter
+
+        get_rate_limiter().acquire(EMBEDDING_MODEL, sum(len(t) for t in texts) // 4 + 1)
+
         result = self._client.embed(
             texts,
             model=EMBEDDING_MODEL,

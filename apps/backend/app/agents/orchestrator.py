@@ -76,6 +76,8 @@ def _create_initial_state(
     previous_partial_constraints: dict | None = None,
     exclude_pending: bool = False,
     benchmark_supplier_ids: list[str] | None = None,
+    non_interactive: bool = False,
+    ablation: str = "none",
 ) -> AgentState:
     """Create initial AgentState with all defaults.
 
@@ -96,6 +98,9 @@ def _create_initial_state(
         detected_language="en",
         needs_clarification=False,
         clarification_question=None,
+        non_interactive=non_interactive,
+        would_clarify=False,
+        ablation=ablation,
 
         # Clarification dialogue
         clarification_id=None,
@@ -497,6 +502,8 @@ async def run_pipeline(
     previous_partial_constraints: dict | None = None,
     exclude_pending: bool = False,
     benchmark_supplier_ids: list[str] | None = None,
+    non_interactive: bool = False,
+    ablation: str = "none",
 ) -> AgentState:
     """
     Main entry point for running the full agent pipeline.
@@ -527,6 +534,8 @@ async def run_pipeline(
         previous_partial_constraints=previous_partial_constraints,
         exclude_pending=exclude_pending,
         benchmark_supplier_ids=benchmark_supplier_ids,
+        non_interactive=non_interactive,
+        ablation=ablation,
     )
     pipeline = get_pipeline()
 

@@ -471,6 +471,24 @@ class ComplianceAgent(BaseAgent):
             state["pipeline_status"] = "running"
             return state
 
+        if state.get("ablation") == "no_compliance":
+            # Ablation: skip the constraint/evidence gate entirely. Every
+            # candidate trivially passes, so ranking scores by semantic /
+            # proximity / completeness only. Reuses the proven "no constraints"
+            # structure below, so ranking behaves normally.
+            state["compliance_results"] = [
+                {
+                    "supplier_id": sid,
+                    "compliance_results": [],
+                    "overall_pass": True,
+                    "has_partial": False,
+                    "pass_rate": 1.0,
+                }
+                for sid in candidate_ids
+            ]
+            state["pipeline_status"] = "running"
+            return state
+
         if not constraints:
             # No constraints to validate — all candidates pass
             state["compliance_results"] = [

@@ -898,7 +898,9 @@ class ParserAgent(BaseAgent):
         # clarification is resumable. Resumed turns and memory-assisted
         # queries skip the gate (memory may resolve "same as before").
         if prior_partial is None and not memory_context and _is_contentless_query(raw_query):
-            return self._raise_pre_loop_clarification(state, raw_query, start)
+            if not state.get("non_interactive"):
+                return self._raise_pre_loop_clarification(state, raw_query, start)
+            state["would_clarify"] = True  # eval: record, then proceed best-effort
 
         system_prompt = _build_system_prompt(self.tools)
         user_open = self._build_initial_user_message(
@@ -1162,6 +1164,12 @@ class ParserAgent(BaseAgent):
         state["react_terminated_by"] = terminated_by
         state["parsed_constraints"] = constraints
         state["detected_language"] = constraints.get("original_language") or "en"
+        # Non-interactive eval: record that a clarification WOULD have been raised
+        # (for the ask-rate metric) but proceed with the best-effort parse instead
+        # of pausing, so P3's retrieval is measured on equal footing with P2.
+        if clarification_needed and state.get("non_interactive"):
+            state["would_clarify"] = True
+            clarification_needed = False
         state["needs_clarification"] = clarification_needed
         state["clarification_question"] = clarification_question
         state["pipeline_status"] = (

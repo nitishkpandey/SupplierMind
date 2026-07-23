@@ -150,6 +150,8 @@ class _UsageTracking:
     def __init__(self) -> None:
         self.total_cost_usd: float = 0.0
         self.total_calls: int = 0
+        self.total_prompt_tokens: int = 0
+        self.total_completion_tokens: int = 0
         self._usage_lock = threading.Lock()
 
     def _track(self, model: str, response: Any) -> None:
@@ -159,6 +161,8 @@ class _UsageTracking:
         cost = estimate_call_cost_usd(model, prompt_t, completion_t)
         with self._usage_lock:
             self.total_calls += 1
+            self.total_prompt_tokens += prompt_t
+            self.total_completion_tokens += completion_t
             self.total_cost_usd += cost
         if cost:
             logger.info(

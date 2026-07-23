@@ -63,15 +63,23 @@ async def run_suppliermind_query(
     query_id: str,
     *,
     allowed_supplier_ids: Iterable[str] | None = None,
-) -> tuple[list[str], list[dict], int]:
+    ablation: str = "none",
+) -> tuple[list[str], list[dict], int, dict]:
     """
     Run one query through the full SupplierMind pipeline.
 
+    Non-interactive: P3 proceeds with its best-effort parse instead of pausing
+    for clarification; whether it *would* have asked is returned separately.
+
     Returns:
-        (list of supplier IDs, compliance_results, execution_time_ms)
+        (supplier IDs, compliance_results, execution_time_ms, extras) where
+        extras carries the diagnostic instrumentation (parser output, tools,
+        termination reason, LLM usage, and provider-pacing time).
     """
     from app.agents.orchestrator import run_pipeline
 
+    calls0, ptok0, ctok0 = _llm_usage()
+    pace0 = _pacing_slept_s()
     start = time.time()
     benchmark_ids = (
         list(allowed_supplier_ids)
@@ -84,14 +92,32 @@ async def run_suppliermind_query(
         user_id=EVAL_USER_ID,
         exclude_pending=True,
         benchmark_supplier_ids=benchmark_ids,
+        non_interactive=True,
+        ablation=ablation,
     )
     exec_ms = int((time.time() - start) * 1000)
+    calls1, ptok1, ctok1 = _llm_usage()
 
     ranked = state.get("ranked_suppliers", [])
     retrieved_ids = [r["supplier_id"] for r in ranked]
     compliance = state.get("compliance_results", [])
+    trace = state.get("react_trace") or []
+    tools_used = [
+        s.get("action") for s in trace
+        if s.get("action") and str(s.get("action")).lower() != "finish"
+    ]
 
-    return retrieved_ids, compliance, exec_ms
+    extras = {
+        "would_clarify": bool(state.get("would_clarify")),
+        "parsed_constraints": state.get("parsed_constraints"),
+        "tools_used": tools_used,
+        "react_terminated_by": state.get("react_terminated_by"),
+        "llm_calls": calls1 - calls0,
+        "prompt_tokens": ptok1 - ptok0,
+        "completion_tokens": ctok1 - ctok0,
+        "pacing_ms": int((_pacing_slept_s() - pace0) * 1000),
+    }
+    return retrieved_ids, compliance, exec_ms, extras
 
 
 async def run_baseline_queries(
@@ -239,6 +265,28 @@ def _llm_total_cost() -> float:
         return 0.0
 
 
+def _llm_usage() -> tuple[int, int, int]:
+    """(calls, prompt_tokens, completion_tokens) so far — read as a delta."""
+    try:
+        from app.core.llm import get_llm_client
+
+        c = get_llm_client()
+        return (c.total_calls, c.total_prompt_tokens, c.total_completion_tokens)
+    except Exception:
+        return (0, 0, 0)
+
+
+def _pacing_slept_s() -> float:
+    """Seconds the rate limiter has slept so far — read as a delta so latency
+    can be split into compute time vs provider-throttle wait."""
+    try:
+        from app.core.rate_limiter import get_rate_limiter
+
+        return float(get_rate_limiter().total_slept_s)
+    except Exception:
+        return 0.0
+
+
 async def run_paradigm_queries(
     raw_query: str,
     constraints: dict,
@@ -259,9 +307,11 @@ async def run_paradigm_queries(
     results = {}
 
     if run_p1:
+        u0 = _llm_usage()
         cost_before = _llm_total_cost()
         p1 = await asyncio.to_thread(run_paradigm1, raw_query)
         p1_cost = _llm_total_cost() - cost_before
+        u1 = _llm_usage()
         p1_ids = [
             name_index[_normalise_name(n)]
             for n in p1.supplier_names
@@ -281,15 +331,20 @@ async def run_paradigm_queries(
             "reasoning": "; ".join(p1.reasoning) if p1.reasoning else None,
             "cost_usd": p1_cost,
             "error": p1.error,
+            "llm_calls": u1[0] - u0[0],
+            "prompt_tokens": u1[1] - u0[1],
+            "completion_tokens": u1[2] - u0[2],
         }
 
     if run_p2:
+        u0 = _llm_usage()
         cost_before = _llm_total_cost()
         p2 = await run_paradigm2(
             raw_query,
             allowed_supplier_ids=allowed_supplier_ids,
         )
         p2_cost = _llm_total_cost() - cost_before
+        u1 = _llm_usage()
         p2_suppliers = await _fetch_supplier_dicts(
             p2.supplier_ids,
             db,
@@ -304,6 +359,9 @@ async def run_paradigm_queries(
             "reasoning": "; ".join(p2.reasoning) if p2.reasoning else None,
             "cost_usd": p2_cost,
             "error": p2.error,
+            "llm_calls": u1[0] - u0[0],
+            "prompt_tokens": u1[1] - u0[1],
+            "completion_tokens": u1[2] - u0[2],
         }
 
     return results
@@ -315,6 +373,11 @@ async def run_full_evaluation(
     query_limit: int | None = None,
     run_p1: bool = False,
     run_p2: bool = False,
+    benchmark_file: Path | None = None,
+    corpus_ids: Iterable[str] | None = None,
+    results_file: Path | None = None,
+    checkpoint_file: Path | None = None,
+    ablation: str = "none",
 ) -> dict:
     """
     Run the complete SupplierBench evaluation.
@@ -323,19 +386,29 @@ async def run_full_evaluation(
         run_suppliermind: Whether to run SupplierMind (time-consuming, ~15 min)
         run_baselines: Whether to run baselines (fast, ~5 seconds)
         query_limit: Limit number of queries for testing (None = all 25)
+        benchmark_file: Query set to score against (default: the frozen curated set).
+        corpus_ids: Supplier-ID allowlist for scoring (default: the frozen curated
+            corpus). Pass the 10k IDs for the thesis 10k run.
+        results_file / checkpoint_file: Where to write outputs (default: the
+            curated-run locations). Override so thesis runs never clobber the
+            locked baseline.
 
     Returns:
         Complete evaluation results dict
     """
-    if not BENCHMARK_FILE.exists():
+    bench_path = benchmark_file or BENCHMARK_FILE
+    out_path = results_file or RESULTS_FILE
+    ckpt_path = checkpoint_file or CHECKPOINT_FILE
+
+    if not bench_path.exists():
         raise FileNotFoundError(
-            f"Benchmark file not found: {BENCHMARK_FILE}\n"
+            f"Benchmark file not found: {bench_path}\n"
             "Run first: uv run python data/generate_dataset.py"
         )
 
-    with open(BENCHMARK_FILE, encoding="utf-8") as f:
+    with open(bench_path, encoding="utf-8") as f:
         benchmark_queries = json.load(f)
-    benchmark_ids = benchmark_supplier_ids()
+    benchmark_ids = frozenset(str(x) for x in corpus_ids) if corpus_ids is not None else benchmark_supplier_ids()
 
     if query_limit:
         benchmark_queries = benchmark_queries[:query_limit]
@@ -383,11 +456,15 @@ async def run_full_evaluation(
             logger.info("  Running SupplierMind...")
             try:
                 sm_cost_before = _llm_total_cost()
-                sm_ids, sm_compliance, sm_ms = await run_suppliermind_query(
+                # Deterministic, VALID UUID (an "eval-<id>" label is not a UUID
+                # and breaks clarification/memory persistence downstream).
+                eval_query_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"eval-{q_id}"))
+                sm_ids, sm_compliance, sm_ms, sm_extras = await run_suppliermind_query(
                     raw_query,
                     constraints,
-                    f"eval-{q_id}",
+                    eval_query_id,
                     allowed_supplier_ids=benchmark_ids,
+                    ablation=ablation,
                 )
                 sm_cost = _llm_total_cost() - sm_cost_before
                 sm_p5 = precision_at_k(sm_ids, ground_truth_ids, k=5)
@@ -407,6 +484,14 @@ async def run_full_evaluation(
                     execution_time_ms=sm_ms,
                     compliance_data=sm_compliance,
                     cost_usd=sm_cost,
+                    would_clarify=sm_extras["would_clarify"],
+                    parsed_constraints=sm_extras["parsed_constraints"],
+                    tools_used=sm_extras["tools_used"],
+                    react_terminated_by=sm_extras["react_terminated_by"],
+                    llm_calls=sm_extras["llm_calls"],
+                    prompt_tokens=sm_extras["prompt_tokens"],
+                    completion_tokens=sm_extras["completion_tokens"],
+                    pacing_ms=sm_extras["pacing_ms"],
                 ))
                 logger.info(
                     "  SupplierMind: P@5=%.2f CSR=%.2f MRR=%.2f time=%dms",
@@ -496,6 +581,9 @@ async def run_full_evaluation(
                     cost_usd=pr["cost_usd"],
                     raw_names=pr["raw_names"],
                     reasoning=pr["reasoning"],
+                    llm_calls=pr.get("llm_calls"),
+                    prompt_tokens=pr.get("prompt_tokens"),
+                    completion_tokens=pr.get("completion_tokens"),
                 ))
                 logger.info(
                     "  %s: P@5=%.2f CSR=%.2f time=%dms%s",
@@ -517,7 +605,7 @@ async def run_full_evaluation(
                 "p2_rag": [asdict(m) for m in p2_metrics],
             },
         }
-        with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+        with open(ckpt_path, "w", encoding="utf-8") as f:
             json.dump(checkpoint, f, indent=2, default=str)
 
     # ── Aggregate Results ─────────────────────────────────────────────
@@ -537,7 +625,7 @@ async def run_full_evaluation(
         "run_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "query_count": total,
-        "benchmark_file": str(BENCHMARK_FILE),
+        "benchmark_file": str(bench_path),
         "per_query_metrics": {
             "suppliermind": [asdict(m) for m in sm_metrics],
             "keyword_sql": [asdict(m) for m in kw_metrics],
@@ -549,11 +637,12 @@ async def run_full_evaluation(
     }
 
     # Save results
-    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, default=str)
 
     _print_summary(aggregated)
-    logger.info("\nResults saved to: %s", RESULTS_FILE)
+    logger.info("\nResults saved to: %s", out_path)
 
     return results
 

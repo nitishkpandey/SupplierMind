@@ -128,6 +128,14 @@ class AgentState(TypedDict):
     detected_language: str
     needs_clarification: bool
     clarification_question: Optional[str]
+    # Non-interactive eval (thesis batch runs): when True the Parser proceeds
+    # with its best-effort parse instead of pausing, and records would_clarify
+    # so the benchmark can report P3's clarification (ask) rate separately.
+    non_interactive: bool
+    would_clarify: bool
+    # Ablation switch for the thesis component study: "none" (full P3),
+    # "no_compliance" (skip the constraint/evidence gate), etc.
+    ablation: str
 
     # ── Multi-turn clarification dialogue ─────────────────────────────
     # Populated by parser_node when the Parser raises a clarification: the

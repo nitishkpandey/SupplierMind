@@ -32,6 +32,10 @@ SAFETY_MARGIN = 0.85
 # snapshots to their family.
 MODEL_RATE_LIMITS: dict[str, dict[str, int]] = {
     "gpt-4o-mini": {"rpm": 400, "tpm": 180_000},
+    # Voyage free tier: 3 RPM / 10K TPM. With SAFETY_MARGIN this paces to ~2
+    # calls/window, so embedding never 429-storms without a paid plan. Raise
+    # (or remove) once a payment method lifts the limit.
+    "voyage-3-lite": {"rpm": 3, "tpm": 10_000},
 }
 
 # Used when a model is not in MODEL_RATE_LIMITS — conservative so an unknown
@@ -63,6 +67,9 @@ class ModelRateLimiter:
         # None to keep the limiter pure.
         self._audit_writer = audit_writer
         self._lock = threading.Lock()
+        # Total seconds spent sleeping to respect the limit — read as a delta
+        # per query to separate provider-throttle wait from real compute time.
+        self.total_slept_s: float = 0.0
         # Per model: request timestamps and (timestamp, tokens) entries.
         self._request_log: dict[str, deque[float]] = defaultdict(deque)
         self._token_log: dict[str, deque[list]] = defaultdict(deque)
@@ -130,6 +137,7 @@ class ModelRateLimiter:
                     wait_ms, model, len(rlog), token_sum,
                 )
                 self._sleep(wait)
+                self.total_slept_s += wait
                 if self._audit_writer is not None:
                     try:
                         self._audit_writer(
