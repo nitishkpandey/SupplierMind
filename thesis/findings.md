@@ -443,6 +443,56 @@ Precision@5 broken down by difficulty tier:
 
 ---
 
+### 5.5 Does a clearer query stop P1 hallucinating? (a targeted probe)
+
+- **What it evaluates.** The headline result — that single-prompt P1 hallucinates
+  on 100% of queries (§5.3) — invites a fair objection: perhaps that is only
+  because the benchmark queries are short. Would a very clear, fully-specified
+  query let the parametric model return real, usable suppliers? This probe tests
+  exactly that objection.
+- **Why it matters.** If clarity fixed P1, the single-prompt approach might still
+  be salvageable for well-worded, easy requests. If it does not, then the
+  hallucination is *structural* — a consequence of having no corpus — and the
+  case for grounding (retrieval or the agentic pipeline) is even stronger.
+- **How it was tested.** I ran P1 on maximally curated queries: fully specified
+  (category, certification, country, capacity, lead time) and even *instructing
+  the model to return "exact, real company names."* I then checked every returned
+  name against the 10k corpus. This is reproducible with
+  `thesis/scripts/probe_p1_curated.py` (one LLM call per query, no databases).
+- **Result.** Two representative examples:
+
+  *Query 1:* "Find five ISO 9001 certified metal suppliers in Germany with
+  capacity above 10,000 kg/month and lead time under 30 days. Give exact, real
+  company names." → **Thyssenkrupp AG, Salzgitter AG, Friedrich Kocks GmbH & Co.
+  KG, Krupp Edelstahlprofile GmbH, Hüttenes-Albertus Chemische Werke GmbH.**
+  Corpus matches: **0/5**.
+
+  *Query 2:* "List five ISO 22000 certified food ingredient suppliers in Germany.
+  Return only exact, real company names." → **BASF SE, Kerry Group, Südzucker AG,
+  Wacker Chemie AG, Döhler GmbH.** Corpus matches: **0/5**.
+
+  In both cases the hallucination rate is **100%**, unchanged from the terser
+  benchmark queries.
+
+- **What it means — and an important nuance.** A clearer query does not help P1
+  at all: it still returns zero corpus matches. But the reason is subtle and
+  worth stating precisely. P1 is **not inventing fictional companies** — it is
+  recalling *genuinely real* German firms (Thyssenkrupp, BASF, Südzucker) from
+  its training data. The problem is that these real companies are **not in the
+  private corpus the benchmark scores against.** So "hallucination" here means
+  "not grounded in the database I am searching," which covers two failure modes
+  at once: fabricated names, and real names that are simply absent from the
+  target corpus. For this benchmark — and, crucially, for any real deployment
+  against a specific buyer's approved-supplier database — both are equally
+  useless: the model cannot know which suppliers are actually *in the database*,
+  so it cannot return verifiable, in-database results no matter how well the query
+  is phrased.
+- **The takeaway.** P1's hallucination is **structural, not a clarity problem.**
+  It follows directly from having no access to the corpus, and better prompting
+  cannot fix it. This makes the case for grounding stronger, not weaker: the only
+  remedies are retrieval (P2) or the agentic pipeline (P3), both of which can only
+  ever return real corpus suppliers by construction.
+
 ## 6. RQ3 — Where each system wins, fails, and what it costs
 
 > **H3: single-prompt collapses on hard queries; RAG weakens on multi-constraint
@@ -557,7 +607,104 @@ exactly the H3 prediction.
 
 ---
 
-## 8. How to reproduce
+## 8. Positioning: why not just use a general-purpose LLM?
+
+A fair and obvious challenge is this: *modern general-purpose LLMs — ChatGPT,
+Perplexity, and similar tools, especially with web search — can already list
+suppliers with links. So why build a five-agent system at all?* This section
+answers that challenge directly, because it is the question the system most needs
+to survive.
+
+### The honest concession
+
+I will not argue that my system *finds* supplier names better than a
+search-enabled LLM. On the narrow task of "produce a plausible list of supplier
+names, maybe with links," a general LLM does that well, and that capability is now
+commoditised. Pretending otherwise would be indefensible. The probe in §5.5 even
+shows that a plain LLM readily returns *real* company names (Thyssenkrupp, BASF)
+from memory.
+
+But that is exactly the point: **a name is not a procurement decision.** The
+question is not "can a chatbot name a supplier?" (yes), but "can a chatbot be
+trusted as a procurement discovery *system*?" (no) — and the difference is
+everything that turns a name into something a buyer can act on. Discovery in
+procurement is not a naming problem; it is a **trust-and-governance** problem.
+
+### What the system provides that a general LLM cannot
+
+Each of the following is a hard procurement requirement, not a convenience:
+
+1. **It searches the buyer's own governed data first.** A general LLM has no
+   access to a company's approved-supplier list, prior contracts, or vetted
+   records — and, for confidentiality and data-protection reasons, that internal
+   data usually *cannot* be sent to a third-party chatbot. Procurement decisions
+   are made against the organisation's own governed corpus (the three-tier
+   scope: approved → personally saved → pending review), not the open web.
+
+2. **It verifies constraints against evidence instead of asserting them.** A
+   chatbot will fluently state "this supplier is ISO 9001 certified with a 30-day
+   lead time" whether or not it is true. The system's compliance gate checks each
+   constraint against quoted evidence, or fails. This is not a stylistic
+   preference: the ablation in `findings_diagnostics.md` §1 shows that removing
+   this gate drops the system *below* plain RAG. So the value is demonstrably not
+   the model picking a name — it is the verification wrapped around it.
+
+3. **Sanctions and location are hard, deterministic gates.** Before a
+   web-discovered supplier can enter a result, the system screens it against a
+   real sanctions dataset (OpenSanctions) and validates a real city, country, and
+   coordinates (Geoapify), then holds it for human approval. A general LLM will
+   happily suggest a sanctioned entity or a fabricated address. Onboarding a
+   sanctioned supplier is a legal and financial catastrophe, and that risk alone
+   justifies a controlled pipeline rather than a chat window.
+
+4. **Every decision is auditable.** Procurement is regulated and audited. The
+   system writes a per-decision trail — which agent decided what, on what
+   evidence, with what reasoning — so a supplier choice that is later challenged
+   can be justified from a record. A chatbot produces a conversation transcript,
+   not a queryable, per-constraint audit log tied to the buyer's data.
+
+5. **It is controllable, reproducible, and private.** I can pin the model, replay
+   a decision, and enforce hard business rules (for example, "never surface a
+   supplier without a validated address"). A hosted consumer LLM changes
+   underneath the user, cannot be pinned for reproducibility, and offers no place
+   to insert deterministic policy — and sending confidential procurement data to
+   it is often not permissible.
+
+### The obvious rebuttal, answered
+
+Someone will ask: *"Could you not just prompt ChatGPT to cite sources and check
+sanctions?"* Prompting for a behaviour is not the same as guaranteeing it. Asking
+a probabilistic model to "check sanctions" simply produces another fluent,
+unverified sentence. My system enforces it as a hard, deterministic control
+against an actual sanctions dataset and an actual geocoder, with human sign-off.
+The difference is a capability **enforced by architecture** versus one
+**requested by prompt** — and in a compliance setting only the former is
+defensible.
+
+### The framing that makes this coherent
+
+The LLM is a **component inside my system, not a competitor to it.** The system
+uses an LLM as its reasoning engine and wraps it with grounding in governed data,
+per-constraint verification, sanctions and location gating, and an audit trail —
+so the output becomes trustworthy and actionable in a regulated purchasing
+process. The LLM is the engine; the contribution of this work is the brakes, the
+seatbelts, and the logbook that make it safe to drive.
+
+### An honest limit of this argument
+
+Two caveats keep this defensible rather than overstated. First, on the raw
+web-search step alone, the gap between my system and a modern search-enabled LLM
+is genuinely small; my differentiation is deliberately the governance layer, and
+I state that plainly rather than overclaim on retrieval. Second, the benchmark in
+this thesis runs the system in *internal-only* mode (web discovery switched off
+for reproducibility), so the sanctions, location, and audit advantages above are
+demonstrated **architecturally rather than empirically measured here.** Building
+a dedicated web-discovery experiment — comparing a plain LLM's unverified names
+against the system's source-, location-, and sanctions-verified discoveries — is
+the clearest way to turn this positioning argument into measured evidence, and I
+flag it as the most valuable next experiment.
+
+## 9. How to reproduce
 
 Free, deterministic (no API keys, no cost):
 
