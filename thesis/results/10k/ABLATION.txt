@@ -1,0 +1,11 @@
+==========================================================================
+Component ablation ladder — Precision@5  (main 5 runs, ablation 3 runs)
+==========================================================================
+
+  rung                                                overall  simple  medium   hard
+  P2 RAG (semantic only)                                0.504   0.950   0.340  0.229
+  P3 no-compliance (+structured discovery/ranking)      0.427   0.850   0.333  0.076  (Δ -0.077)
+  P3 full (+compliance gate)                            0.731   0.950   0.664  0.577  (Δ +0.305)
+
+Reading each Δ: P2→no-compliance = value of structured discovery + ranking;
+no-compliance→full = value of the compliance / quote-or-fail gate.

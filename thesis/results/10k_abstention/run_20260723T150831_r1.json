@@ -1,0 +1,1930 @@
+{
+  "run_id": "cb0864c4-f66b-4222-85ea-9b779fd0c7f9",
+  "timestamp": "2026-07-23T15:13:15.213254+00:00",
+  "query_count": 5,
+  "benchmark_file": "/Users/nitishkumarpandey/Desktop/SupplierMind-thesis/thesis/benchmark/abstention5_10k.json",
+  "per_query_metrics": {
+    "suppliermind": [
+      {
+        "query_id": "f23c3798-05d3-506f-85a9-f5a46d89a531",
+        "query_number": 1,
+        "difficulty": "unsatisfiable",
+        "system_name": "suppliermind",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.5,
+        "execution_time_ms": 37133,
+        "compliance_data": [
+          {
+            "supplier_id": "c55a3f6c-fabd-2daa-6a40-c746a86dd879",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold the AS9100 certification or any directly equivalent certification.",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "0f90f3a1-c9f8-892c-f9c9-68ff9c6ecbd2",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold the AS9100 certification or any related certification.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "e1616e35-a02f-5493-6774-655dcb04ce57",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold the AS9100 certification or any related certification.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "f0b60b95-eebe-393d-f019-d179d2d18ff0",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; AS9100 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "a0d10aeb-8b90-b62c-84ea-285641a58c2a",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "Supplier does not hold AS9100 or any related certification.",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "47983a73-e720-68b2-c4eb-de61591e264c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; AS9100 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "806af617-40e0-492b-cdbd-7a0eb16ae717",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; AS9100 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "73d780bb-fb43-f425-6ead-52a803171ea5",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold the AS9100 certification or any related certification.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "293b1c07-01a3-e28c-0ca5-33b4941f34d1",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold the AS9100 certification or any directly equivalent certification.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "0f1d7dc2-e4aa-36e6-8edb-e267685077f0",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'logistics' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "AS9100",
+                "status": "FAIL",
+                "reason": "The supplier does not hold any certification equivalent or related to AS9100.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          }
+        ],
+        "cost_usd": 0.003921750000000001,
+        "raw_names": null,
+        "reasoning": null,
+        "would_clarify": false
+      },
+      {
+        "query_id": "b1324440-c198-5027-940f-8525c7d917e6",
+        "query_number": 2,
+        "difficulty": "unsatisfiable",
+        "system_name": "suppliermind",
+        "retrieved_ids": [
+          "d429c2ed-f6bd-cf3c-773f-555a49304d1c",
+          "926ca2c0-2546-ea1d-b85c-e55267b8377a"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.8166666666666667,
+        "execution_time_ms": 44571,
+        "compliance_data": [
+          {
+            "supplier_id": "d429c2ed-f6bd-cf3c-773f-555a49304d1c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 27001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "926ca2c0-2546-ea1d-b85c-e55267b8377a",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 27001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "ba539b0f-ba8d-95b9-fae8-6b88e0da21e6",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Italy, required country is Germany",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 27001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.75
+          },
+          {
+            "supplier_id": "3bb1591b-2e83-2bbe-55ba-1dfea30e1e97",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "The supplier does not hold any related certification for ISO 27001.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "1db2cd36-435a-2730-b92b-6c2329986aae",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "The supplier does not hold any related certification for ISO 27001.",
+                "confidence": 0.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "02fcff0f-8087-8889-81c4-7186e15696c2",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "ISO 9001 is explicitly not equivalent to ISO 27001",
+                "confidence": 0.95
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "fa7cdb14-7c32-d240-1809-8cc5dc428abe",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "ISO 9001 is explicitly not equivalent to ISO 27001",
+                "confidence": 0.95
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "63e57c7f-48e6-0822-99c6-41d2793741e4",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "ISO 9001 is explicitly not equivalent to ISO 27001",
+                "confidence": 0.95
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "d86a5f93-3547-fe7d-5c85-a2b5df0cfeed",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "ISO 14001 is explicitly not equivalent to ISO 27001",
+                "confidence": 0.95
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "753d9211-1d23-4c70-0c7e-2daee9353abb",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 27001",
+                "status": "FAIL",
+                "reason": "ISO 14001 is explicitly not equivalent to ISO 27001",
+                "confidence": 0.95
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          }
+        ],
+        "cost_usd": 0.002152649999999999,
+        "raw_names": null,
+        "reasoning": null,
+        "would_clarify": false
+      },
+      {
+        "query_id": "a53855b1-b852-5271-8524-45e431bfe5ac",
+        "query_number": 3,
+        "difficulty": "unsatisfiable",
+        "system_name": "suppliermind",
+        "retrieved_ids": [
+          "fa7cdb14-7c32-d240-1809-8cc5dc428abe",
+          "38c4f346-e5dd-614c-a70b-ba9c3d5e69df",
+          "926ca2c0-2546-ea1d-b85c-e55267b8377a",
+          "02fcff0f-8087-8889-81c4-7186e15696c2",
+          "63e57c7f-48e6-0822-99c6-41d2793741e4"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 1.0,
+        "execution_time_ms": 35311,
+        "compliance_data": [
+          {
+            "supplier_id": "38c4f346-e5dd-614c-a70b-ba9c3d5e69df",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "3bb1591b-2e83-2bbe-55ba-1dfea30e1e97",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "02fcff0f-8087-8889-81c4-7186e15696c2",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "fa7cdb14-7c32-d240-1809-8cc5dc428abe",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "63e57c7f-48e6-0822-99c6-41d2793741e4",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "926ca2c0-2546-ea1d-b85c-e55267b8377a",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier text overlaps requested product terms",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "PASS",
+                "reason": "Supplier holds IATF 16949 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": false,
+            "pass_rate": 1.0
+          },
+          {
+            "supplier_id": "4d8b3af4-5c76-cb01-4cd0-dd01522cf00c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'food_ingredients' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; IATF 16949 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "0447c6c3-0ac1-1397-a81d-5fd2b44395f8",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'food_ingredients' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "FAIL",
+                "reason": "The supplier does not hold any certification equivalent or related to IATF 16949.",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "74875cf3-bf9e-1791-deb9-b97ea5b7065f",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'food_ingredients' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; IATF 16949 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          },
+          {
+            "supplier_id": "a5cbb730-b049-453b-4966-f03a101e1e0d",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'food_ingredients' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "IATF 16949",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; IATF 16949 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.5
+          }
+        ],
+        "cost_usd": 0.0015861,
+        "raw_names": null,
+        "reasoning": null,
+        "would_clarify": false
+      },
+      {
+        "query_id": "18f3c31e-dcb8-5d7e-8f16-71599c07f7b1",
+        "query_number": 4,
+        "difficulty": "unsatisfiable",
+        "system_name": "suppliermind",
+        "retrieved_ids": [
+          "95d0783f-984c-55bc-862e-c2212ca01ff9",
+          "e97f9c42-2914-e443-7d9c-7b9116535fb9",
+          "a0f155fb-8d64-ec21-8fc9-3778288510d1",
+          "3e15fdeb-3464-1fac-ca15-ff320bb3a1e0",
+          "95f8e88d-6be8-be5c-505b-327c105aafb8"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.8333333333333334,
+        "execution_time_ms": 36363,
+        "compliance_data": [
+          {
+            "supplier_id": "a0f155fb-8d64-ec21-8fc9-3778288510d1",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "PARTIAL",
+                "reason": "Capacity data not available in supplier profile",
+                "confidence": 0.5
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": true,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "3e15fdeb-3464-1fac-ca15-ff320bb3a1e0",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "PARTIAL",
+                "reason": "Capacity data not available in supplier profile",
+                "confidence": 0.5
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": true,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "e97f9c42-2914-e443-7d9c-7b9116535fb9",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "PARTIAL",
+                "reason": "Capacity data not available in supplier profile",
+                "confidence": 0.5
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": true,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "95f8e88d-6be8-be5c-505b-327c105aafb8",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "PARTIAL",
+                "reason": "Capacity data not available in supplier profile",
+                "confidence": 0.5
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": true,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "95d0783f-984c-55bc-862e-c2212ca01ff9",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "PARTIAL",
+                "reason": "Capacity data not available in supplier profile",
+                "confidence": 0.5
+              }
+            ],
+            "overall_pass": true,
+            "has_partial": true,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "df3a098a-ccac-2fb5-1a0c-6c0493cd1291",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 3,471 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "ee05d46d-c546-3621-25d7-2faa5023de4c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 9,399 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "66c5c513-20dd-4f6b-ecbd-b2332fc1aa49",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 161 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "890c778a-9f6c-2944-3dbb-db0f9f9d93d3",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 1,696 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "04369592-7989-6384-febb-fd51faddde38",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 4,435 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "1fb58bec-87b2-b6ff-ab7d-601afa29f5c6",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 8,869 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "6e96c57c-493a-e137-ee93-5ad336f58528",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 8,418 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "8c44adcc-6043-959d-6daf-e4dd0b7adef1",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 7,081 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "0a32b7be-9ded-8674-338c-1ad05116aee6",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 7,140 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "3c56c92b-a064-4e36-1668-5af5c835611c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 60,460 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "2cb1fd18-310b-b4c0-cf58-2b4736a21dc8",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 381,769 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "e7f11795-88ac-5d13-3667-88b523354b53",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 8,862 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "b819929c-0082-81e3-0dcc-5d19403b8556",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 3,095 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "c46695ec-8b2b-d15d-ece8-b8d0740fa127",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 8,772 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "69a9a2ef-e885-f9f3-b46a-31c1e60c1fce",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 9,875 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "00d4ed18-a5e8-a553-c821-36b42c51f7fe",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 7,022 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "6957597b-dd26-0497-b9e1-550dec74352d",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 9001 certification",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 4,984 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "4511b929-07fc-f70e-0abf-c0a58b2750e0",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; ISO 9001 required",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 7,178 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.3333333333333333
+          },
+          {
+            "supplier_id": "2bdd0490-e7b0-a8c6-b20e-3a6d64975769",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'metals' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 9001",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; ISO 9001 required",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "capacity",
+                "status": "FAIL",
+                "reason": "Capacity 81,677 kg/month is below minimum 999,999,999",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.3333333333333333
+          }
+        ],
+        "cost_usd": 0.00171345,
+        "raw_names": null,
+        "reasoning": null,
+        "would_clarify": false
+      },
+      {
+        "query_id": "eb8018f8-92ba-52ea-ae8d-a1959d1af688",
+        "query_number": 5,
+        "difficulty": "unsatisfiable",
+        "system_name": "suppliermind",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.6666666666666666,
+        "execution_time_ms": 32725,
+        "compliance_data": [
+          {
+            "supplier_id": "b3d41d2a-304e-18c8-5a3f-f16306cd0f2f",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Denmark, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "13ba4fa7-c206-1c27-df85-d8f43200a736",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Czech Republic, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "51db41ea-216f-2c1c-7e82-80afec51c6f8",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Finland, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "e8a018ea-cd99-af08-ce13-efbc77865bbc",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Turkey, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "c2244466-0d52-b7a9-83cb-adc70c4bf722",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Turkey, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "4604ddbc-4ea5-809c-c336-b00f6d45eaeb",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Czech Republic, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "95f9b0ab-f0fe-0cca-c811-130d6d6a8eef",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Norway, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "1b5794b0-ab2f-bc03-8fea-e5cb2964bd08",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Italy, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "7440a43c-369b-cd61-4de6-58a54827041e",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Czech Republic, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "PASS",
+                "reason": "Supplier holds ISO 14001 certification",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.6666666666666666
+          },
+          {
+            "supplier_id": "44ac11eb-984b-f444-2204-5977d8f14b2c",
+            "compliance_results": [
+              {
+                "constraint_name": "product_fit",
+                "status": "PASS",
+                "reason": "Supplier category 'textiles' matches product scope",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "country",
+                "status": "FAIL",
+                "reason": "Supplier is in Norway, required country is Iceland",
+                "confidence": 1.0
+              },
+              {
+                "constraint_name": "ISO 14001",
+                "status": "FAIL",
+                "reason": "Supplier lists no certifications; ISO 14001 required",
+                "confidence": 1.0
+              }
+            ],
+            "overall_pass": false,
+            "has_partial": false,
+            "pass_rate": 0.3333333333333333
+          }
+        ],
+        "cost_usd": 0.001460099999999999,
+        "raw_names": null,
+        "reasoning": null,
+        "would_clarify": false
+      }
+    ],
+    "keyword_sql": [],
+    "manual_simulation": [],
+    "p1_singleprompt": [
+      {
+        "query_id": "f23c3798-05d3-506f-85a9-f5a46d89a531",
+        "query_number": 1,
+        "difficulty": "unsatisfiable",
+        "system_name": "p1_singleprompt",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 3059,
+        "compliance_data": null,
+        "cost_usd": 0.00016005000000000012,
+        "raw_names": [
+          "DB Schenker",
+          "Kuehne + Nagel",
+          "DHL Supply Chain",
+          "Rhenus Logistics",
+          "Geodis"
+        ],
+        "reasoning": "DB Schenker is a leading logistics provider with a strong presence in Germany and is known for its expertise in aerospace logistics, including AS9100 certification.; Kuehne + Nagel offers specialized logistics services for the aerospace sector and has facilities in Germany, ensuring compliance with AS9100 standards.; DHL Supply Chain provides tailored logistics solutions for the aerospace industry and is AS9100 certified, with operations across Germany.; Rhenus Logistics has a dedicated aerospace division and is AS9100 certified, making it a suitable choice for aerospace logistics in Germany.; Geodis offers comprehensive logistics services for the aerospace industry and is AS9100 certified, with a strong operational footprint in Germany.",
+        "would_clarify": null
+      },
+      {
+        "query_id": "b1324440-c198-5027-940f-8525c7d917e6",
+        "query_number": 2,
+        "difficulty": "unsatisfiable",
+        "system_name": "p1_singleprompt",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 18656,
+        "compliance_data": null,
+        "cost_usd": 0.00019725000000000038,
+        "raw_names": [
+          "T\u00dcV Rheinland",
+          "DQS GmbH",
+          "SQS Software Quality Systems AG",
+          "KPMG Germany",
+          "Capgemini"
+        ],
+        "reasoning": "T\u00dcV Rheinland is a well-known certification body in Germany that offers a range of services, including ISO 27001 and IATF 16949 certifications. They also provide consulting services for software development in the automotive sector.; DQS is a leading certification body in Germany that specializes in ISO certifications, including ISO 27001 and IATF 16949. They also offer training and consulting services tailored to the automotive industry.; SQS is a prominent software quality assurance provider in Germany, offering services that align with ISO 27001 and IATF 16949 standards, particularly for automotive software development.; KPMG provides consulting services that include compliance with ISO 27001 and IATF 16949 standards, focusing on risk management and software solutions for the automotive industry.; Capgemini offers a range of IT services and consulting, including expertise in ISO 27001 and IATF 16949 certifications, specifically for clients in the automotive sector in Germany.",
+        "would_clarify": null
+      },
+      {
+        "query_id": "a53855b1-b852-5271-8524-45e431bfe5ac",
+        "query_number": 3,
+        "difficulty": "unsatisfiable",
+        "system_name": "p1_singleprompt",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 20768,
+        "compliance_data": null,
+        "cost_usd": 0.0001732499999999998,
+        "raw_names": [
+          "BASF SE",
+          "Kerry Group",
+          "Wacker Chemie AG",
+          "S\u00fcdzucker AG",
+          "D\u00f6hler Group"
+        ],
+        "reasoning": "BASF is a leading chemical company with a strong presence in food ingredients and is known for its quality and compliance with various industry standards, including IATF 16949.; Kerry Group specializes in food ingredients and has a commitment to quality and safety, making it a suitable supplier for automotive-certified food ingredients.; Wacker Chemie is a global chemical company that provides high-quality food ingredients and has the necessary certifications, including IATF 16949.; S\u00fcdzucker is one of Europe's largest sugar producers and offers a range of food ingredients, with a focus on quality and compliance with industry standards.; D\u00f6hler is a global producer of natural ingredients and has a strong focus on quality assurance, making them a viable option for IATF 16949 certified food ingredients.",
+        "would_clarify": null
+      },
+      {
+        "query_id": "18f3c31e-dcb8-5d7e-8f16-71599c07f7b1",
+        "query_number": 4,
+        "difficulty": "unsatisfiable",
+        "system_name": "p1_singleprompt",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 23190,
+        "compliance_data": null,
+        "cost_usd": 0.00019454999999999993,
+        "raw_names": [
+          "Thyssenkrupp AG",
+          "Salzgitter AG",
+          "ArcelorMittal Bremen",
+          "Voestalpine AG",
+          "Krupp Edelstahlprofile GmbH"
+        ],
+        "reasoning": "Thyssenkrupp is one of the largest steel producers in Germany and has a strong reputation for quality, holding ISO 9001 certification. They have the capacity to produce large quantities of metal products.; Salzgitter AG is a major player in the steel industry in Germany, known for its high production capacity and ISO 9001 certification, making it a suitable supplier for large-scale metal needs.; As part of the ArcelorMittal group, the Bremen plant is one of the largest steel producers in Germany, certified with ISO 9001, and capable of meeting high volume demands.; Voestalpine is a leading steel and technology group with operations in Germany, known for its quality management systems and ISO 9001 certification, with significant production capacity.; Krupp Edelstahlprofile specializes in high-quality stainless steel products and is ISO 9001 certified, with the capability to handle large orders efficiently.",
+        "would_clarify": null
+      },
+      {
+        "query_id": "eb8018f8-92ba-52ea-ae8d-a1959d1af688",
+        "query_number": 5,
+        "difficulty": "unsatisfiable",
+        "system_name": "p1_singleprompt",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 2694,
+        "compliance_data": null,
+        "cost_usd": 0.00011145000000000078,
+        "raw_names": [
+          "Gottfr\u00ed\u00f0ur Textiles",
+          "Icelandic Wool Company",
+          "Textile Iceland",
+          "Nordic Textile Group",
+          "Reykjavik Fabrics"
+        ],
+        "reasoning": "A well-known textile manufacturer in Iceland that focuses on sustainable practices and is ISO 14001 certified.; Specializes in eco-friendly wool products and has achieved ISO 14001 certification for their environmental management.; Offers a range of textile products and has implemented ISO 14001 standards to ensure environmental sustainability.; A group of textile manufacturers in Iceland committed to sustainable practices and ISO 14001 certification.; Known for their sustainable fabric production, they are ISO 14001 certified and focus on reducing environmental impact.",
+        "would_clarify": null
+      }
+    ],
+    "p2_rag": [
+      {
+        "query_id": "f23c3798-05d3-506f-85a9-f5a46d89a531",
+        "query_number": 1,
+        "difficulty": "unsatisfiable",
+        "system_name": "p2_rag",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 1211,
+        "compliance_data": null,
+        "cost_usd": 0.00015554999999999996,
+        "raw_names": [],
+        "reasoning": null,
+        "would_clarify": null
+      },
+      {
+        "query_id": "b1324440-c198-5027-940f-8525c7d917e6",
+        "query_number": 2,
+        "difficulty": "unsatisfiable",
+        "system_name": "p2_rag",
+        "retrieved_ids": [
+          "d429c2ed-f6bd-cf3c-773f-555a49304d1c",
+          "5d58e56f-2305-e7b7-141e-592b9e83cb0e",
+          "5df4ec25-7e16-ee96-389a-2ad4d1f01a84",
+          "ba200d1a-dac6-6257-a120-dbadd3d6b3e2",
+          "fa7cdb14-7c32-d240-1809-8cc5dc428abe"
+        ],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.6,
+        "execution_time_ms": 3260,
+        "compliance_data": null,
+        "cost_usd": 0.0003147000000000002,
+        "raw_names": [
+          "Stuttgart Automotive AG",
+          "Dortmund Software AG",
+          "Stuttgart Software AG",
+          "Stuttgart Software GmbH",
+          "Hannover Automotive GmbH & Co. KG"
+        ],
+        "reasoning": "Stuttgart Automotive AG holds both ISO 27001 and IATF 16949 certifications, making it a strong match for the user's requirements.; Dortmund Software AG is ISO 27001 certified and provides software services, although it lacks IATF 16949 certification.; Stuttgart Software AG is ISO 27001 certified and offers software services, but does not have IATF 16949 certification.; Stuttgart Software GmbH is ISO 27001 certified and provides software services, but does not have IATF 16949 certification.; Hannover Automotive GmbH & Co. KG holds IATF 16949 certification but lacks ISO 27001 certification.",
+        "would_clarify": null
+      },
+      {
+        "query_id": "a53855b1-b852-5271-8524-45e431bfe5ac",
+        "query_number": 3,
+        "difficulty": "unsatisfiable",
+        "system_name": "p2_rag",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 1093,
+        "compliance_data": null,
+        "cost_usd": 0.00015030000000000078,
+        "raw_names": [],
+        "reasoning": null,
+        "would_clarify": null
+      },
+      {
+        "query_id": "18f3c31e-dcb8-5d7e-8f16-71599c07f7b1",
+        "query_number": 4,
+        "difficulty": "unsatisfiable",
+        "system_name": "p2_rag",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 858,
+        "compliance_data": null,
+        "cost_usd": 0.00017204999999999998,
+        "raw_names": [],
+        "reasoning": null,
+        "would_clarify": null
+      },
+      {
+        "query_id": "eb8018f8-92ba-52ea-ae8d-a1959d1af688",
+        "query_number": 5,
+        "difficulty": "unsatisfiable",
+        "system_name": "p2_rag",
+        "retrieved_ids": [],
+        "ground_truth_ids": [],
+        "precision_at_5": 0.0,
+        "reciprocal_rank": 0.0,
+        "constraint_satisfaction_rate": 0.0,
+        "execution_time_ms": 21414,
+        "compliance_data": null,
+        "cost_usd": 0.0001621499999999998,
+        "raw_names": [],
+        "reasoning": null,
+        "would_clarify": null
+      }
+    ]
+  },
+  "aggregated": {
+    "suppliermind": {
+      "system_name": "suppliermind",
+      "query_count": 5,
+      "mean_precision_at_5": 0.0,
+      "std_precision_at_5": 0.0,
+      "mean_csr": 0.7633333333333333,
+      "std_csr": 0.1887090647295755,
+      "mean_reciprocal_rank": 0.0,
+      "std_mrr": 0.0,
+      "mean_execution_time_ms": 37220.6,
+      "std_execution_time_ms": 4433.636295412604,
+      "simple_p5": 0.0,
+      "medium_p5": 0.0,
+      "hard_p5": 0.0
+    },
+    "p1_singleprompt": {
+      "system_name": "p1_singleprompt",
+      "query_count": 5,
+      "mean_precision_at_5": 0.0,
+      "std_precision_at_5": 0.0,
+      "mean_csr": 0.0,
+      "std_csr": 0.0,
+      "mean_reciprocal_rank": 0.0,
+      "std_mrr": 0.0,
+      "mean_execution_time_ms": 13673.4,
+      "std_execution_time_ms": 9986.71666765409,
+      "simple_p5": 0.0,
+      "medium_p5": 0.0,
+      "hard_p5": 0.0
+    },
+    "p2_rag": {
+      "system_name": "p2_rag",
+      "query_count": 5,
+      "mean_precision_at_5": 0.0,
+      "std_precision_at_5": 0.0,
+      "mean_csr": 0.12,
+      "std_csr": 0.2683281572999748,
+      "mean_reciprocal_rank": 0.0,
+      "std_mrr": 0.0,
+      "mean_execution_time_ms": 5567.2,
+      "std_execution_time_ms": 8910.888715498584,
+      "simple_p5": 0.0,
+      "medium_p5": 0.0,
+      "hard_p5": 0.0
+    }
+  }
+}

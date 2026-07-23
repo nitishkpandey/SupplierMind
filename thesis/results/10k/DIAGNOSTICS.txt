@@ -1,0 +1,36 @@
+========================================================================
+DIAGNOSTICS — 5 instrumented run(s) in 10k
+========================================================================
+
+[Prompt efficiency & latency] per-query means
+  system             llm_calls  prompt_tok  compl_tok   wall_ms  pacing_ms  compute_ms
+  suppliermind             5.3        7322        496     21408       8179       13229
+  p2_rag                   1.0        1017        171      2814        nan        2814
+  p1_singleprompt          1.0          91        261      3498        nan        3498
+
+[Task success rate] fraction of queries with >=1 correct supplier in top-5
+  suppliermind       0.984
+  p2_rag             0.840
+  p1_singleprompt    0.000
+
+[Intent resolution] P3 parser extraction accuracy vs ground truth
+  category         0.992  (124/125)
+  country          1.000  (100/100)
+  certifications   0.992  (124/125)
+  capacity         1.000  (125/125)
+  lead_time        0.984  (123/125)
+  OVERALL          0.993  (596/600)
+
+[Error taxonomy] P3, pooled over 125 query-runs (categories overlap)
+  polluted_product_string           21  (16.8%)
+  parse_failure_or_maxiter           4  (3.2%)
+  clean_parse_but_zero_precision     2  (1.6%)
+  missed_a_constraint                1  (0.8%)
+
+[Tool access] P3 parser, avg 3.1 tool-calls/query
+  tool                       used_in_queries  mean_P@5_when_used
+  infer_industry_context                 111               0.753
+  geocode_location                       103               0.713
+  parse_quantity_unit                     75               0.600
+  canonicalize_certification              73               0.668
+  lookup_past_query                        2               1.000

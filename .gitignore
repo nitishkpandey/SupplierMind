@@ -75,3 +75,7 @@ codebase_walkthrough.md
 known_bugs_to_triage.md
 *_sprint_plan.md
 *_plan.md
+
+# Thesis experiment throwaway (checkpoints + smoke runs)
+thesis/results/**/checkpoint_*.json
+thesis/results/**/_smoke/
