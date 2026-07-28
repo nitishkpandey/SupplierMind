@@ -89,6 +89,77 @@ def test_stage2_preserves_clean_location_text_for_geoapify(monkeypatch):
     assert result["longitude"] is None
 
 
+def test_stage2_prefers_verified_company_name_hint(monkeypatch):
+    monkeypatch.setattr(
+        extraction_module,
+        "fetch_page_content",
+        lambda url: "Woove Beer supplies German beer to wholesale customers.",
+    )
+    service = _service(
+        _payload(
+            name="Beer Wholesale Germany",
+            citations={"name": "Beer Wholesale Germany"},
+        )
+    )
+
+    result = service.stage2_extract(
+        "https://woovebeer.example/beer-wholesale-germany",
+        company_name_hint="Woove Beer",
+    )
+
+    assert result is not None
+    assert result["name"] == "Woove Beer"
+    assert result["source_citations"]["name"] == {
+        "url": "https://woovebeer.example/beer-wholesale-germany",
+        "source_phrase": "Woove Beer",
+    }
+
+
+def test_stage2_ignores_company_name_hint_absent_from_source(monkeypatch):
+    monkeypatch.setattr(
+        extraction_module,
+        "fetch_page_content",
+        lambda url: "Acme Metals GmbH manufactures precision metal parts.",
+    )
+    service = _service(_payload())
+
+    result = service.stage2_extract(
+        "https://acme.example",
+        company_name_hint="Unrelated Holdings",
+    )
+
+    assert result is not None
+    assert result["name"] == "Acme Metals GmbH"
+
+
+def test_stage2_preserves_verified_main_page_location_citation(monkeypatch):
+    location_phrase = "Werkstraße 4, 80331 Munich, Germany"
+    monkeypatch.setattr(
+        extraction_module,
+        "fetch_page_content",
+        lambda url: f"Acme Metals GmbH, {location_phrase}.",
+    )
+    service = _service(
+        _payload(
+            city="Munich",
+            country="Germany",
+            address=location_phrase,
+            citations={
+                "name": "Acme Metals GmbH",
+                "location": location_phrase,
+            },
+        )
+    )
+
+    result = service.stage2_extract("https://acme.example")
+
+    assert result is not None
+    assert result["source_citations"]["location"] == {
+        "url": "https://acme.example",
+        "source_phrase": location_phrase,
+    }
+
+
 def test_stage2_enriches_certifications_from_same_site_quality_page(monkeypatch):
     pages = {
         "https://acme.example": (

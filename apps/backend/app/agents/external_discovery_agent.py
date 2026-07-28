@@ -140,9 +140,18 @@ class ExternalDiscoveryAgent(BaseAgent):
             stage1_passed += 1
 
             # Stage 2: Rich extraction from full page
+            classification_confidence = float(
+                classification.get("confidence") or 0.0
+            )
+            company_name_hint = (
+                classification.get("company_name")
+                if classification_confidence >= 0.8
+                else None
+            )
             data = self.extractor.stage2_extract(
                 url=result.url,
                 deadline_at=deadline_at,
+                company_name_hint=company_name_hint,
             )
             if data:
                 extracted.append(data)

@@ -166,7 +166,11 @@ def test_external_discovery_rejects_supplier_without_verified_location():
         search_suppliers=MagicMock(return_value=[web_result]),
     )
     agent.extractor = SimpleNamespace(
-        stage1_classify=MagicMock(return_value={"is_supplier": True, "confidence": 0.95}),
+        stage1_classify=MagicMock(return_value={
+            "is_supplier": True,
+            "company_name": "Hogge Precision",
+            "confidence": 0.95,
+        }),
         stage2_extract=MagicMock(return_value={
             "name": "Hogge Precision",
             "description": "AS9100D aerospace machining supplier.",
@@ -194,6 +198,8 @@ def test_external_discovery_rejects_supplier_without_verified_location():
 
     result = agent.execute(state)
 
+    stage2_kwargs = agent.extractor.stage2_extract.call_args.kwargs
+    assert stage2_kwargs["company_name_hint"] == "Hogge Precision"
     agent._ingest_suppliers.assert_not_called()
     assert result["newly_discovered_supplier_ids"] == []
     assert result["external_discovery_stats"]["rejected_missing_location"] == 1

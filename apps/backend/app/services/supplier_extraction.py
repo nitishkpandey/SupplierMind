@@ -154,6 +154,7 @@ OUTPUT JSON:
   "citations": {
     "name": "exact source phrase",
     "description": "exact source phrase or 'composed from multiple sentences'",
+    "location": "exact phrase containing the city, country, or address, or null",
     "certifications": "exact phrase where certs are mentioned, or null",
     "capacity": "exact phrase where capacity number appears, or null",
     "lead_time_days": "exact phrase, or null"
@@ -218,7 +219,10 @@ class SupplierExtractionService:
         return False
 
     def stage2_extract(
-        self, url: str, deadline_at: float | None = None
+        self,
+        url: str,
+        deadline_at: float | None = None,
+        company_name_hint: str | None = None,
     ) -> dict | None:
         """
         Stage 2: Rich extraction from full page content. SYNC.
@@ -231,7 +235,18 @@ class SupplierExtractionService:
             logger.debug("[extraction] Could not fetch %s for stage 2", url)
             return None
 
-        text = f"SOURCE URL: {url}\n\nPAGE CONTENT:\n{full_content[:8000]}"
+        identity_context = ""
+        cleaned_company_name_hint = clean_optional_text(company_name_hint)
+        if cleaned_company_name_hint:
+            identity_context = (
+                "\n\nCANDIDATE COMPANY NAME FROM INITIAL CLASSIFICATION: "
+                f"{cleaned_company_name_hint}"
+                "\nUse this only if the company name is supported by PAGE CONTENT."
+            )
+        text = (
+            f"SOURCE URL: {url}\n\nPAGE CONTENT:\n{full_content[:8000]}"
+            f"{identity_context}"
+        )
 
         try:
             parsed = complete_json_dict(
@@ -250,6 +265,11 @@ class SupplierExtractionService:
         # Verification: hallucination guards
         verified = self._normalise_extracted_fields(
             self._verify_facts(parsed, full_content)
+        )
+        verified = self._reconcile_company_name(
+            verified,
+            cleaned_company_name_hint,
+            full_content,
         )
 
         location_evidence = {}
@@ -284,13 +304,23 @@ class SupplierExtractionService:
         # Build source_citations dict
         citations_dict: dict[str, dict[str, Any]] = {}
         raw_citations = verified.get("citations") or {}
-        for field in ("name", "description", "certifications", "capacity", "lead_time_days"):
+        for field in (
+            "name",
+            "description",
+            "location",
+            "certifications",
+            "capacity",
+            "lead_time_days",
+        ):
             source_phrase = clean_optional_text(raw_citations.get(field))
-            if source_phrase:
-                citations_dict[field] = {
-                    "url": url,
-                    "source_phrase": source_phrase[:300],
-                }
+            if not source_phrase:
+                continue
+            if field == "location" and source_phrase.casefold() not in full_content.casefold():
+                continue
+            citations_dict[field] = {
+                "url": url,
+                "source_phrase": source_phrase[:300],
+            }
         if location_evidence:
             citations_dict["location"] = {
                 "url": location_evidence["url"],
@@ -416,6 +446,27 @@ class SupplierExtractionService:
             cleaned["capacity_unit"] = None
 
         return cleaned
+
+    @staticmethod
+    def _reconcile_company_name(
+        verified: dict,
+        company_name_hint: str | None,
+        source_text: str,
+    ) -> dict:
+        hint = clean_optional_text(company_name_hint)
+        if not hint or hint.casefold() not in source_text.casefold():
+            return verified
+
+        extracted_name = clean_optional_text(verified.get("name"))
+        if extracted_name and extracted_name.casefold() == hint.casefold():
+            return verified
+
+        reconciled = dict(verified)
+        reconciled["name"] = hint
+        citations = dict(reconciled.get("citations") or {})
+        citations["name"] = hint
+        reconciled["citations"] = citations
+        return reconciled
 
     def _discover_certifications_from_site(
         self,
