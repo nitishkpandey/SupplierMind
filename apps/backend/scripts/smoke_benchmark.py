@@ -14,7 +14,7 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -32,6 +32,7 @@ async def main() -> None:
     from app.core.cache import InMemoryCache, set_cache_instance
     from app.core.vector_store import create_vector_store, set_vector_store_instance
     from app.db.session import AsyncSessionLocal
+    from app.evaluation.metrics import precision_at_k
     from app.evaluation.runner import (
         _convert_benchmark_constraints,
         _llm_total_cost,
@@ -39,7 +40,6 @@ async def main() -> None:
         run_paradigm_queries,
         run_suppliermind_query,
     )
-    from app.evaluation.metrics import precision_at_k
 
     set_cache_instance(InMemoryCache())
     set_vector_store_instance(create_vector_store())
@@ -114,8 +114,8 @@ async def main() -> None:
     lines = [
         "# Verification 03: Smoke Benchmark (3 queries x 3 paradigms)",
         "",
-        f"**Date:** {datetime.now(timezone.utc).isoformat()}",
-        f"**Provider:** OpenAI / gpt-4o-mini (no runtime fallback)",
+        f"**Date:** {datetime.now(UTC).isoformat()}",
+        "**Provider:** OpenAI / gpt-4o-mini (no runtime fallback)",
         f"**Wall time:** {time.time() - started:.0f}s",
         "",
         "| Q | Tier | Paradigm | Returned IDs (count) | P@5 | Latency ms | Cost USD |",

@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
 
-from app.db.session import AsyncSessionLocal
 from app.db.models import Supplier
+from app.db.session import AsyncSessionLocal
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND.parents[1]

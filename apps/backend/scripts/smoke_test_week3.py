@@ -33,7 +33,7 @@ import base64
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -53,7 +53,7 @@ PIPELINE_DEADLINE_S = 900
 
 
 def utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def login(email: str, role: str = "procurement_manager") -> str:
@@ -362,7 +362,6 @@ def scenario_4_combined(out: dict) -> None:
     traces = parser_traces(entries)
     last_trace = traces[-1] if traces else []
     # Did the resumed Parser run actually absorb the clarified intent?
-    trace_blob = json.dumps(last_trace).lower()
     audit_blob = json.dumps(entries).lower()
     reflects = ("fastener" in audit_blob) or ("steel" in audit_blob) or ("bolt" in audit_blob)
     final = dialogue["final_payload"] or {}

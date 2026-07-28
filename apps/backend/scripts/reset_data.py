@@ -4,10 +4,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import text
-from app.db.session import engine
-from app.core.config import settings
 from pymilvus import connections, utility
+from sqlalchemy import text
+
+from app.core.config import settings
+from app.db.session import engine
+
 
 async def reset_data():
     # 1. Clear PostgreSQL suppliers table

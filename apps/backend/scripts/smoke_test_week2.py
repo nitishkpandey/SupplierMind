@@ -12,7 +12,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -22,7 +22,7 @@ EVIDENCE = Path(__file__).resolve().parents[2] / "demo_output" / "week_2_product
 
 
 def utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def login(email: str, role: str = "procurement_manager") -> str:
@@ -207,7 +207,6 @@ def test_2_hitl_full_cycle(out: dict) -> None:
     )
 
     # Step 10: metrics page — human_admin count should be > 0
-    metrics_before_total = None
     metrics_after_total = None
     r_metrics = httpx.get(f"{BACKEND}/api/v1/admin/metrics", headers=auth(admin), params={"window_hours": 24}, timeout=10.0)
     if r_metrics.status_code == 200:

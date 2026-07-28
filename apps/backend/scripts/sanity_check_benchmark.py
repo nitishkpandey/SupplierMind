@@ -12,7 +12,7 @@ import json
 import re
 import statistics
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -129,7 +129,7 @@ def main() -> None:
     lines = [
         "# Verification 06: Post-Lock Sanity Checks",
         "",
-        f"**Date:** {datetime.now(timezone.utc).isoformat()}",
+        f"**Date:** {datetime.now(UTC).isoformat()}",
         f"**Run dir:** {run_dir}",
         f"**Run log:** {log_path}",
         f"**Verdict:** {'NO BLOCKERS' if not blockers else f'{len(blockers)} BLOCKER(S)'}",

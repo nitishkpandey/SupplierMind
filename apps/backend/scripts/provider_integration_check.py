@@ -24,7 +24,7 @@ import logging
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -114,7 +114,7 @@ async def main() -> None:
     out_path = TRACES_DIR / "pipeline_integration_run.json"
     out_path.write_text(
         json.dumps(
-            {"captured_at": datetime.now(timezone.utc).isoformat(), **result},
+            {"captured_at": datetime.now(UTC).isoformat(), **result},
             indent=2, default=str,
         ),
         encoding="utf-8",

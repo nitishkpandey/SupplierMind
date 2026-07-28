@@ -4,8 +4,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.db.session import engine
 from app.db.models import Base
+from app.db.session import engine
+
 
 async def init_db():
     async with engine.begin() as conn:

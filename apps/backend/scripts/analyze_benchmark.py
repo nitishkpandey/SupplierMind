@@ -20,8 +20,7 @@ from __future__ import annotations
 import json
 import random
 import statistics
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import matplotlib
@@ -245,7 +244,7 @@ def main() -> None:
 
     # ---- summary table -------------------------------------------------
     header = [
-        f"# Benchmark run {datetime.now(timezone.utc).isoformat()}",
+        f"# Benchmark run {datetime.now(UTC).isoformat()}",
         "",
         "Corpus: frozen curated-100 supplier corpus "
         "(approved + active rows only; pending-review and quarantined rows excluded).",

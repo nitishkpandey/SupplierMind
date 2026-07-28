@@ -77,7 +77,7 @@ async def main() -> None:
         return
 
     specific_run = args.p1 or args.p2 or args.p3
-    
+
     if specific_run:
         run_suppliermind = args.p3
         run_baselines = False
@@ -92,9 +92,8 @@ async def main() -> None:
     # Initialize vector store (required for SupplierMind and P2)
     if run_suppliermind or run_p2:
         logger.info("Initializing vector store...")
-        from app.core.config import settings
-        from app.core.vector_store import create_vector_store, set_vector_store_instance
         from app.core.cache import InMemoryCache, set_cache_instance
+        from app.core.vector_store import create_vector_store, set_vector_store_instance
 
         set_cache_instance(InMemoryCache())
         vs = create_vector_store()
@@ -104,7 +103,7 @@ async def main() -> None:
     logger.info("Starting evaluation...")
     from app.evaluation.runner import run_full_evaluation
 
-    results = await run_full_evaluation(
+    await run_full_evaluation(
         run_suppliermind=run_suppliermind,
         run_baselines=run_baselines,
         query_limit=args.limit,
