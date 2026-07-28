@@ -7,17 +7,66 @@ import os
 import sys
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1"
-COUNTRY = "Germany"
-QUERY = (
+FLAGSHIP_QUERY = (
     "i want to buy 1000 (.5l) bottles of helles and Pilsner beer in Germany "
     "for the client who is going to organise the summer party."
 )
-TERMINAL_EVENTS = frozenset({"complete", "error"})
+
+
+@dataclass(frozen=True)
+class LiveScenario:
+    key: str
+    query: str
+    clarification_answer: str | None = None
+    clarification_country: str | None = None
+    require_results: bool = False
+
+
+FLAGSHIP_SCENARIOS = (
+    LiveScenario(
+        key="beer-munich",
+        query=FLAGSHIP_QUERY,
+        clarification_answer="Munich",
+        clarification_country="Germany",
+        require_results=True,
+    ),
+    LiveScenario(
+        key="beer-germany",
+        query=FLAGSHIP_QUERY,
+        clarification_answer="all of Germany",
+        clarification_country="Germany",
+        require_results=True,
+    ),
+)
+
+GENERIC_SCENARIOS = (
+    LiveScenario(
+        key="office-furniture-germany",
+        query="Find ISO 9001 certified office furniture manufacturers in Germany",
+        clarification_answer="all of Germany",
+        clarification_country="Germany",
+    ),
+    LiveScenario(
+        key="recyclable-packaging-berlin",
+        query="Find 5000 recyclable food packaging units near Berlin within 30 days",
+    ),
+    LiveScenario(
+        key="aerospace-machining-bavaria",
+        query="Find aerospace machining suppliers in Bavaria with AS9100",
+    ),
+    LiveScenario(
+        key="textiles-france",
+        query="Find a textile supplier in France",
+        clarification_answer="all of France",
+        clarification_country="France",
+    ),
+)
 
 
 def parse_sse_events(lines: Iterable[str]) -> list[tuple[str, dict[str, Any]]]:
@@ -124,11 +173,16 @@ def _development_token(
     return token
 
 
-def _submit_query(client: httpx.Client, api_url: str, token: str) -> str:
+def _submit_query(
+    client: httpx.Client,
+    api_url: str,
+    token: str,
+    query: str,
+) -> str:
     response = client.post(
         f"{api_url}/queries",
         headers=_auth_headers(token),
-        json={"raw_query": QUERY, "search_scope": "both"},
+        json={"raw_query": query, "search_scope": "both"},
     )
     response.raise_for_status()
     query_id = response.json().get("id")
@@ -152,35 +206,30 @@ def _stream_query(
         return parse_sse_events(response.iter_lines())
 
 
-def _assert_persisted_run(
-    client: httpx.Client,
-    api_url: str,
-    token: str,
+def assert_persisted_payload(
+    result: dict[str, Any],
+    audit: dict[str, Any],
+    *,
     query_id: str,
+    require_results: bool,
 ) -> int:
-    headers = _auth_headers(token)
-    result_response = client.get(f"{api_url}/queries/{query_id}", headers=headers)
-    result_response.raise_for_status()
-    result = result_response.json()
+    """Validate terminal persistence without coupling the checks to HTTP."""
     if result.get("status") != "completed":
         raise AssertionError(
             f"Persisted query {query_id} ended with status {result.get('status')!r}: "
             f"{result.get('error_message') or 'no error message'}"
         )
     suppliers = result.get("results")
-    if not isinstance(suppliers, list) or not suppliers:
+    if not isinstance(suppliers, list):
+        raise AssertionError(f"Persisted query {query_id} has a non-list results payload")
+    if require_results and not suppliers:
         diagnostics = result.get("diagnostics") or {}
         raise AssertionError(
             "Live discovery completed without a supplier result: "
             f"{diagnostics.get('code') or 'no diagnostic code'}"
         )
 
-    audit_response = client.get(
-        f"{api_url}/queries/{query_id}/audit",
-        headers=headers,
-    )
-    audit_response.raise_for_status()
-    audit_entries = audit_response.json().get("audit_entries")
+    audit_entries = audit.get("audit_entries")
     if not isinstance(audit_entries, list) or not audit_entries:
         raise AssertionError(f"Query {query_id} did not persist an agent audit trail")
     agent_names = {
@@ -188,7 +237,11 @@ def _assert_persisted_run(
         for entry in audit_entries
         if isinstance(entry, dict)
     }
-    required_agents = {"parser", "discovery", "compliance", "ranking"}
+    required_agents = {"parser", "discovery"}
+    if result.get("search_scope") == "both":
+        required_agents.add("external_discovery")
+    if suppliers:
+        required_agents.update({"compliance", "ranking"})
     missing_agents = required_agents - agent_names
     if missing_agents:
         missing = ", ".join(sorted(missing_agents))
@@ -196,34 +249,70 @@ def _assert_persisted_run(
     return len(suppliers)
 
 
+def _assert_persisted_run(
+    client: httpx.Client,
+    api_url: str,
+    token: str,
+    query_id: str,
+    *,
+    require_results: bool,
+) -> int:
+    headers = _auth_headers(token)
+    result_response = client.get(f"{api_url}/queries/{query_id}", headers=headers)
+    result_response.raise_for_status()
+    audit_response = client.get(
+        f"{api_url}/queries/{query_id}/audit",
+        headers=headers,
+    )
+    audit_response.raise_for_status()
+    return assert_persisted_payload(
+        result_response.json(),
+        audit_response.json(),
+        query_id=query_id,
+        require_results=require_results,
+    )
+
+
 def _run_scenario(
     client: httpx.Client,
     api_url: str,
     *,
-    scenario: str,
-    answer: str,
+    scenario: LiveScenario,
 ) -> int:
-    token = _development_token(client, api_url, scenario)
-    query_id = _submit_query(client, api_url, token)
+    token = _development_token(client, api_url, scenario.key)
+    query_id = _submit_query(client, api_url, token, scenario.query)
 
-    clarification_events = _stream_query(client, api_url, token, query_id)
-    clarification = require_event(clarification_events, "needs_clarification")
-    assert_clarification_question(clarification, COUNTRY)
+    events = _stream_query(client, api_url, token, query_id)
+    if scenario.clarification_answer is not None:
+        clarification = require_event(events, "needs_clarification")
+        if scenario.clarification_country is not None:
+            assert_clarification_question(
+                clarification,
+                scenario.clarification_country,
+            )
 
-    response = client.post(
-        f"{api_url}/queries/{query_id}/clarify",
-        headers=_auth_headers(token),
-        json={"answer": answer},
-    )
-    response.raise_for_status()
-    if response.json().get("status") != "resuming":
-        raise AssertionError(f"Clarification for {query_id} did not enter resuming state")
+        response = client.post(
+            f"{api_url}/queries/{query_id}/clarify",
+            headers=_auth_headers(token),
+            json={"answer": scenario.clarification_answer},
+        )
+        response.raise_for_status()
+        if response.json().get("status") != "resuming":
+            raise AssertionError(
+                f"Clarification for {query_id} did not enter resuming state"
+            )
+        events = _stream_query(client, api_url, token, query_id)
 
-    resumed_events = _stream_query(client, api_url, token, query_id)
-    terminal = assert_terminal_completion(resumed_events)
+    terminal = assert_terminal_completion(events)
     if terminal.get("query_id") != query_id:
         raise AssertionError("Terminal event did not belong to the submitted query")
-    return _assert_persisted_run(client, api_url, token, query_id)
+    return _assert_persisted_run(
+        client,
+        api_url,
+        token,
+        query_id,
+        require_results=scenario.require_results,
+    )
 
 
 def main() -> int:
@@ -232,26 +321,24 @@ def main() -> int:
 
     try:
         with httpx.Client(timeout=timeout) as client:
-            city_results = _run_scenario(
-                client,
-                api_url,
-                scenario="city",
-                answer="Munich",
-            )
-            nationwide_results = _run_scenario(
-                client,
-                api_url,
-                scenario="nationwide",
-                answer="all of Germany",
-            )
+            result_counts = {
+                scenario.key: _run_scenario(
+                    client,
+                    api_url,
+                    scenario=scenario,
+                )
+                for scenario in (*FLAGSHIP_SCENARIOS, *GENERIC_SCENARIOS)
+            }
     except (httpx.HTTPError, AssertionError, ValueError) as exc:
         print(f"Live discovery verification failed: {exc}", file=sys.stderr)
         return 1
 
     print(
         "Live discovery verification passed: "
-        f"Munich={city_results} supplier(s), "
-        f"Germany-wide={nationwide_results} supplier(s)"
+        + ", ".join(
+            f"{scenario}={count} supplier(s)"
+            for scenario, count in result_counts.items()
+        )
     )
     return 0
 
