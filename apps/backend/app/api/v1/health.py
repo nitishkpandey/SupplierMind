@@ -81,7 +81,7 @@ async def health_check(
     except Exception as e:
         components["cache"] = ComponentHealth(status="unavailable", message=str(e)[:200])
 
-    # ponytail: DB is the only hard readiness dependency; other components
+    # The database is the only hard readiness dependency; other components
     # only degrade. Split /livez vs /readyz if K8s ever needs them apart.
     if components["database"].status != "ok":
         overall = "unavailable"

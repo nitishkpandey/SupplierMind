@@ -32,7 +32,7 @@ class SupplierResponse(BaseModel):
     source_citations: dict | None = None
     is_active: bool
     created_at: datetime
-    # Task 2.4 — HITL approval rationale, only set after an admin decision.
+    # Human-review rationale is populated only after an admin decision.
     approval_justification: str | None = None
     approval_action: str | None = None
     approval_decided_at: datetime | None = None

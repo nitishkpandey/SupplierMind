@@ -114,7 +114,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
   const [tier, setTier] = useState(result.tier || result.supplier_status);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Task 2.4 — HITL justification modal state
+  // Human-review justification modal state.
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
   const [recordedJustification, setRecordedJustification] = useState<string | null>(
     result.approval_justification ?? null
@@ -310,7 +310,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
           </div>
         )}
 
-        {/* Explanation — Task 1.5: structured, data-derived (no LLM free text) */}
+        {/* Structured, data-derived explanation (no LLM free text). */}
         {result.explanation_detail ? (
           <div className="bg-muted/50 p-3 rounded-lg border border-border/50 space-y-2.5">
             {result.explanation_detail.summary && (
@@ -471,7 +471,7 @@ export function SupplierCard({ result }: SupplierCardProps) {
           </div>
         </div>
 
-        {/* Task 2.4 — HITL rationale on approved/rejected suppliers */}
+        {/* Human-review rationale on approved/rejected suppliers. */}
         {recordedJustification && recordedAction === 'approved' && (
           <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">

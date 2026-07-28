@@ -60,7 +60,7 @@ from app.agents.tools import build_user_registry
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-# ponytail: 2 workers so one stuck memory write can't block every later
+# Two workers keep one stuck memory write from blocking every later
 # query's finalize; grow (or add a queue) if timeouts become common.
 _query_memory_executor = ThreadPoolExecutor(
     max_workers=2,

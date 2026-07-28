@@ -6,7 +6,7 @@ A supplier on a sanctions list (EU, UN, US OFAC, etc.) cannot be procured from
 legally. Every newly discovered supplier MUST be screened before adding to
 the database. This is a hard procurement compliance requirement.
 
-Task 1.6 Component C — hardened against the OpenSanctions rate limit:
+The integration is hardened against the OpenSanctions rate limit:
   1. Cache verdicts (7-day TTL, normalized company name) — cheap repeat checks.
   2. Bounded exponential backoff (1s, 2s, 4s) on 429/5xx — survive throttling.
   3. Explicit `pending_review` status when screening can't complete — NEVER

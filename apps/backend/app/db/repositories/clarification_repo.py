@@ -3,8 +3,6 @@
 One row per open clarification dialogue. The repo exposes both async and
 sync entry points: the API layer uses async (FastAPI handlers), the
 orchestrator's `parser_node` uses sync (LangGraph runs in a thread).
-
-Task 3.3 — Component B.
 """
 
 from __future__ import annotations

@@ -37,7 +37,7 @@ from app.utils.text_normalization import clean_optional_text, clean_text_list
 
 logger = logging.getLogger(__name__)
 
-# ── Certification taxonomy (Task 1.3) ─────────────────────────────────
+# ── Certification taxonomy ────────────────────────────────────────────
 # Human-verified lookup table that grounds cert-equivalence decisions in
 # facts instead of LLM guesses. See app/data/cert_taxonomy.json.
 _TAXONOMY_PATH = Path(__file__).resolve().parent.parent / "data" / "cert_taxonomy.json"
@@ -194,7 +194,7 @@ def taxonomy_prompt_snippet(cert_names: list[str]) -> str:
     return "\n".join(lines)
 
 
-# ── Quote-or-fail verification (Task 1.4) ─────────────────────────────
+# ── Quote-or-fail verification ────────────────────────────────────────
 # Every LLM-issued PASS/PARTIAL must cite a verbatim phrase from the supplier's
 # source text. The backend verifies the phrase exists (substring after
 # normalization); unverifiable claims are downgraded to PARTIAL with a logged
@@ -656,7 +656,7 @@ class ComplianceAgent(BaseAgent):
         else:
             for required_cert in required_certs:
                 if required_cert.upper() in supplier_certs:
-                    # Step 1 (Task 1.2): verbatim (case-insensitive) match → PASS, no LLM.
+                    # A verbatim, case-insensitive match passes without an LLM call.
                     results.append({
                         "constraint_name": required_cert,
                         "status": "PASS",
@@ -666,7 +666,7 @@ class ComplianceAgent(BaseAgent):
                     sc_count += 1
                     continue
 
-                # Steps 3-4 (Task 1.3): taxonomy lookup before the LLM.
+                # Consult the deterministic taxonomy before using the LLM.
                 # contains_or_supersedes → PASS; NOT_equivalent_to → FAIL.
                 verdict = taxonomy_cert_verdict(required_cert, supplier_certs_raw)
                 if verdict is not None:
@@ -801,7 +801,7 @@ class ComplianceAgent(BaseAgent):
         )
 
         # The evidence pool is the ONLY text the LLM may quote from, and exactly
-        # what the backend verifies the evidence_quote against (Task 1.4).
+        # what the backend verifies the evidence_quote against.
         evidence_pool = build_evidence_pool(supplier)
 
         prompt = f"""Supplier does NOT hold these certifications (no exact match found): {certs_to_check}
@@ -854,7 +854,7 @@ Return JSON object:
                 except (TypeError, ValueError):
                     confidence = LLM_CERT_CONFIDENCE
 
-                # Quote-or-fail (Task 1.4): a PASS/PARTIAL must cite a verbatim
+                # Quote-or-fail: a PASS/PARTIAL must cite a verbatim
                 # phrase that exists in the supplier text, else it is downgraded.
                 new_status, flag = quote_or_fail_verdict(
                     raw_status, confidence, evidence_quote, evidence_pool

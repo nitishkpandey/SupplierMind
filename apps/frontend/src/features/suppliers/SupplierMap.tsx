@@ -97,7 +97,7 @@ export function SupplierMap({ results, constraints }: SupplierMapProps) {
       });
     });
 
-    // ponytail: full teardown/rebuild on data change; incremental marker
+    // Rebuild on data changes; use incremental marker
     // updates only if rebuild flicker ever becomes a problem.
     return () => {
       cancelled = true;

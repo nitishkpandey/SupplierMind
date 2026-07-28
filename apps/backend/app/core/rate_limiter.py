@@ -60,8 +60,8 @@ class ModelRateLimiter:
         self._monotonic = monotonic
         self._sleep = sleep
         # Optional callback invoked once per pacing event. Production wires this
-        # to an audit_logs writer (see _default_audit_writer below) so the Week 1
-        # throttle work is observable from the admin metrics page. Tests pass
+        # to an audit_logs writer (see _default_audit_writer below) so throttle
+        # activity is observable from the admin metrics page. Tests pass
         # None to keep the limiter pure.
         self._audit_writer = audit_writer
         self._lock = threading.Lock()
@@ -104,7 +104,7 @@ class ModelRateLimiter:
         update_actual_tokens once the real usage is known).
         """
         rpm_cap, tpm_cap = self._caps(model)
-        # ponytail: one global lock, but held only for window bookkeeping — the
+        # One global lock is held only for window bookkeeping; the
         # pacing sleep and the audit DB write happen with the lock released so
         # one paced model never stalls the others. Per-model locks if the
         # bookkeeping itself ever shows contention.

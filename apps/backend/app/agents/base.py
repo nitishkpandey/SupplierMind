@@ -95,7 +95,7 @@ class BaseAgent(ABC):
         Every significant agent decision should be logged here.
         This is what appears in the UI's "Agent Audit Trail" panel.
 
-        Optional structured snapshots (Task 3.1) carry richer payloads such
+        Optional structured snapshots carry richer payloads such
         as the ReAct trace; the API flush stage prefers them when present
         and falls back to the plain summaries otherwise.
         """

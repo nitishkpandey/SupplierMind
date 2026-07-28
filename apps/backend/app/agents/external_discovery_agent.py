@@ -378,7 +378,7 @@ class ExternalDiscoveryAgent(BaseAgent):
                 # Embed BEFORE commit: a Milvus failure raises here, the
                 # session exit rolls back the uncommitted Postgres rows, and
                 # both stores stay in sync.
-                # ponytail: if commit fails after the vector add, Milvus keeps
+                # If commit fails after the vector add, Milvus keeps
                 # orphan vectors (harmless — search resolves via Postgres);
                 # add reconciliation if that ever matters.
                 vs = get_vector_store()

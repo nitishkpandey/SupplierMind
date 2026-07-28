@@ -1,8 +1,7 @@
 """
 app/api/v1/evaluation.py — Evaluation endpoints for the admin dashboard.
 
-These endpoints let admins trigger evaluations and view results
-through the web UI (Phase 4 will build the frontend for this).
+These endpoints let admins trigger evaluations and view persisted results.
 """
 
 import json

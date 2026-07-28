@@ -1,4 +1,4 @@
-"""app/agents/parser_agent.py — Task 3.1: ReAct-pattern constraint extractor.
+"""app/agents/parser_agent.py — ReAct-pattern constraint extractor.
 
 The Parser is the first agent in the system that does *real* ReAct reasoning
 (Yao et al. 2022, arXiv:2210.03629) rather than executing a fixed pipeline. At
@@ -46,7 +46,7 @@ _MAX_CALLS_PER_TOOL = 2
 CLARIFICATION_THRESHOLD = 0.5
 LLM_MAX_TOKENS_PER_STEP = 768
 
-# ── Task 3.3 — Clarification trigger thresholds ──────────────────────
+# ── Clarification trigger thresholds ─────────────────────────────────
 # Rule 2: low confidence AND fewer than N concrete constraints → ask.
 CLARIFICATION_CONFIDENCE_FLOOR = 0.4
 CLARIFICATION_MIN_CONSTRAINTS = 2
@@ -921,11 +921,11 @@ class ParserAgent(BaseAgent):
 
         memory_context_requested = self._raw_query_requests_memory_context(raw_query)
         memory_context = self._load_user_memory(user_id) if memory_context_requested else None
-        # Task 3.3 — on a resumed run, pass the partial constraints from the
+        # On a resumed run, pass the partial constraints from the
         # paused turn so the Parser doesn't re-extract from scratch.
         prior_partial = state.get("previous_partial_constraints") or None
 
-        # Pre-loop placeholder gate (Task 3.4 smoke finding). A query whose
+        # A pre-loop placeholder gate catches queries whose
         # every token is filler ("I need a supplier", "we need materials for
         # our project") cannot be improved by tool calls — the ReAct loop
         # just spends its whole budget and degrades. Ask the user up front:
@@ -957,7 +957,7 @@ class ParserAgent(BaseAgent):
         loop_error: str | None = None
 
         for iteration in range(MAX_REACT_ITERATIONS):
-            # Force-finish nudge (Task 3.4): on the last allowed iteration,
+            # On the last allowed iteration, force the model to finish;
             # tell the model explicitly that only Finish is acceptable.
             # Some models otherwise keep "validating" with more tool calls
             # until the budget dies.
@@ -1065,7 +1065,7 @@ class ParserAgent(BaseAgent):
                 continue
             seen_calls.add(call_key)
 
-            # Per-tool budget (Task 3.4): exact-args dedup is dodged by arg
+            # Exact-argument dedup can be dodged by argument
             # variations ("...for construction" vs "...for building"). Two
             # executions of the same tool are plenty for one query; a third
             # request gets a hint instead of a tool run.
@@ -1258,13 +1258,12 @@ class ParserAgent(BaseAgent):
             "needs_clarification" if clarification_needed else "running"
         )
 
-        # Task 3.3 — a clarification is a distinct, auditable event. Logged
+        # A clarification is a distinct, auditable event. Log it
         # under a dedicated agent_name so it surfaces cleanly in /admin/metrics
         # and audit-log queries can count "clarifications raised per query".
         # Both origins are audited: the post-loop composer AND the legacy
-        # path where the LLM set clarification_needed in its Finish payload
-        # (Task 3.4 smoke found the latter raised a resumable dialogue with
-        # no audit row). Deterministic degraded country-scope questions are
+        # path where the LLM set clarification_needed in its Finish payload.
+        # Deterministic degraded country-scope questions are
         # resumable and therefore audited; other degraded messages are not.
         if clarification_needed and clarification_resumable:
             if scope_question is not None:
@@ -1302,8 +1301,7 @@ class ParserAgent(BaseAgent):
     def _raise_pre_loop_clarification(
         self, state: AgentState, raw_query: str, start: float
     ) -> AgentState:
-        """Short-circuit for contentless queries: raise a resumable
-        clarification without entering the ReAct loop (Task 3.4)."""
+        """Raise a resumable clarification before ReAct for contentless queries."""
         question = self._compose_clarification_question(
             raw_query, {}, missing="placeholder"
         )
@@ -1360,7 +1358,7 @@ class ParserAgent(BaseAgent):
         memory_context: str | None,
         turn_number: int = 1,
     ) -> str | None:
-        """Task 3.3 — decide whether to interrupt the pipeline with a question.
+        """Decide whether to interrupt the pipeline with a question.
 
         Three trigger rules, evaluated in priority order. The first rule that
         fires composes a single user-facing question via a focused LLM call.
@@ -1517,7 +1515,7 @@ class ParserAgent(BaseAgent):
     def _memory_returned_useful_hit(trace: list[dict]) -> bool:
         """True iff a lookup_past_query observation came back non-empty.
 
-        Task 3.2's lookup_past_query tool returns a list of memory rows. An
+        The lookup_past_query tool returns a list of memory rows. An
         empty list means no useful prior query was found, which we treat the
         same as the tool never having been called.
         """
@@ -1694,7 +1692,7 @@ class ParserAgent(BaseAgent):
                 f"{memory_context}"
             )
         if prior_partial:
-            # Task 3.3 — on resumed turns, the Parser already extracted some
+            # On resumed turns, the Parser already extracted some
             # constraints in the prior turn. Hand those over so the LLM can
             # merge the user's new clarification instead of re-extracting.
             try:
@@ -1868,7 +1866,7 @@ class ParserAgent(BaseAgent):
         forgot to include them in the Finish payload.
         """
         raw = dict(raw or {})
-        # Legacy nested shape (Week 1/2 prompt produced "location": {...}).
+        # Legacy prompt shape nested location fields under "location".
         if isinstance(raw.get("location"), dict):
             loc = raw.pop("location")
             raw.setdefault("location_city", loc.get("city"))
@@ -2078,7 +2076,7 @@ class ParserAgent(BaseAgent):
             location_country = None
         location_name = location_city or location_country
 
-        # Rule 1 pollution guard (Task 3.4): never let a placeholder reach
+        # Never let a placeholder reach
         # downstream discovery as a product_type — semantic search for
         # "our project" is noise and it silences the clarification trigger.
         product_type = raw.get("product_type")
@@ -2196,7 +2194,7 @@ class ParserAgent(BaseAgent):
                 fallback["industry_context"] = fallback["industry_context"] or obs.get("industry")
                 # The LLM's own product_description argument is its distilled
                 # product label — far better than the token salad below
-                # (Task 3.4: resumed runs carry the user's answer here).
+                # (Resumed runs carry the user's answer here.)
                 product_desc = (step.get("action_input") or {}).get("product_description")
                 if (
                     product_desc
@@ -2237,7 +2235,7 @@ class ParserAgent(BaseAgent):
             fallback["product_keywords"] = words[:5]
             fallback["product_type"] = fallback["product_type"] or " ".join(words[:3]) or None
 
-        # Task 3.4: when the trace recovered a real product AND at least one
+        # When the trace recovered a real product and at least one
         # other concrete constraint, the extraction is good enough to proceed.
         # Asking the user again after a productive (if unfinished) loop is
         # worse UX than running the search with what was learned — especially

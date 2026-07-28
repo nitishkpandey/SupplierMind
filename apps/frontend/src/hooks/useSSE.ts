@@ -80,7 +80,7 @@ export function useSSE(queryId: string | null, resumeKey = 0) {
     });
 
     source.addEventListener("needs_clarification", (e: MessageEvent) => {
-      // Task 3.3 — pipeline paused waiting for user reply. Surface the
+      // The pipeline paused for a user reply. Surface the
       // question to the page so it can render the ClarificationCard.
       try {
         const data = JSON.parse(e.data);

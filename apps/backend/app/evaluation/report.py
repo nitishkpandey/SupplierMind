@@ -6,7 +6,7 @@ Produces two outputs:
 2. Console summary — what to put in thesis tables directly
 
 The report answers all three research questions:
-  RQ1: Answered by the architecture (Phase 2)
+  RQ1: Answered by the architecture
   RQ2: Answered by P@5, CSR, MRR comparison tables (this file)
   RQ3: Answered by the failure analysis section (which queries failed?)
 """

@@ -1,7 +1,7 @@
 """
 app/api/v1/metrics.py — Admin operational metrics from audit_logs.
 
-Task 2.5. Reads the existing audit_logs table to surface per-agent latency
+Reads the existing audit_logs table to surface per-agent latency
 percentiles, throttle event counts, human-decision counts, and recent
 errors over a configurable window. Adds no new instrumentation — every
 metric is derived from data the system already produces.
@@ -43,8 +43,8 @@ async def get_admin_metrics(
 
     The dual purpose: (1) a 90-second visual answer to "is the system healthy"
     for thesis demos and viva questions, (2) a debugging surface for the
-    builder. The throttle pacing-event count makes the Week 1 rate-limit work
-    directly visible — that was opaque-to-stdout before this endpoint existed.
+    builder. The throttle pacing-event count makes rate-limit behavior directly
+    visible instead of leaving it only in process logs.
     """
     # ── Per-agent latency percentiles ─────────────────────────────────
     latency_rows = (
@@ -169,7 +169,7 @@ async def get_admin_metrics(
         for row in error_rows
     ]
 
-    # Active LLM provider + running cost (Development Plan, Phase 1).
+    # Active LLM provider and running cost.
     from app.core.llm import get_llm_client
 
     try:

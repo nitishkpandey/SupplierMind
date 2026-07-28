@@ -103,7 +103,7 @@ export default function ResultsPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Clarification state (Task 3.3) ───────────────────────────────
+  // ── Clarification state ──────────────────────────────────────────
   // Surfaces when the Parser pauses with a question. The card renders
   // beneath the agent-steps strip so the user sees the pipeline made
   // progress before being asked for more input.

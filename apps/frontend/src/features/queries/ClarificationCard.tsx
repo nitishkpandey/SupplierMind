@@ -1,5 +1,5 @@
 /**
- * ClarificationCard — Task 3.3 multi-turn clarification dialogue.
+ * Multi-turn clarification dialogue.
  *
  * Rendered when the Parser pauses the pipeline with a question. The user
  * types one short answer; on submit we POST to /queries/:id/clarify, which

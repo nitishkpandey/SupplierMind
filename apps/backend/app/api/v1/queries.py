@@ -138,7 +138,7 @@ async def submit_query(
         )
 
     # Check for prompt injection.
-    # ponytail: heuristic tripwire only — substring matching is trivially
+    # This is a heuristic tripwire only; substring matching is trivially
     # bypassed; the real defense is the downstream prompt/tool design.
     # Broad single-word patterns ("act as", "disregard") were dropped:
     # they flagged legitimate procurement queries without stopping anyone.

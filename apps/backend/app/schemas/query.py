@@ -22,7 +22,7 @@ class QueryResponse(BaseModel):
     created_at: str
 
 
-# ── Task 3.3 — Multi-turn clarification dialogue ─────────────────────
+# ── Multi-turn clarification dialogue ────────────────────────────────
 
 
 class ClarificationAnswerRequest(BaseModel):

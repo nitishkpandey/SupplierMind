@@ -1,4 +1,4 @@
-"""app/api/v1/users.py — User-scoped endpoints (Task 3.2).
+"""app/api/v1/users.py — User-scoped endpoints.
 
 Currently exposes one endpoint:
 
