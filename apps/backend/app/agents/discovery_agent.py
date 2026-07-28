@@ -1,17 +1,15 @@
 """Hybrid supplier retrieval with tier and benchmark-corpus awareness."""
 
-import json
 import logging
 import time
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from sqlalchemy import Text, func, or_, select
 
 from app.agents.base import BaseAgent
 from app.agents.compliance_agent import canonical_cert_key
-from app.agents.state import AgentState, ParsedConstraints
-from app.core.llm import complete_json_dict
+from app.agents.state import AgentState
 from app.db.models import Supplier, SupplierStatus, UserSupplierSave
 from app.db.repositories.supplier_repo import SupplierRepository
 from app.db.session import SyncSessionLocal
@@ -19,8 +17,6 @@ from app.utils.geo import haversine_km
 
 logger = logging.getLogger(__name__)
 
-MIN_RESULTS = 5
-MAX_RETRIES = 3
 RRF_K = 60
 CANDIDATE_HANDOFF_LIMIT = 25
 PROTECTED_CHANNEL_LIMIT = 10
@@ -33,32 +29,9 @@ CATEGORY_EXPANSIONS = {
     "office_supplies": ("office_supplies", "electronics", "software_services", "packaging", "textiles"),
 }
 
-RELAXATION_PROMPT = """You are a procurement search optimizer.
-A search returned too few results. Decide which ONE constraint to relax.
-
-Constraints: {constraints}
-Results found: {count}
-Already relaxed: {previous}
-
-Priority for relaxation (relax first to last):
-1. location_radius_km — expand the radius
-2. lead_time_max_days — increase lead time limit
-3. capacity_min — lower the capacity threshold
-4. certifications — only remove ONE certification, keep the others
-
-NEVER relax: product_type (defines the product)
-
-Return JSON only:
-{{
-  "relax_constraint": "constraint_name",
-  "new_value": null_or_new_value,
-  "reasoning": "one sentence"
-}}"""
-
-
 class DiscoveryAgent(BaseAgent):
     """
-    Retrieves candidate suppliers using hybrid search + agentic retry.
+    Retrieves candidate suppliers using hybrid search.
     Production v2: Tier-aware retrieval.
     """
 
@@ -415,29 +388,6 @@ class DiscoveryAgent(BaseAgent):
             ),
         )
 
-        # ── Step 5: Agentic retry ─────────────────────────────────────
-        if len(candidate_ids) < MIN_RESULTS and retry_count < MAX_RETRIES:
-            relaxed, relax_key = self._decide_relaxation(
-                constraints,
-                len(candidate_ids),
-                state.get("relaxed_constraints", []),
-            )
-            if relaxed is not None and relax_key:
-                # relaxed is a plain-dict copy of ParsedConstraints minus one key
-                state["parsed_constraints"] = cast("ParsedConstraints", relaxed)
-                state["retry_count"] = retry_count + 1
-                state["relaxed_constraints"] = state.get("relaxed_constraints", []) + [relax_key]
-                logger.info("[discovery] Relaxing %r, retry %d/%d", relax_key, retry_count + 1, MAX_RETRIES)
-                return self._run_search(
-                    state,
-                    relaxed,
-                    retry_count + 1,
-                    search_scope,
-                    user_id,
-                    exclude_pending,
-                    allowed_supplier_ids=allowed_supplier_ids,
-                )
-
         # ── Final state ───────────────────────────────────────────────
         selected_candidate_ids = self._candidate_handoff_ids(
             rrf_sorted_ids=candidate_ids,
@@ -453,15 +403,13 @@ class DiscoveryAgent(BaseAgent):
         state["retry_count"] = retry_count
 
         if not candidate_ids:
-            state["pipeline_status"] = "failed"
-            state["error"] = (
-                "No suppliers found matching your constraints after "
-                f"{retry_count} relaxation attempt(s) in scope '{search_scope}'. "
-                "Try broadening your search."
-            )
+            # A valid empty search is a business outcome, not an infrastructure
+            # error. The API turns it into strict-constraint diagnostics.
+            state["pipeline_status"] = "completed"
+            state["error"] = None
         else:
             state["pipeline_status"] = "running"
-            state["error"] = None # Clear any previous error if we succeeded on retry
+            state["error"] = None
 
         return state
 
@@ -709,49 +657,3 @@ class DiscoveryAgent(BaseAgent):
         if isinstance(country, str) and city.strip().casefold() == country.strip().casefold():
             return None
         return city.strip()
-
-    def _decide_relaxation(
-        self,
-        constraints: Mapping[str, Any],
-        result_count: int,
-        previous: list[str],
-    ) -> tuple[dict | None, str]:
-        available = [
-            k for k in ["lead_time_max_days", "capacity_min"]
-            if k in constraints and k not in previous
-        ]
-
-        if not available:
-            return None, ""
-
-        try:
-            decision = complete_json_dict(self.llm, [
-                {"role": "system", "content": "Return JSON only."},
-                {"role": "user", "content": RELAXATION_PROMPT.format(
-                    constraints=json.dumps({k: v for k, v in constraints.items() if v}, default=str),
-                    count=result_count,
-                    previous=previous,
-                )},
-            ])
-            key = decision.get("relax_constraint", "")
-            new_val = decision.get("new_value")
-
-            if key not in constraints:
-                key = available[0]
-                new_val = None
-
-            relaxed = dict(constraints)
-            if new_val is None:
-                relaxed.pop(key, None)
-            else:
-                relaxed[key] = new_val
-
-            logger.info("[discovery] LLM relaxed %r → %r: %s", key, new_val, decision.get("reasoning"))
-            return relaxed, key
-
-        except Exception as e:
-            logger.warning("[discovery] Relaxation decision failed: %s. Using fallback.", e)
-            key = available[0]
-            relaxed = dict(constraints)
-            relaxed.pop(key, None)
-            return relaxed, key

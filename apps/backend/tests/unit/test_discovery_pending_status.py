@@ -476,6 +476,58 @@ def test_structured_search_expands_missing_parser_category_to_corpus_category():
         db.rollback()
 
 
+def test_empty_search_completes_without_relaxing_user_constraints():
+    """A genuine zero-match result is not a pipeline failure.
+
+    Discovery must preserve explicitly parsed lead-time and capacity constraints
+    instead of silently widening them to manufacture a result.
+    """
+    agent = DiscoveryAgent.__new__(DiscoveryAgent)
+    original_constraints = {
+        "product_type": "zzq nonexistent aerospace component",
+        "product_keywords": ["zzqnonexistentcomponent"],
+        "location_country": "ZZQNoCountry",
+        "lead_time_max_days": 30,
+        "capacity_min": 5000,
+        "capacity_unit": "units/month",
+    }
+
+    with SyncSessionLocal() as db:
+        fake_vs = MagicMock()
+        fake_vs.search.return_value = []
+        fake_session_cm = MagicMock()
+        fake_session_cm.__enter__.return_value = db
+        fake_session_cm.__exit__.return_value = False
+        state = {
+            "raw_query": "Find 5000 aerospace components within 30 days in ZZQNoCountry",
+            "parsed_constraints": dict(original_constraints),
+            "newly_discovered_supplier_ids": [],
+            "candidate_supplier_ids": [],
+            "semantic_scores": {},
+            "geo_distances": {},
+            "relaxed_constraints": [],
+            "tier_assignments": {},
+            "retry_count": 0,
+            "search_scope": "both",
+            "user_id": "",
+            "exclude_pending": False,
+            "audit_log": [],
+        }
+
+        with patch("app.core.vector_store.get_vector_store", return_value=fake_vs), patch(
+            "app.agents.discovery_agent.SyncSessionLocal",
+            return_value=fake_session_cm,
+        ):
+            result = agent.execute(state)
+
+        assert result["parsed_constraints"] == original_constraints
+        assert result["relaxed_constraints"] == []
+        assert result["candidate_supplier_ids"] == []
+        assert result["pipeline_status"] == "completed"
+        assert result["error"] is None
+        db.rollback()
+
+
 def test_qualified_fresh_pending_review_candidate_surfaces_in_query_results(monkeypatch):
     """A qualified fresh web supplier should still reach the current result list.
 
