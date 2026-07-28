@@ -9,6 +9,7 @@ through the response headers so clients (and APM tools) can correlate logs.
 
 import contextvars
 import logging
+import re
 import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -18,6 +19,10 @@ from starlette.responses import Response
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
+_ACCESS_LOG_CREDENTIAL_RE = re.compile(
+    r"([?&](?:token|access_token|refresh_token)=)[^&\s]+",
+    flags=re.IGNORECASE,
+)
 
 # Per-request ID, isolated per task/thread — concurrent requests each see their
 # own value, unlike a filter added/removed on the shared root logger.
@@ -34,8 +39,32 @@ class _RequestIDFilter(logging.Filter):
         return True
 
 
+def redact_access_log_credentials(record: logging.LogRecord) -> None:
+    """Remove URL credential values from Uvicorn's structured access-log args."""
+    if record.name != "uvicorn.access":
+        return
+    args = record.args
+    if not isinstance(args, tuple) or len(args) < 3 or not isinstance(args[2], str):
+        return
+    path = _ACCESS_LOG_CREDENTIAL_RE.sub(
+        r"\1%5BREDACTED%5D",
+        args[2],
+    )
+    if path != args[2]:
+        record.args = (*args[:2], path, *args[3:])
+
+
+class _AccessLogCredentialFilter(logging.Filter):
+    """Redact query-string credentials before the access record is rendered."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        redact_access_log_credentials(record)
+        return True
+
+
 # Installed once at import time; reads the ContextVar per record.
 logging.getLogger().addFilter(_RequestIDFilter())
+logging.getLogger("uvicorn.access").addFilter(_AccessLogCredentialFilter())
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):

@@ -18,6 +18,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
     force=True,
 )
+# HTTPX renders full request URLs at INFO. Some providers place credentials in
+# query parameters, so dependency request lines must never enter application logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
