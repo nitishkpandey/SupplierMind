@@ -140,6 +140,27 @@ uv run python scripts/run_evaluation.py --paradigms
 
 ---
 
+## Release Verification
+
+Run every deterministic backend and frontend quality gate from the repository
+root:
+
+```bash
+./scripts/verify_release.sh
+```
+
+With the backend and its external services running, include the live
+country-scope clarification, resume, supplier-result, and audit-trail checks:
+
+```bash
+./scripts/verify_release.sh --live
+```
+
+The live check uses the development login endpoint and does not print tokens or
+credentials.
+
+---
+
 ## The Three Paradigms
 
 The thesis benchmarks three ways of answering the same procurement query:
