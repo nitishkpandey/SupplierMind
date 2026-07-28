@@ -3,6 +3,7 @@
 import logging
 import time
 import uuid
+from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
@@ -167,6 +168,7 @@ class ExternalDiscoveryAgent(BaseAgent):
         rejected_sanctions = 0
         rejected_duplicate = 0
         rejected_missing_location = 0
+        location_rejection_reasons: Counter[str] = Counter()
         pending_sanctions = 0
 
         with SyncSessionLocal() as db:
@@ -179,11 +181,16 @@ class ExternalDiscoveryAgent(BaseAgent):
                     )
                     break
 
-                location = self.location_enricher.enrich(s, constraints)
+                resolution = self.location_enricher.resolve(s, constraints)
+                location = resolution.location
                 if location is None:
                     logger.info(
-                        "[external_discovery] Missing verified location: %r",
+                        "[external_discovery] Missing verified location: %r (%s)",
                         s["name"],
+                        ", ".join(resolution.rejection_reasons),
+                    )
+                    location_rejection_reasons.update(
+                        resolution.rejection_reasons
                     )
                     rejected_missing_location += 1
                     continue
@@ -239,6 +246,9 @@ class ExternalDiscoveryAgent(BaseAgent):
             "pending_sanctions": pending_sanctions,
             "rejected_duplicates": rejected_duplicate,
             "rejected_missing_location": rejected_missing_location,
+            "location_rejection_reasons": dict(
+                sorted(location_rejection_reasons.items())
+            ),
             "deadline_exceeded": deadline_exceeded,
             "ingested": len(newly_added_ids),
         }
@@ -257,6 +267,7 @@ class ExternalDiscoveryAgent(BaseAgent):
                 f"ingested={len(newly_added_ids)}, "
                 f"rejected_sanctions={rejected_sanctions}, pending_sanctions={pending_sanctions}, "
                 f"duplicates={rejected_duplicate}, missing_location={rejected_missing_location}, "
+                f"location_reasons={dict(sorted(location_rejection_reasons.items()))}, "
                 f"deadline_exceeded={deadline_exceeded}"
             ),
             duration_ms=duration_ms,

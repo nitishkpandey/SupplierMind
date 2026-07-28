@@ -181,7 +181,15 @@ def test_external_discovery_rejects_supplier_without_verified_location():
             "source_citations": {},
         }),
     )
-    agent.location_enricher = SimpleNamespace(enrich=MagicMock(return_value=None))
+    agent.location_enricher = SimpleNamespace(
+        resolve=MagicMock(return_value=SimpleNamespace(
+            location=None,
+            rejection_reasons=(
+                "geocoding_company_name_mismatch",
+                "places_no_feature",
+            ),
+        ))
+    )
     agent.sanctions = SimpleNamespace()
     agent._log_audit = MagicMock()
     agent._ingest_suppliers = MagicMock()
@@ -203,6 +211,10 @@ def test_external_discovery_rejects_supplier_without_verified_location():
     agent._ingest_suppliers.assert_not_called()
     assert result["newly_discovered_supplier_ids"] == []
     assert result["external_discovery_stats"]["rejected_missing_location"] == 1
+    assert result["external_discovery_stats"]["location_rejection_reasons"] == {
+        "geocoding_company_name_mismatch": 1,
+        "places_no_feature": 1,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────

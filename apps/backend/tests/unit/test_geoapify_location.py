@@ -206,3 +206,141 @@ def test_geoapify_rejects_low_confidence_location():
     )
 
     assert location is None
+
+
+def test_geoapify_places_accepts_matching_feature_without_geocoding_rank():
+    feature = _feature(
+        city="Munich",
+        lat=48.137,
+        lon=11.575,
+        name="Hogge Precision",
+    )
+    feature["properties"].pop("rank")
+    client = _Client([{"features": [feature]}])
+    service = GeoapifyLocationService(
+        geocoding_api_key="",
+        places_api_key="places-key",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is not None
+    assert resolution.location.source == "geoapify_places"
+    assert resolution.location.confidence is None
+    assert resolution.rejection_reasons == ()
+
+
+def test_geoapify_geocoding_rejects_missing_rank_confidence():
+    feature = _feature(city="Munich", name="Hogge Precision")
+    feature["properties"].pop("rank")
+    client = _Client([{"features": [feature]}])
+    service = GeoapifyLocationService(
+        geocoding_api_key="geo-key",
+        places_api_key="",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is None
+    assert resolution.rejection_reasons == ("geocoding_confidence_missing",)
+
+
+def test_geoapify_places_reports_name_mismatch():
+    client = _Client([
+        {
+            "features": [
+                _feature(city="Munich", name="Different Manufacturing GmbH")
+            ]
+        },
+    ])
+    service = GeoapifyLocationService(
+        geocoding_api_key="",
+        places_api_key="places-key",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is None
+    assert resolution.rejection_reasons == ("places_company_name_mismatch",)
+
+
+def test_geoapify_places_reports_country_conflict():
+    client = _Client([
+        {
+            "features": [
+                _feature(
+                    city="Munich",
+                    country="Austria",
+                    country_code="at",
+                    name="Hogge Precision",
+                )
+            ]
+        },
+    ])
+    service = GeoapifyLocationService(
+        geocoding_api_key="",
+        places_api_key="places-key",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is None
+    assert resolution.rejection_reasons == ("places_country_conflict",)
+
+
+def test_geoapify_places_reports_city_conflict():
+    client = _Client([
+        {
+            "features": [
+                _feature(city="Berlin", name="Hogge Precision")
+            ]
+        },
+    ])
+    service = GeoapifyLocationService(
+        geocoding_api_key="",
+        places_api_key="places-key",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is None
+    assert resolution.rejection_reasons == ("places_city_conflict",)
+
+
+def test_geoapify_places_reports_missing_coordinates():
+    feature = _feature(city="Munich", name="Hogge Precision")
+    feature["geometry"]["coordinates"] = []
+    client = _Client([{"features": [feature]}])
+    service = GeoapifyLocationService(
+        geocoding_api_key="",
+        places_api_key="places-key",
+        client=client,
+    )
+
+    resolution = service.resolve(
+        {"name": "Hogge Precision"},
+        constraints={"location_city": "Munich", "location_country": "Germany"},
+    )
+
+    assert resolution.location is None
+    assert resolution.rejection_reasons == ("places_coordinates_missing",)

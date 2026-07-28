@@ -32,7 +32,13 @@ class VerifiedLocation:
     longitude: float
     formatted_address: str | None
     source: str
-    confidence: float
+    confidence: float | None
+
+
+@dataclass(frozen=True)
+class LocationResolution:
+    location: VerifiedLocation | None
+    rejection_reasons: tuple[str, ...] = ()
 
 
 class GeoapifyLocationService:
@@ -64,27 +70,66 @@ class GeoapifyLocationService:
     def is_available(self) -> bool:
         return bool(self.geocoding_api_key or self.places_api_key)
 
-    def enrich(self, supplier: dict, constraints: Mapping[str, Any] | None = None) -> VerifiedLocation | None:
+    def enrich(
+        self,
+        supplier: dict,
+        constraints: Mapping[str, Any] | None = None,
+    ) -> VerifiedLocation | None:
+        return self.resolve(supplier, constraints).location
+
+    def resolve(
+        self,
+        supplier: dict,
+        constraints: Mapping[str, Any] | None = None,
+    ) -> LocationResolution:
         constraints = constraints or {}
         if self._supplier_conflicts_with_constraints(supplier, constraints):
-            return None
+            return LocationResolution(
+                location=None,
+                rejection_reasons=("supplier_country_conflict",),
+            )
+
+        rejection_reasons: list[str] = []
 
         if self.geocoding_api_key:
             query, expected_name = self._build_geocoding_query(supplier, constraints)
             if query:
-                location = self._geocode(query, expected_name=expected_name)
-                if location and self._matches_constraints(location, constraints):
-                    return location
+                resolution = self._geocode(query, expected_name=expected_name)
+                if resolution.location:
+                    constraint_reason = self._constraint_rejection_reason(
+                        resolution.location,
+                        constraints,
+                        path="geocoding",
+                    )
+                    if constraint_reason is None:
+                        return resolution
+                    rejection_reasons.append(constraint_reason)
+                rejection_reasons.extend(resolution.rejection_reasons)
+            else:
+                rejection_reasons.append("geocoding_query_unavailable")
 
         if self.places_api_key:
-            location = self._places_lookup(
+            resolution = self._places_lookup(
                 name=clean_optional_text(supplier.get("name")),
                 constraints=constraints,
             )
-            if location and self._matches_constraints(location, constraints):
-                return location
+            if resolution.location:
+                constraint_reason = self._constraint_rejection_reason(
+                    resolution.location,
+                    constraints,
+                    path="places",
+                )
+                if constraint_reason is None:
+                    return resolution
+                rejection_reasons.append(constraint_reason)
+            rejection_reasons.extend(resolution.rejection_reasons)
 
-        return None
+        if not rejection_reasons:
+            rejection_reasons.append("location_service_unavailable")
+        return LocationResolution(
+            location=None,
+            rejection_reasons=tuple(dict.fromkeys(rejection_reasons)),
+        )
 
     def _build_geocoding_query(
         self,
@@ -124,7 +169,12 @@ class GeoapifyLocationService:
 
         return None, None
 
-    def _geocode(self, text: str, *, expected_name: str | None = None) -> VerifiedLocation | None:
+    def _geocode(
+        self,
+        text: str,
+        *,
+        expected_name: str | None = None,
+    ) -> LocationResolution:
         try:
             response = self.client.get(
                 GEOCODING_URL,
@@ -139,24 +189,35 @@ class GeoapifyLocationService:
             response.raise_for_status()
             features = response.json().get("features") or []
             if not features:
-                return None
+                return LocationResolution(
+                    location=None,
+                    rejection_reasons=("geocoding_no_feature",),
+                )
             return self._location_from_feature(
                 features[0],
                 source="geoapify_geocoding",
+                path="geocoding",
                 expected_name=expected_name,
+                require_confidence=True,
             )
         except Exception as e:
             logger.info("[geoapify] Geocoding failed for %r: %s", text, e)
-            return None
+            return LocationResolution(
+                location=None,
+                rejection_reasons=("geocoding_request_failed",),
+            )
 
     def _places_lookup(
         self,
         *,
         name: str | None,
         constraints: Mapping[str, Any],
-    ) -> VerifiedLocation | None:
+    ) -> LocationResolution:
         if not name:
-            return None
+            return LocationResolution(
+                location=None,
+                rejection_reasons=("places_company_name_missing",),
+            )
 
         country = clean_optional_text(
             constraints.get("location_country") or constraints.get("country")
@@ -166,7 +227,10 @@ class GeoapifyLocationService:
         )
         location_filter = self._location_filter(region=region, country=country)
         if not location_filter:
-            return None
+            return LocationResolution(
+                location=None,
+                rejection_reasons=("places_context_unbounded",),
+            )
 
         params: dict[str, str | int] = {
             "categories": self.places_categories,
@@ -185,26 +249,37 @@ class GeoapifyLocationService:
             response.raise_for_status()
             features = response.json().get("features") or []
             if not features:
-                return None
+                return LocationResolution(
+                    location=None,
+                    rejection_reasons=("places_no_feature",),
+                )
             return self._location_from_feature(
                 features[0],
                 source="geoapify_places",
+                path="places",
                 expected_name=name,
+                require_confidence=False,
             )
         except Exception as e:
             logger.info("[geoapify] Places lookup failed for %r: %s", name, e)
-            return None
+            return LocationResolution(
+                location=None,
+                rejection_reasons=("places_request_failed",),
+            )
 
     def _location_from_feature(
         self,
         feature: dict,
         *,
         source: str,
+        path: str,
         expected_name: str | None = None,
-    ) -> VerifiedLocation | None:
+        require_confidence: bool,
+    ) -> LocationResolution:
         props = feature.get("properties") or {}
+        rejection_reasons: list[str] = []
         if expected_name and not self._name_matches(expected_name, props):
-            return None
+            rejection_reasons.append(f"{path}_company_name_mismatch")
 
         city = clean_optional_text(
             props.get("city")
@@ -214,33 +289,53 @@ class GeoapifyLocationService:
             or props.get("county")
         )
         country = clean_optional_text(props.get("country"))
-        confidence = self._confidence(props)
         coords = (feature.get("geometry") or {}).get("coordinates") or []
+        confidence, confidence_valid = self._confidence(props)
 
-        if not city or not country or len(coords) < 2 or confidence < self.min_confidence:
-            return None
+        if not city:
+            rejection_reasons.append(f"{path}_city_missing")
+        if not country:
+            rejection_reasons.append(f"{path}_country_missing")
+        if len(coords) < 2:
+            rejection_reasons.append(f"{path}_coordinates_missing")
+        if require_confidence:
+            if confidence is None and confidence_valid:
+                rejection_reasons.append(f"{path}_confidence_missing")
+            elif not confidence_valid:
+                rejection_reasons.append(f"{path}_confidence_invalid")
+            elif confidence is not None and confidence < self.min_confidence:
+                rejection_reasons.append(f"{path}_confidence_below_threshold")
 
-        return VerifiedLocation(
-            city=city,
-            country=country,
-            latitude=float(coords[1]),
-            longitude=float(coords[0]),
-            formatted_address=clean_optional_text(props.get("formatted")),
-            source=source,
-            confidence=confidence,
+        if rejection_reasons:
+            return LocationResolution(
+                location=None,
+                rejection_reasons=tuple(rejection_reasons),
+            )
+
+        assert city is not None
+        assert country is not None
+        return LocationResolution(
+            location=VerifiedLocation(
+                city=city,
+                country=country,
+                latitude=float(coords[1]),
+                longitude=float(coords[0]),
+                formatted_address=clean_optional_text(props.get("formatted")),
+                source=source,
+                confidence=confidence,
+            ),
         )
 
     @staticmethod
-    def _confidence(props: dict) -> float:
+    def _confidence(props: dict) -> tuple[float | None, bool]:
         rank = props.get("rank") or {}
         value = rank.get("confidence")
         if value is None:
-            return 0.0
+            return None, True
         try:
-            return float(value)
+            return float(value), True
         except (TypeError, ValueError):
-            # No rank reported — treat as unverified, not high-confidence.
-            return 0.0
+            return None, False
 
     @staticmethod
     def _name_matches(expected_name: str, props: dict) -> bool:
@@ -284,11 +379,24 @@ class GeoapifyLocationService:
 
     @staticmethod
     def _matches_constraints(location: VerifiedLocation, constraints: Mapping[str, Any]) -> bool:
+        return GeoapifyLocationService._constraint_rejection_reason(
+            location,
+            constraints,
+            path="location",
+        ) is None
+
+    @staticmethod
+    def _constraint_rejection_reason(
+        location: VerifiedLocation,
+        constraints: Mapping[str, Any],
+        *,
+        path: str,
+    ) -> str | None:
         requested_country = clean_optional_text(
             constraints.get("location_country") or constraints.get("country")
         )
         if requested_country and location.country.casefold() != requested_country.casefold():
-            return False
+            return f"{path}_country_conflict"
         requested_city = clean_optional_text(constraints.get("location_city"))
         if (
             requested_city
@@ -296,8 +404,8 @@ class GeoapifyLocationService:
             and not _is_region_filter(requested_city)
             and _normalize_location_name(location.city) != _normalize_location_name(requested_city)
         ):
-            return False
-        return True
+            return f"{path}_city_conflict"
+        return None
 
     @staticmethod
     def _supplier_conflicts_with_constraints(supplier: dict, constraints: Mapping[str, Any]) -> bool:
