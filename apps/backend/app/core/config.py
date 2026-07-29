@@ -9,10 +9,13 @@ USAGE anywhere in the codebase:
 import warnings
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from app.platform.ai.types import DataClassification
 
 # Resolve the .env from the repo root regardless of the current working
 # directory. This file lives at apps/backend/app/core/config.py, so the repo
@@ -59,6 +62,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["openai"] = "openai"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL_NAME: str = "gpt-4o-mini-2024-07-18"
+    AI_EXTERNAL_ALLOWED_CLASSIFICATIONS: str = "public,internal"
+    AI_MAX_CALL_TOKENS: int = 32_000
+    AI_MAX_CALL_COST_USD: float = 0.10
+    AI_MAX_QUERY_COST_USD: float = 0.50
 
     # ── Embeddings ───────────────────────────────────────────────────
     EMBEDDING_PROVIDER: Literal["voyage", "openai"] = "voyage"
@@ -134,6 +141,19 @@ class Settings(BaseSettings):
     def effective_vector_db(self) -> str:
         """Return chromadb if LITE_MODE, regardless of VECTOR_DB_PROVIDER."""
         return "chromadb" if self.LITE_MODE else self.VECTOR_DB_PROVIDER
+
+    @property
+    def ai_external_allowed_classifications(
+        self,
+    ) -> frozenset["DataClassification"]:
+        from app.platform.ai.types import DataClassification
+
+        values = {
+            DataClassification(part.strip())
+            for part in self.AI_EXTERNAL_ALLOWED_CLASSIFICATIONS.split(",")
+            if part.strip()
+        }
+        return frozenset(values)
 
     # ── Validators ────────────────────────────────────────────────────
     @field_validator("SECRET_KEY")
