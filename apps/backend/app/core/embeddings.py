@@ -17,6 +17,7 @@ import hashlib
 import logging
 import time
 from functools import lru_cache
+from typing import Any, Protocol
 
 import voyageai
 from tenacity import (
@@ -29,6 +30,8 @@ from tenacity import (
 from voyageai.error import RateLimitError
 
 from app.core.config import settings
+from app.platform.ai.gateway import EmbeddingGateway
+from app.platform.ai.policy import AIPolicyEngine
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,28 @@ _EMBED_CACHE_MAX_ENTRIES = 5000
 # discovery agent from re-embedding the identical query on every relaxation
 # retry and blowing through Voyage's free-tier 3 RPM limit.
 _EMBED_CACHE: dict[str, tuple[list[float], float]] = {}
+
+
+class EmbeddingService(Protocol):
+    @property
+    def provider_name(self) -> str: ...
+
+    @property
+    def model_name(self) -> str: ...
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        input_type: str = "document",
+    ) -> list[list[float]]: ...
+
+    def embed_one(
+        self,
+        text: str,
+        input_type: str = "document",
+    ) -> list[float]: ...
+
+    def embed_supplier_text(self, supplier: dict[str, Any]) -> str: ...
 
 
 class EmbeddingUpstreamError(RuntimeError):
@@ -87,6 +112,9 @@ class EmbeddingClient:
         # Batch (more efficient, fewer API calls)
         vectors = client.embed_batch(["text1", "text2", "text3"])
     """
+
+    provider_name = "voyage"
+    model_name = EMBEDDING_MODEL
 
     def __init__(self) -> None:
         if not settings.VOYAGE_API_KEY:
@@ -266,7 +294,7 @@ class EmbeddingClient:
         results = self.embed_batch([text], input_type=input_type)
         return results[0]
 
-    def embed_supplier_text(self, supplier: dict) -> str:
+    def embed_supplier_text(self, supplier: dict[str, Any]) -> str:
         """
         Build the text representation of a supplier for embedding.
 
@@ -290,6 +318,9 @@ class EmbeddingClient:
 
 
 @lru_cache(maxsize=1)
-def get_embedding_client() -> EmbeddingClient:
-    """Returns cached embedding client instance."""
-    return EmbeddingClient()
+def get_embedding_client() -> EmbeddingService:
+    """Return a cached policy gateway over the Voyage transport."""
+    policy = AIPolicyEngine(
+        {"voyage": settings.ai_external_allowed_classifications}
+    )
+    return EmbeddingGateway(EmbeddingClient(), policy)

@@ -37,6 +37,8 @@ from tenacity import (
 
 from app.core.config import settings
 from app.core.rate_limiter import get_rate_limiter
+from app.platform.ai.gateway import AIGateway
+from app.platform.ai.policy import AIPolicyEngine
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +208,10 @@ class OpenAIProvider(_UsageTracking):
         self._rate_limiter = get_rate_limiter()
         logger.info("LLM client initialized (provider=openai, model=%s)", self._model)
 
+    @property
+    def model_name(self) -> str:
+        return self._model
+
     @retry(
         retry=retry_if_exception(_is_retryable_openai_error),
         stop=stop_after_attempt(5),
@@ -290,13 +296,13 @@ class OpenAIProvider(_UsageTracking):
 
 
 
-# Backwards-compatible alias: BaseAgent and the tools type-annotate against
-# LLMClient. Post-Phase-C the single provider is OpenAI.
-LLMClient = OpenAIProvider
+# Backwards-compatible alias: agents and tools type-annotate against the
+# policy-enforcing client surface.
+LLMClient = AIGateway
 
 
-def build_llm_client() -> Any:
-    """Build the single OpenAI provider (uncached — used by tests).
+def build_llm_client() -> AIGateway:
+    """Build the policy gateway over the single OpenAI transport.
 
     Single-provider deployment (ADR-002): OpenAI is the only backend. The
     LLMProvider Protocol is kept so a future OpenAI-compatible provider can be
@@ -307,11 +313,14 @@ def build_llm_client() -> Any:
             f"Unsupported LLM_PROVIDER={settings.LLM_PROVIDER!r}. "
             "Only 'openai' is supported in the single-provider deployment."
         )
-    return OpenAIProvider()
+    policy = AIPolicyEngine(
+        {"openai": settings.ai_external_allowed_classifications}
+    )
+    return AIGateway(OpenAIProvider(), policy)
 
 
 @lru_cache(maxsize=1)
-def get_llm_client() -> Any:
+def get_llm_client() -> AIGateway:
     """Returns a cached LLM client instance — one for the whole process."""
     return build_llm_client()
 

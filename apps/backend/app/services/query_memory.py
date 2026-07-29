@@ -36,7 +36,11 @@ from collections.abc import Iterable
 from typing import Any
 
 from app.core.config import settings
-from app.core.embeddings import EMBEDDING_DIM, EmbeddingClient, get_embedding_client
+from app.core.embeddings import (
+    EMBEDDING_DIM,
+    EmbeddingService,
+    get_embedding_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +177,7 @@ class QueryMemoryService:
 
     def __init__(
         self,
-        embedding_client: EmbeddingClient | None = None,
+        embedding_client: EmbeddingService | None = None,
         collection_name: str = COLLECTION_NAME,
     ) -> None:
         self._embeddings = embedding_client or get_embedding_client()

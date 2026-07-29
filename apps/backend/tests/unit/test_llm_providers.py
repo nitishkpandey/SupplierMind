@@ -1,7 +1,7 @@
 """Unit tests for the LLM provider abstraction (single-provider deployment).
 
 Pins the contracts after ADR-002:
-  1. build_llm_client returns a bare OpenAIProvider — no fallback wrapper.
+  1. build_llm_client returns an AIGateway around OpenAIProvider.
   2. An unsupported LLM_PROVIDER raises.
   3. Missing OPENAI_API_KEY raises.
   4. Non-retryable OpenAI errors (auth, insufficient_quota) fail fast / propagate
@@ -28,6 +28,7 @@ from app.core.llm import (
     build_llm_client,
     estimate_call_cost_usd,
 )
+from app.platform.ai.gateway import AIGateway
 
 
 def _openai_error(cls, status_code: int):
@@ -43,9 +44,10 @@ def _openai_error(cls, status_code: int):
 def test_build_llm_client_returns_openai_provider():
     with patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"), \
          patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
-         patch("openai.OpenAI", MagicMock()):
+        patch("openai.OpenAI", MagicMock()):
         client = build_llm_client()
-    assert isinstance(client, OpenAIProvider)
+    assert isinstance(client, AIGateway)
+    assert isinstance(client.transport, OpenAIProvider)
     assert client.provider_name == "openai"
 
 
@@ -71,13 +73,14 @@ def test_build_llm_client_openai_without_key_raises():
 
 
 def test_no_fallback_wrapper_built():
-    """The client IS the provider — no FallbackLLMClient layer remains."""
+    """The gateway has one transport and no fallback provider."""
     with patch.object(llm_mod.settings, "LLM_PROVIDER", "openai"), \
          patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
-         patch("openai.OpenAI", MagicMock()):
+        patch("openai.OpenAI", MagicMock()):
         client = build_llm_client()
-    assert type(client) is OpenAIProvider
-    assert not hasattr(client, "_fallback")
+    assert isinstance(client, AIGateway)
+    assert isinstance(client.transport, OpenAIProvider)
+    assert not hasattr(client.transport, "_fallback")
 
 
 def test_authentication_error_propagates_without_retry():
