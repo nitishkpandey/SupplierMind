@@ -91,6 +91,7 @@ def test_gateway_budget_failure_never_calls_transport() -> None:
 
     transport.complete.assert_not_called()
     assert recorder.snapshot()[0].outcome is AIOutcome.budget_exceeded
+    assert recorder.snapshot()[0].cost_usd == Decimal("0")
 
 
 def test_text_token_limit_denies_before_transport() -> None:
@@ -331,6 +332,7 @@ def test_unbound_gateway_call_is_denied_before_transport() -> None:
     assert measurement.outcome is AIOutcome.denied
     assert measurement.input_units == 0
     assert measurement.output_units == 0
+    assert measurement.cost_usd == Decimal("0")
     assert measurement.error_code == "classification_not_allowed"
 
 

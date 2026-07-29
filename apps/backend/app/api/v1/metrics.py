@@ -20,7 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.db.models import User
+from app.db.repositories.ai_usage_repo import AIUsageRepository
 from app.db.session import get_db
+from app.schemas.metrics import AdminMetricsResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,12 +34,13 @@ RECENT_ERRORS_LIMIT = 10
 @router.get(
     "/metrics",
     summary="Operational metrics for the last N hours (admin only)",
+    response_model=AdminMetricsResponse,
 )
 async def get_admin_metrics(
     current_user: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     window_hours: int = Query(24, ge=1, le=MAX_WINDOW_HOURS),
-) -> dict:
+) -> AdminMetricsResponse:
     """
     Aggregate operational signal from audit_logs over the last `window_hours`.
 
@@ -169,20 +172,42 @@ async def get_admin_metrics(
         for row in error_rows
     ]
 
-    # Active LLM provider and running cost.
+    ai_usage = {
+        "summary": await AIUsageRepository.summary_async(
+            db,
+            window_hours,
+        ),
+        "providers": await AIUsageRepository.provider_usage_async(
+            db,
+            window_hours,
+        ),
+        "purposes": await AIUsageRepository.purpose_usage_async(
+            db,
+            window_hours,
+        ),
+        "top_queries": await AIUsageRepository.top_queries_async(
+            db,
+            window_hours,
+        ),
+    }
+
+    # Runtime labels only. Persistent usage events are the cost source of truth.
     from app.core.llm import get_llm_client
 
     try:
         llm = get_llm_client()
         llm_info = {
             "provider": getattr(llm, "provider_name", "unknown"),
+            "model": getattr(llm, "model_name", None),
             "last_provider_used": getattr(llm, "last_provider_used", None),
-            "estimated_cost_usd": round(getattr(llm, "total_cost_usd", 0.0), 4),
         }
     except Exception as e:  # noqa: BLE001 — metrics must not 500 on LLM config issues
-        llm_info = {"provider": "unavailable", "error": str(e)[:200]}
+        llm_info = {
+            "provider": "unavailable",
+            "error_code": type(e).__name__,
+        }
 
-    return {
+    return AdminMetricsResponse.model_validate({
         "window_hours": window_hours,
         "as_of": datetime.now(UTC).isoformat(),
         "summary": summary,
@@ -190,4 +215,5 @@ async def get_admin_metrics(
         "throttle_events": throttle_events,
         "recent_errors": recent_errors,
         "llm": llm_info,
-    }
+        "ai_usage": ai_usage,
+    })

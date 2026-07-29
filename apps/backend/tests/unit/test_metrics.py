@@ -48,6 +48,10 @@ def _fake_session_for(metrics_rows):
       3. throttle row (.one())
       4. sanctions row (.one())
       5. error rows  (.all())
+      6. AI usage summary (.one())
+      7. AI provider rows (.all())
+      8. AI purpose rows (.all())
+      9. AI top-query rows (.all())
     """
     latency_result = MagicMock()
     latency_result.all.return_value = metrics_rows["latency"]
@@ -59,6 +63,14 @@ def _fake_session_for(metrics_rows):
     sanctions_result.one.return_value = metrics_rows["sanctions"]
     errors_result = MagicMock()
     errors_result.all.return_value = metrics_rows["errors"]
+    ai_summary_result = MagicMock()
+    ai_summary_result.one.return_value = metrics_rows["ai_summary"]
+    ai_providers_result = MagicMock()
+    ai_providers_result.all.return_value = metrics_rows["ai_providers"]
+    ai_purposes_result = MagicMock()
+    ai_purposes_result.all.return_value = metrics_rows["ai_purposes"]
+    ai_top_queries_result = MagicMock()
+    ai_top_queries_result.all.return_value = metrics_rows["ai_top_queries"]
 
     session = MagicMock()
     session.execute = AsyncMock(
@@ -68,6 +80,10 @@ def _fake_session_for(metrics_rows):
             throttle_result,
             sanctions_result,
             errors_result,
+            ai_summary_result,
+            ai_providers_result,
+            ai_purposes_result,
+            ai_top_queries_result,
         ]
     )
     session.commit = AsyncMock()
@@ -114,6 +130,53 @@ def _default_rows():
                 query_id=uuid4(),
                 reasoning="No web hits for query",
             )
+        ],
+        "ai_summary": SimpleNamespace(
+            calls=12,
+            input_units=4200,
+            output_units=900,
+            known_cost_usd=0.0432,
+            unknown_cost_calls=3,
+            denied_calls=2,
+            failed_calls=1,
+        ),
+        "ai_providers": [
+            SimpleNamespace(
+                provider="openai",
+                model="gpt-4o-mini-2024-07-18",
+                operation="chat",
+                calls=8,
+                p95_ms=1820,
+                known_cost_usd=0.0432,
+                unknown_cost_calls=0,
+            ),
+            SimpleNamespace(
+                provider="voyage",
+                model="voyage-3-lite",
+                operation="embedding",
+                calls=3,
+                p95_ms=950,
+                known_cost_usd=0,
+                unknown_cost_calls=3,
+            ),
+        ],
+        "ai_purposes": [
+            SimpleNamespace(
+                purpose="agent.parser",
+                calls=5,
+                p95_ms=1510,
+                known_cost_usd=0.012,
+                denied_calls=0,
+                failed_calls=1,
+            ),
+        ],
+        "ai_top_queries": [
+            SimpleNamespace(
+                query_id=uuid4(),
+                calls=4,
+                known_cost_usd=0.021,
+                unknown_cost_calls=1,
+            ),
         ],
     }
 
@@ -168,6 +231,47 @@ def test_admin_metrics_returns_documented_shape():
     err = body["recent_errors"][0]
     assert err["agent_name"] == "external_discovery"
     assert err["action"] == "no_web_results"
+    assert body["ai_usage"]["summary"] == {
+        "calls": 12,
+        "input_units": 4200,
+        "output_units": 900,
+        "known_cost_usd": 0.0432,
+        "unknown_cost_calls": 3,
+        "denied_calls": 2,
+        "failed_calls": 1,
+    }
+    assert body["ai_usage"]["providers"][0] == {
+        "provider": "openai",
+        "model": "gpt-4o-mini-2024-07-18",
+        "operation": "chat",
+        "calls": 8,
+        "p95_ms": 1820,
+        "known_cost_usd": 0.0432,
+        "unknown_cost_calls": 0,
+    }
+    assert body["ai_usage"]["providers"][1][
+        "unknown_cost_calls"
+    ] == 3
+    assert body["ai_usage"]["providers"][1][
+        "known_cost_usd"
+    ] == 0.0
+    assert body["ai_usage"]["purposes"][0] == {
+        "purpose": "agent.parser",
+        "calls": 5,
+        "p95_ms": 1510,
+        "known_cost_usd": 0.012,
+        "denied_calls": 0,
+        "failed_calls": 1,
+    }
+    assert body["ai_usage"]["top_queries"][0]["calls"] == 4
+    assert fake_session.execute.await_count == 9
+    assert "estimated_cost_usd" not in body["llm"]
+    for call in fake_session.execute.await_args_list[5:]:
+        sql = str(call.args[0]).casefold()
+        assert "user_id" not in sql
+        assert "source_document_id" not in sql
+        assert "prompt" not in sql
+        assert "response" not in sql
 
 
 # ── 2. Non-admin gets 403 ─────────────────────────────────────────────
