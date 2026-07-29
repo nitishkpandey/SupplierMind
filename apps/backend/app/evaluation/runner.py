@@ -44,6 +44,8 @@ from app.evaluation.metrics import (
     precision_at_k,
     reciprocal_rank,
 )
+from app.platform.ai.context import ai_request_scope, new_query_ai_context
+from app.platform.ai.types import DataClassification
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +85,7 @@ async def run_suppliermind_query(
         raw_query,
         query_id,
         user_id=EVAL_USER_ID,
+        attribute_ai_usage_to_user=False,
         exclude_pending=True,
         benchmark_supplier_ids=benchmark_ids,
     )
@@ -307,6 +310,31 @@ async def run_full_evaluation(
     run_p1: bool = False,
     run_p2: bool = False,
 ) -> dict:
+    """Run SupplierBench under one explicit evaluation-runner context."""
+    context = new_query_ai_context(
+        purpose="evaluation.runner",
+        classification=DataClassification.internal,
+        user_id=None,
+        query_id=None,
+        correlation_id=f"evaluation-{uuid.uuid4()}",
+    )
+    with ai_request_scope(context):
+        return await _run_full_evaluation(
+            run_suppliermind=run_suppliermind,
+            run_baselines=run_baselines,
+            query_limit=query_limit,
+            run_p1=run_p1,
+            run_p2=run_p2,
+        )
+
+
+async def _run_full_evaluation(
+    run_suppliermind: bool = True,
+    run_baselines: bool = True,
+    query_limit: int | None = None,
+    run_p1: bool = False,
+    run_p2: bool = False,
+) -> dict:
     """
     Run the complete SupplierBench evaluation.
 
@@ -365,8 +393,12 @@ async def run_full_evaluation(
         constraints = _convert_benchmark_constraints(query["constraints"])
 
         logger.info(
-            "[%d/%d] %s | %r",
-            i, total, difficulty.upper(), raw_query[:60]
+            "[%d/%d] query_number=%s difficulty=%s query_length=%d",
+            i,
+            total,
+            query["query_number"],
+            difficulty.upper(),
+            len(raw_query),
         )
 
         # ── Run SupplierMind ──────────────────────────────────────────
@@ -404,7 +436,10 @@ async def run_full_evaluation(
                     sm_p5, sm_csr, sm_rr, sm_ms
                 )
             except Exception as e:
-                logger.error("  SupplierMind FAILED: %s", e)
+                logger.error(
+                    "  SupplierMind FAILED error_type=%s",
+                    type(e).__name__,
+                )
                 sm_metrics.append(QueryMetrics(
                     query_id=q_id, query_number=query["query_number"],
                     difficulty=difficulty, system_name="suppliermind",
@@ -489,9 +524,12 @@ async def run_full_evaluation(
                     reasoning=pr["reasoning"],
                 ))
                 logger.info(
-                    "  %s: P@5=%.2f CSR=%.2f time=%dms%s",
-                    system_name, p5, pr["csr"], pr["exec_ms"],
-                    f" ERROR={pr['error']}" if pr["error"] else "",
+                    "  %s: P@5=%.2f CSR=%.2f time=%dms status=%s",
+                    system_name,
+                    p5,
+                    pr["csr"],
+                    pr["exec_ms"],
+                    "error" if pr["error"] else "ok",
                 )
 
         # A full run takes ~35 min and an interrupted process otherwise loses

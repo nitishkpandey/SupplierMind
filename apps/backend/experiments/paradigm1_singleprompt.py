@@ -18,8 +18,12 @@ import json
 import logging
 import sys
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
+
+from app.platform.ai.context import ai_request_scope, new_query_ai_context
+from app.platform.ai.types import DataClassification
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,12 @@ class ParadigmResult:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-def run_paradigm1(raw_query: str, llm: Any = None) -> ParadigmResult:
+def run_paradigm1(
+    raw_query: str,
+    llm: Any = None,
+    *,
+    run_id: str | None = None,
+) -> ParadigmResult:
     """Run one query through the single-prompt baseline.
 
     `llm` is injectable for tests; defaults to the application provider
@@ -63,14 +72,22 @@ def run_paradigm1(raw_query: str, llm: Any = None) -> ParadigmResult:
 
     start = time.time()
     try:
-        raw = llm.complete_json(
-            [
-                {"role": "system", "content": PROMPT_SYSTEM},
-                {"role": "user", "content": query},
-            ],
-            max_tokens=1024,
-            temperature=0.0,
+        context = new_query_ai_context(
+            purpose="evaluation.p1",
+            classification=DataClassification.internal,
+            user_id=None,
+            query_id=None,
+            correlation_id=run_id or f"p1-{uuid.uuid4()}",
         )
+        with ai_request_scope(context):
+            raw = llm.complete_json(
+                [
+                    {"role": "system", "content": PROMPT_SYSTEM},
+                    {"role": "user", "content": query},
+                ],
+                max_tokens=1024,
+                temperature=0.0,
+            )
     except Exception as e:  # noqa: BLE001 — a provider failure is a recorded outcome
         return ParadigmResult(
             paradigm="P1-singleprompt",

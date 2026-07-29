@@ -40,6 +40,12 @@ EVAL_USER_ID = "00000000-0000-0000-0000-000000000000"
 def check_provider() -> None:
     from app.core.config import settings
     from app.core.llm import OpenAIProvider, get_llm_client
+    from app.platform.ai.context import (
+        ai_request_scope,
+        new_query_ai_context,
+    )
+    from app.platform.ai.gateway import AIGateway
+    from app.platform.ai.types import DataClassification
 
     if settings.LLM_PROVIDER != "openai":
         raise SystemExit(
@@ -48,15 +54,28 @@ def check_provider() -> None:
         )
     client = get_llm_client()
     logger.info("Active client: %s", client.provider_name)
-    assert isinstance(client, OpenAIProvider), (
-        "single-provider deployment (ADR-002): expected OpenAIProvider, "
+    assert isinstance(client, AIGateway), (
+        "AI policy boundary missing: expected AIGateway, "
         f"got {type(client).__name__}"
     )
-    # One trivial call proves auth + connectivity.
-    out = client.complete(
-        [{"role": "user", "content": "Reply with exactly: provider-ok"}],
-        max_tokens=8, temperature=0.0,
+    assert isinstance(client.transport, OpenAIProvider), (
+        "single-provider deployment (ADR-002): expected OpenAIProvider "
+        f"transport, got {type(client.transport).__name__}"
     )
+    # One trivial call proves auth + connectivity.
+    context = new_query_ai_context(
+        purpose="provider.smoke_check",
+        classification=DataClassification.public,
+        user_id=None,
+        query_id=None,
+        correlation_id=f"provider-smoke-{uuid.uuid4()}",
+    )
+    with ai_request_scope(context):
+        out = client.complete(
+            [{"role": "user", "content": "Reply with exactly: provider-ok"}],
+            max_tokens=8,
+            temperature=0.0,
+        )
     logger.info("Smoke completion: %r (served by %s)", out.strip(),
                 getattr(client, "last_provider_used", client.provider_name))
 
@@ -66,7 +85,11 @@ async def pipeline_run() -> dict:
 
     query = "ISO 9001 certified packaging supplier in Germany, 5000 units per month"
     qid = str(uuid.uuid4())
-    logger.info("Pipeline run on GPT-4o-mini: %r", query)
+    logger.info(
+        "Pipeline run on GPT-4o-mini query_length=%d query_id=%s",
+        len(query),
+        qid,
+    )
     start = time.time()
     state = await run_pipeline(query, qid, user_id=EVAL_USER_ID)
     elapsed = int((time.time() - start) * 1000)

@@ -46,6 +46,11 @@ from app.core.vector_store import (  # noqa: E402
 )
 from app.db.models import Supplier, SupplierStatus  # noqa: E402
 from app.db.session import SyncSessionLocal  # noqa: E402
+from app.platform.ai.context import (  # noqa: E402
+    ai_request_scope,
+    new_query_ai_context,
+)
+from app.platform.ai.types import DataClassification  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -238,13 +243,21 @@ def phase_milvus(records: list[dict], start_index: int) -> int:
     total_batches = (total + VOYAGE_BATCH - 1) // VOYAGE_BATCH
     indexed_total = 0
     start_time = time.time()
+    context = new_query_ai_context(
+        purpose="supplier.indexing",
+        classification=DataClassification.internal,
+        user_id=None,
+        query_id=None,
+        correlation_id="bulk-ingest-synthetic",
+    )
 
     for batch_start in range(start_index, total, VOYAGE_BATCH):
         batch = records[batch_start : batch_start + VOYAGE_BATCH]
         batch_num = batch_start // VOYAGE_BATCH + 1
 
         try:
-            vector_store.add_suppliers(batch)
+            with ai_request_scope(context):
+                vector_store.add_suppliers(batch)
             indexed_total += len(batch)
         except Exception as e:
             logger.error(

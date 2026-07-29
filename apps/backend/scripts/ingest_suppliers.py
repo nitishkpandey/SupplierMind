@@ -20,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.core.config import settings
 from app.core.vector_store import create_vector_store, set_vector_store_instance
 from app.db.session import AsyncSessionLocal
+from app.platform.ai.context import ai_request_scope, new_query_ai_context
+from app.platform.ai.types import DataClassification
 from app.services.ingestion import ingest_suppliers_from_json
 
 logging.basicConfig(
@@ -47,7 +49,19 @@ async def main() -> None:
 
     logger.info("Starting supplier ingestion...")
     async with AsyncSessionLocal() as db:
-        stats = await ingest_suppliers_from_json(db, dataset_path, batch_size=20)
+        context = new_query_ai_context(
+            purpose="supplier.indexing",
+            classification=DataClassification.internal,
+            user_id=None,
+            query_id=None,
+            correlation_id="ingest-suppliers",
+        )
+        with ai_request_scope(context):
+            stats = await ingest_suppliers_from_json(
+                db,
+                dataset_path,
+                batch_size=20,
+            )
 
     logger.info("=" * 50)
     logger.info("INGESTION COMPLETE")

@@ -173,8 +173,10 @@ async def keyword_baseline_search(
 
     exec_ms = int((time.time() - start) * 1000)
     logger.debug(
-        "[baseline_a] Query=%r, words=%s, results=%d, time=%dms",
-        raw_query[:40], words, len(suppliers), exec_ms
+        "[baseline_a] query_length=%d results=%d time_ms=%d",
+        len(raw_query),
+        len(suppliers),
+        exec_ms,
     )
 
     return [_supplier_to_dict(s) for s in suppliers], exec_ms
@@ -304,8 +306,10 @@ async def manual_baseline_search(
 
     exec_ms = int((time.time() - start) * 1000)
     logger.debug(
-        "[baseline_b] Query=%r, category=%s, country=%s, keywords=%s, results=%d, time=%dms",
-        raw_query[:40], category, country, extra_keywords, len(suppliers), exec_ms
+        "[baseline_b] query_length=%d results=%d time_ms=%d",
+        len(raw_query),
+        len(suppliers),
+        exec_ms,
     )
 
     return [_supplier_to_dict(s) for s in suppliers], exec_ms

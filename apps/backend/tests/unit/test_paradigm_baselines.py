@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from app.platform.ai.context import current_ai_request_context
 from experiments.paradigm1_singleprompt import run_paradigm1
 from experiments.paradigm2_rag import build_prompt, run_paradigm2, select_top5
 
@@ -19,9 +20,11 @@ class _FakeLLM:
         self.response = response
         self.error = error
         self.calls: list[list[dict]] = []
+        self.contexts = []
 
     def complete_json(self, messages, **kwargs):
         self.calls.append(messages)
+        self.contexts.append(current_ai_request_context())
         if self.error is not None:
             raise self.error
         return self.response or "{}"
@@ -81,6 +84,9 @@ def test_p1_happy_path_parses_names_and_reasoning():
     assert result.supplier_ids == []  # parametric only: no corpus ids, ever
     assert result.error is None
     assert len(result.reasoning) == 2
+    assert llm.contexts[0].purpose == "evaluation.p1"
+    assert llm.contexts[0].classification.value == "internal"
+    assert llm.contexts[0].user_id is None
 
 
 def test_p1_empty_query_raises():
@@ -132,6 +138,9 @@ async def test_p2_retrieval_returns_k_and_prompt_contains_candidates():
     assert result.supplier_ids == ["id-1", "id-3"]
     assert result.supplier_names == ["Supplier 1", "Supplier 3"]
     assert result.error is None
+    assert llm.contexts[0].purpose == "evaluation.p2"
+    assert llm.contexts[0].classification.value == "internal"
+    assert llm.contexts[0].user_id is None
 
 
 @pytest.mark.asyncio

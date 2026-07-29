@@ -18,9 +18,12 @@ import json
 import logging
 import sys
 import time
+import uuid
 from collections.abc import Iterable
 from typing import Any
 
+from app.platform.ai.context import ai_request_scope, new_query_ai_context
+from app.platform.ai.types import DataClassification
 from experiments.paradigm1_singleprompt import ParadigmResult
 
 logger = logging.getLogger(__name__)
@@ -148,6 +151,35 @@ async def run_paradigm2(
     vector_store: Any = None,
     fetch_suppliers: Any = None,
     allowed_supplier_ids: Iterable[str] | None = None,
+    run_id: str | None = None,
+) -> ParadigmResult:
+    """Run one query through P2 under an isolated evaluation budget."""
+    context = new_query_ai_context(
+        purpose="evaluation.p2",
+        classification=DataClassification.internal,
+        user_id=None,
+        query_id=None,
+        correlation_id=run_id or f"p2-{uuid.uuid4()}",
+    )
+    with ai_request_scope(context):
+        return await _run_paradigm2_scoped(
+            raw_query,
+            top_k=top_k,
+            llm=llm,
+            vector_store=vector_store,
+            fetch_suppliers=fetch_suppliers,
+            allowed_supplier_ids=allowed_supplier_ids,
+        )
+
+
+async def _run_paradigm2_scoped(
+    raw_query: str,
+    *,
+    top_k: int,
+    llm: Any,
+    vector_store: Any,
+    fetch_suppliers: Any,
+    allowed_supplier_ids: Iterable[str] | None,
 ) -> ParadigmResult:
     """Run one query through the RAG baseline.
 

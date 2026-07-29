@@ -24,6 +24,11 @@ from app.core.config import settings  # noqa: E402
 from app.core.vector_store import COLLECTION_NAME, create_vector_store  # noqa: E402
 from app.db.models import Supplier  # noqa: E402
 from app.db.session import SyncSessionLocal  # noqa: E402
+from app.platform.ai.context import (  # noqa: E402
+    ai_request_scope,
+    new_query_ai_context,
+)
+from app.platform.ai.types import DataClassification  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,10 +98,18 @@ def sync_missing(batch_size: int, sleep_seconds: int, dry_run: bool) -> int:
 
     vector_store = create_vector_store()
     indexed_count = 0
+    context = new_query_ai_context(
+        purpose="supplier.indexing",
+        classification=DataClassification.internal,
+        user_id=None,
+        query_id=None,
+        correlation_id="sync-active-supplier-vectors",
+    )
     for batch_start in range(0, len(missing), batch_size):
         batch = missing[batch_start : batch_start + batch_size]
         vector_payload = [_supplier_to_vector_dict(supplier) for supplier in batch]
-        indexed_ids = vector_store.add_suppliers(vector_payload)
+        with ai_request_scope(context):
+            indexed_ids = vector_store.add_suppliers(vector_payload)
         indexed_count += len(indexed_ids)
 
         with SyncSessionLocal() as db:

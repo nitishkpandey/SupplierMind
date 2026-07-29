@@ -514,6 +514,7 @@ async def run_pipeline(
     previous_partial_constraints: ParsedConstraints | None = None,
     exclude_pending: bool = False,
     benchmark_supplier_ids: list[str] | None = None,
+    attribute_ai_usage_to_user: bool = True,
 ) -> AgentState:
     """
     Main entry point for running the full agent pipeline.
@@ -526,6 +527,8 @@ async def run_pipeline(
         turn_number: 1 on first submission, 2/3 on resumed turns.
         previous_partial_constraints: hint for the Parser on resume.
         benchmark_supplier_ids: Optional fixed corpus for thesis evaluation.
+        attribute_ai_usage_to_user: False for service runs whose retrieval
+            user UUID is not backed by a users row.
 
     Returns:
         Final AgentState with ranked_suppliers and audit_log populated
@@ -566,7 +569,7 @@ async def run_pipeline(
         classification=DataClassification.internal,
         user_id=(
             user_id
-            if _is_uuid(user_id)
+            if attribute_ai_usage_to_user and _is_uuid(user_id)
             else None
         ),
         query_id=(
