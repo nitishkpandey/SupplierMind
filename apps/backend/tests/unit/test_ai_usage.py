@@ -10,6 +10,7 @@ from app.core import embeddings as embeddings_mod
 from app.core.embeddings import EMBEDDING_DIM, EmbeddingClient
 from app.db.models import AIUsageEvent
 from app.db.repositories.ai_usage_repo import AIUsageRepository
+from app.platform.ai.context import new_query_ai_context
 from app.platform.ai.types import (
     AIOperation,
     AIOutcome,
@@ -95,6 +96,40 @@ def test_repository_records_safe_fields_and_commits() -> None:
     assert event.redaction_applied is True
     assert event.excerpted is True
     session.commit.assert_called_once_with()
+
+
+def test_known_query_cost_seeds_resumed_query_budget() -> None:
+    session = MagicMock()
+    session.scalar.return_value = Decimal("0.125")
+
+    known_cost = AIUsageRepository.known_query_cost_sync(
+        session,
+        "22222222-2222-2222-2222-222222222222",
+    )
+    context = new_query_ai_context(
+        purpose="query.pipeline",
+        classification=DataClassification.internal,
+        user_id="11111111-1111-1111-1111-111111111111",
+        query_id="22222222-2222-2222-2222-222222222222",
+        initial_spent_usd=known_cost,
+    )
+
+    assert known_cost == Decimal("0.125")
+    assert context.budget is not None
+    assert context.budget.spent_usd == Decimal("0.125")
+    session.scalar.assert_called_once()
+
+
+def test_unknown_query_costs_are_not_invented_as_zero_cost_events() -> None:
+    session = MagicMock()
+    session.scalar.return_value = None
+
+    known_cost = AIUsageRepository.known_query_cost_sync(
+        session,
+        "22222222-2222-2222-2222-222222222222",
+    )
+
+    assert known_cost == Decimal("0")
 
 
 def test_in_memory_recorder_returns_a_copy() -> None:

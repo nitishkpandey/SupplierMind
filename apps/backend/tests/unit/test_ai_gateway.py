@@ -1,18 +1,25 @@
 """Request-context and policy-boundary tests for AI gateways."""
 
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from threading import Barrier
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.core import embeddings as embeddings_mod
 from app.core.embeddings import EmbeddingClient, get_embedding_client
+from app.platform.ai.budget import AIBudgetExceeded, AIBudgetLedger
 from app.platform.ai.context import (
     ai_request_scope,
     current_ai_request_context,
     derive_ai_request_context,
 )
-from app.platform.ai.gateway import AIGateway, EmbeddingGateway
+from app.platform.ai.gateway import (
+    AIGateway,
+    EmbeddingGateway,
+    ProviderUsageContractError,
+)
 from app.platform.ai.policy import AIDataEgressDenied, AIPolicyEngine
 from app.platform.ai.types import (
     AIOperation,
@@ -34,6 +41,277 @@ def _policy() -> AIPolicyEngine:
             "voyage": externally_allowed,
         }
     )
+
+
+def test_budget_reservation_blocks_before_provider_call() -> None:
+    ledger = AIBudgetLedger(limit_usd=Decimal("0.000001"))
+
+    with pytest.raises(AIBudgetExceeded):
+        ledger.reserve(Decimal("0.01"))
+
+    assert ledger.spent_usd == Decimal("0")
+    assert ledger.reserved_usd == Decimal("0")
+
+
+def test_budget_settlement_replaces_reservation_with_actual_cost() -> None:
+    ledger = AIBudgetLedger(limit_usd=Decimal("1.00"))
+
+    reservation = ledger.reserve(Decimal("0.10"))
+    ledger.settle(reservation, Decimal("0.025"))
+
+    assert ledger.reserved_usd == Decimal("0")
+    assert ledger.spent_usd == Decimal("0.025")
+
+
+def test_gateway_budget_failure_never_calls_transport() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        budget=AIBudgetLedger(limit_usd=Decimal("0.000001")),
+        max_call_tokens=32_000,
+        max_call_cost_usd=Decimal("0.10"),
+    )
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+
+    with (
+        ai_request_scope(context),
+        pytest.raises(AIBudgetExceeded),
+    ):
+        gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            model="gpt-4o-mini-2024-07-18",
+            max_tokens=2048,
+        )
+
+    transport.complete.assert_not_called()
+    assert recorder.snapshot()[0].outcome is AIOutcome.budget_exceeded
+
+
+def test_text_token_limit_denies_before_transport() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        max_call_tokens=5,
+    )
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+
+    with ai_request_scope(context), pytest.raises(AIBudgetExceeded):
+        gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            max_tokens=10,
+        )
+
+    transport.complete.assert_not_called()
+    assert recorder.snapshot()[0].outcome is AIOutcome.budget_exceeded
+
+
+def test_text_cost_limit_denies_before_transport() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        max_call_cost_usd=Decimal("0.0000001"),
+    )
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+
+    with ai_request_scope(context), pytest.raises(AIBudgetExceeded):
+        gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            max_tokens=10,
+        )
+
+    transport.complete.assert_not_called()
+    assert recorder.snapshot()[0].outcome is AIOutcome.budget_exceeded
+
+
+def test_embedding_token_limit_denies_before_transport() -> None:
+    transport = MagicMock(
+        provider_name="voyage",
+        model_name="voyage-3-lite",
+    )
+    context = AIRequestContext(
+        purpose="ingestion.index",
+        classification=DataClassification.internal,
+        max_call_tokens=4,
+    )
+    recorder = InMemoryAIUsageRecorder()
+    gateway = EmbeddingGateway(transport, _policy(), recorder)
+
+    with ai_request_scope(context), pytest.raises(AIBudgetExceeded):
+        gateway.embed_batch(["x" * 20])
+
+    transport.embed_batch.assert_not_called()
+    assert recorder.snapshot()[0].outcome is AIOutcome.budget_exceeded
+
+
+def test_gateway_settles_reserved_estimate_with_actual_cost() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    ledger = AIBudgetLedger(limit_usd=Decimal("1"))
+    recorder = InMemoryAIUsageRecorder()
+
+    def complete(*_args, **_kwargs):
+        callback = transport.set_usage_callback.call_args.args[0]
+        callback(
+            ProviderUsage(
+                provider="openai",
+                model="gpt-4o-mini-2024-07-18",
+                operation=AIOperation.chat,
+                input_units=3,
+                output_units=2,
+                cost_usd=Decimal("0.00000165"),
+                latency_ms=7,
+            )
+        )
+        return "ok"
+
+    transport.complete.side_effect = complete
+    gateway = AIGateway(transport, _policy(), recorder)
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        budget=ledger,
+    )
+
+    with ai_request_scope(context):
+        assert gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            max_tokens=5,
+        ) == "ok"
+
+    assert ledger.reserved_usd == Decimal("0")
+    assert ledger.spent_usd == Decimal("0.00000165")
+
+
+def test_gateway_releases_reservation_on_provider_error() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    transport.complete.side_effect = RuntimeError("provider unavailable")
+    ledger = AIBudgetLedger(limit_usd=Decimal("1"))
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        budget=ledger,
+    )
+
+    with ai_request_scope(context), pytest.raises(RuntimeError):
+        gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            max_tokens=5,
+        )
+
+    assert ledger.reserved_usd == Decimal("0")
+    assert ledger.spent_usd == Decimal("0")
+    assert recorder.snapshot()[0].outcome is AIOutcome.error
+
+
+def test_gateway_releases_budget_when_provider_omits_usage() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    transport.complete.return_value = "untracked"
+    ledger = AIBudgetLedger(limit_usd=Decimal("1"))
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        budget=ledger,
+    )
+
+    with (
+        ai_request_scope(context),
+        pytest.raises(ProviderUsageContractError),
+    ):
+        gateway.complete(
+            [{"role": "user", "content": "supplier query"}],
+            max_tokens=5,
+        )
+
+    assert ledger.reserved_usd == Decimal("0")
+    assert ledger.spent_usd == Decimal("0")
+
+
+def test_concurrent_gateway_calls_settle_their_own_reservations() -> None:
+    transport = MagicMock(
+        provider_name="openai",
+        model_name="gpt-4o-mini-2024-07-18",
+        total_cost_usd=0.0,
+    )
+    ledger = AIBudgetLedger(limit_usd=Decimal("1"))
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(transport, _policy(), recorder)
+    usage_callback = transport.set_usage_callback.call_args.args[0]
+    overlap = Barrier(2)
+
+    def complete(messages, **_kwargs):
+        overlap.wait(timeout=2)
+        cost = (
+            Decimal("0.01")
+            if messages[0]["content"] == "first"
+            else Decimal("0.02")
+        )
+        usage_callback(
+            ProviderUsage(
+                provider="openai",
+                model="gpt-4o-mini-2024-07-18",
+                operation=AIOperation.chat,
+                input_units=1,
+                output_units=1,
+                cost_usd=cost,
+                latency_ms=5,
+            )
+        )
+        return "ok"
+
+    transport.complete.side_effect = complete
+    context = AIRequestContext(
+        purpose="agent.parser",
+        classification=DataClassification.internal,
+        budget=ledger,
+    )
+
+    def invoke(content: str) -> str:
+        with ai_request_scope(context):
+            return gateway.complete(
+                [{"role": "user", "content": content}],
+                max_tokens=5,
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(invoke, ["first", "second"]))
+
+    assert results == ["ok", "ok"]
+    assert ledger.reserved_usd == Decimal("0")
+    assert ledger.spent_usd == Decimal("0.03")
+    assert len(recorder.snapshot()) == 2
 
 
 def test_unbound_gateway_call_is_denied_before_transport() -> None:

@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.platform.ai.budget import AIBudgetLedger
 
 
 class DataClassification(StrEnum):
@@ -38,6 +42,7 @@ class AIRequestContext:
     correlation_id: str | None = None
     redaction_applied: bool = False
     excerpted: bool = False
+    budget: AIBudgetLedger | None = None
     max_call_tokens: int = 32_000
     max_call_cost_usd: Decimal = Decimal("0.10")
 

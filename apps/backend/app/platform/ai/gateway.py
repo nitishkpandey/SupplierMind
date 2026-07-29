@@ -9,6 +9,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from app.platform.ai.budget import (
+    AIBudgetExceeded,
+    BudgetReservation,
+)
 from app.platform.ai.context import current_ai_request_context
 from app.platform.ai.policy import AIPolicyEngine
 from app.platform.ai.types import (
@@ -21,11 +25,16 @@ from app.platform.ai.types import (
 from app.platform.ai.usage import AIUsageRecorder
 
 
-@dataclass(frozen=True, slots=True)
+class ProviderUsageContractError(RuntimeError):
+    """Raised when a transport fails its usage-reporting contract."""
+
+
+@dataclass(slots=True)
 class _ActiveAICall:
     context: AIRequestContext
     started_at: float
     operation: AIOperation
+    reservation: BudgetReservation | None = None
 
 
 def _elapsed_ms(started_at: float) -> int:
@@ -98,17 +107,27 @@ class _ProviderGateway:
     def _record_provider_usage(self, usage: ProviderUsage) -> None:
         active = self._active_call.get()
         if active is None:
-            raise RuntimeError(
+            raise ProviderUsageContractError(
                 "AI transport emitted usage outside an active gateway call"
             )
         if usage.provider != self.provider_name:
-            raise RuntimeError(
+            raise ProviderUsageContractError(
                 "AI transport emitted usage for a different provider"
             )
         if usage.operation is not active.operation:
-            raise RuntimeError(
+            raise ProviderUsageContractError(
                 "AI transport emitted usage for a different operation"
             )
+        if active.reservation is not None:
+            if usage.cost_usd is None or active.context.budget is None:
+                raise ProviderUsageContractError(
+                    "AI transport omitted cost for a reserved call"
+                )
+            active.context.budget.settle(
+                active.reservation,
+                usage.cost_usd,
+            )
+            active.reservation = None
         self._recorder.record(
             self._measurement(
                 active,
@@ -126,6 +145,9 @@ class _ProviderGateway:
         self,
         operation: AIOperation,
         invoke_transport: Callable[[], Any],
+        reserve_call: (
+            Callable[[AIRequestContext], BudgetReservation | None] | None
+        ) = None,
     ) -> Any:
         context = current_ai_request_context()
         active = _ActiveAICall(
@@ -156,22 +178,67 @@ class _ProviderGateway:
                 context,
             )
 
+        if reserve_call is not None:
+            try:
+                active.reservation = reserve_call(context)
+            except AIBudgetExceeded:
+                self._recorder.record(
+                    self._measurement(
+                        active,
+                        input_units=0,
+                        output_units=0,
+                        cost_usd=None,
+                        latency_ms=_elapsed_ms(active.started_at),
+                        outcome=AIOutcome.budget_exceeded,
+                        error_code="AIBudgetExceeded",
+                    )
+                )
+                raise
+
         token = self._active_call.set(active)
         try:
-            return invoke_transport()
-        except BaseException as exc:
-            self._recorder.record(
-                self._measurement(
-                    active,
-                    input_units=0,
-                    output_units=0,
-                    cost_usd=None,
-                    latency_ms=_elapsed_ms(active.started_at),
-                    outcome=AIOutcome.error,
-                    error_code=type(exc).__name__,
+            try:
+                result = invoke_transport()
+            except BaseException as exc:
+                if (
+                    active.reservation is not None
+                    and active.context.budget is not None
+                ):
+                    active.context.budget.release(active.reservation)
+                    active.reservation = None
+                self._recorder.record(
+                    self._measurement(
+                        active,
+                        input_units=0,
+                        output_units=0,
+                        cost_usd=None,
+                        latency_ms=_elapsed_ms(active.started_at),
+                        outcome=AIOutcome.error,
+                        error_code=type(exc).__name__,
+                    )
                 )
-            )
-            raise
+                raise
+
+            if active.reservation is not None:
+                if active.context.budget is not None:
+                    active.context.budget.release(active.reservation)
+                active.reservation = None
+                contract_error = ProviderUsageContractError(
+                    "AI transport returned without reporting usage"
+                )
+                self._recorder.record(
+                    self._measurement(
+                        active,
+                        input_units=0,
+                        output_units=0,
+                        cost_usd=None,
+                        latency_ms=_elapsed_ms(active.started_at),
+                        outcome=AIOutcome.error,
+                        error_code=type(contract_error).__name__,
+                    )
+                )
+                raise contract_error
+            return result
         finally:
             self._active_call.reset(token)
 
@@ -185,6 +252,44 @@ class AIGateway(_ProviderGateway):
     def last_provider_used(self) -> str:
         return self.provider_name
 
+    def _reserve_text_call(
+        self,
+        context: AIRequestContext,
+        messages: list[dict[str, str]],
+        kwargs: dict[str, Any],
+    ) -> BudgetReservation | None:
+        from app.core.llm import (
+            DEFAULT_MAX_TOKENS,
+            estimate_call_cost_usd,
+            estimate_message_tokens,
+        )
+
+        max_tokens = int(kwargs.get("max_tokens", DEFAULT_MAX_TOKENS))
+        model = str(kwargs.get("model") or self.model_name)
+        estimated_tokens = estimate_message_tokens(messages, max_tokens)
+        if estimated_tokens > context.max_call_tokens:
+            raise AIBudgetExceeded(
+                f"AI call token limit exceeded: {estimated_tokens} "
+                f"> {context.max_call_tokens}"
+            )
+        estimated_cost = Decimal(
+            str(
+                estimate_call_cost_usd(
+                    model,
+                    estimated_tokens - max_tokens,
+                    max_tokens,
+                )
+            )
+        )
+        if estimated_cost > context.max_call_cost_usd:
+            raise AIBudgetExceeded(
+                f"AI call cost limit exceeded: ${estimated_cost} "
+                f"> ${context.max_call_cost_usd}"
+            )
+        if context.budget is None:
+            return None
+        return context.budget.reserve(estimated_cost)
+
     def complete(
         self,
         messages: list[dict[str, str]],
@@ -194,6 +299,11 @@ class AIGateway(_ProviderGateway):
             self._invoke(
                 AIOperation.chat,
                 lambda: self._transport.complete(messages, **kwargs),
+                lambda context: self._reserve_text_call(
+                    context,
+                    messages,
+                    kwargs,
+                ),
             )
         )
 
@@ -206,11 +316,30 @@ class AIGateway(_ProviderGateway):
             self._invoke(
                 AIOperation.chat_json,
                 lambda: self._transport.complete_json(messages, **kwargs),
+                lambda context: self._reserve_text_call(
+                    context,
+                    messages,
+                    kwargs,
+                ),
             )
         )
 
 
 class EmbeddingGateway(_ProviderGateway):
+    @staticmethod
+    def _enforce_embedding_token_limit(
+        context: AIRequestContext,
+        texts: list[str],
+    ) -> None:
+        estimated_tokens = sum(
+            max(1, (len(text) + 3) // 4) for text in texts
+        )
+        if estimated_tokens > context.max_call_tokens:
+            raise AIBudgetExceeded(
+                f"AI call token limit exceeded: {estimated_tokens} "
+                f"> {context.max_call_tokens}"
+            )
+
     def embed_batch(
         self,
         texts: list[str],
@@ -221,6 +350,10 @@ class EmbeddingGateway(_ProviderGateway):
             lambda: self._transport.embed_batch(
                 texts,
                 input_type=input_type,
+            ),
+            lambda context: self._enforce_embedding_token_limit(
+                context,
+                texts,
             ),
         )
 

@@ -1,7 +1,9 @@
 """Persistence operations for privacy-safe AI usage events."""
 
 import uuid
+from decimal import Decimal
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import AIUsageEvent
@@ -52,3 +54,14 @@ class AIUsageRepository:
         )
         session.add(event)
         session.commit()
+
+    @staticmethod
+    def known_query_cost_sync(
+        session: Session,
+        query_id: str,
+    ) -> Decimal:
+        statement = select(
+            func.coalesce(func.sum(AIUsageEvent.cost_usd), 0)
+        ).where(AIUsageEvent.query_id == uuid.UUID(query_id))
+        total = session.scalar(statement)
+        return Decimal(str(total or 0))
