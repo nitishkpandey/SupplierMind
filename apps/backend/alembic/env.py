@@ -8,6 +8,8 @@ KEY POINTS:
 """
 
 import asyncio
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -16,13 +18,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Import ALL models — Alembic must see them to detect schema changes
-from app.db.models import Base  # noqa: F401
 from app.core.config import settings
+from app.db.models import Base  # noqa: F401
 
 config = context.config
 
@@ -39,7 +39,14 @@ target_metadata = Base.metadata
 
 # All SupplierMind tables — only these should be managed by Alembic
 SUPPLIERMIND_TABLES = {
-    "suppliers", "users", "queries", "query_results", "audit_logs",
+    "suppliers",
+    "user_supplier_saves",
+    "users",
+    "queries",
+    "query_results",
+    "audit_logs",
+    "pending_clarifications",
+    "ai_usage_events",
 }
 
 

@@ -14,6 +14,7 @@ Better than creating a separate certifications table for this use case.
 import enum
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -24,6 +25,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
 )
@@ -118,6 +120,7 @@ class Supplier(Base):
     status: Mapped[SupplierStatus] = mapped_column(
         SAEnum(SupplierStatus, name="supplierstatus"),
         default=SupplierStatus.approved,
+        server_default=SupplierStatus.approved.value,
         nullable=False,
         index=True,
     )
@@ -271,9 +274,17 @@ class Query(Base):
 
     # ── Production v2: routing and evaluation tracking ─────────────
     search_scope: Mapped[str] = mapped_column(
-        String(20), default="approved_only", nullable=False
+        String(20),
+        default="approved_only",
+        server_default="approved_only",
+        nullable=False,
     )
-    evaluator_retries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    evaluator_retries: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default=sa_text("0"),
+        nullable=False,
+    )
     evaluator_verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
@@ -377,6 +388,85 @@ class AuditLog(Base):
     )
 
 
+class AIUsageEvent(Base):
+    """Content-free AI policy decision and provider usage telemetry."""
+
+    __tablename__ = "ai_usage_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    query_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("queries.id"), nullable=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    job_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True
+    )
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True
+    )
+    correlation_id: Mapped[str | None] = mapped_column(String(100))
+    purpose: Mapped[str] = mapped_column(String(100), nullable=False)
+    classification: Mapped[str] = mapped_column(String(20), nullable=False)
+    operation: Mapped[str] = mapped_column(String(30), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_units: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    output_units: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[str] = mapped_column(String(30), nullable=False)
+    redaction_applied: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    excerpted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_ai_usage_events_created_at", "created_at"),
+        Index("ix_ai_usage_events_query_id", "query_id"),
+        Index("ix_ai_usage_events_job_id", "job_id"),
+        Index(
+            "ix_ai_usage_events_provider_model",
+            "provider",
+            "model",
+        ),
+        CheckConstraint(
+            "input_units >= 0",
+            name="ai_usage_input_units_nonnegative",
+        ),
+        CheckConstraint(
+            "output_units >= 0",
+            name="ai_usage_output_units_nonnegative",
+        ),
+        CheckConstraint(
+            "latency_ms >= 0",
+            name="ai_usage_latency_nonnegative",
+        ),
+        CheckConstraint(
+            "cost_usd IS NULL OR cost_usd >= 0",
+            name="ai_usage_cost_nonnegative",
+        ),
+        CheckConstraint(
+            "classification IN "
+            "('public','internal','confidential','restricted')",
+            name="ai_usage_classification_valid",
+        ),
+    )
+
+
 # ── PendingClarification ──────────────────────────────────────────────
 class PendingClarification(Base):
     """
@@ -407,8 +497,18 @@ class PendingClarification(Base):
     raw_query: Mapped[str] = mapped_column(Text, nullable=False)
     clarification_question: Mapped[str] = mapped_column(Text, nullable=False)
     partial_constraints: Mapped[dict] = mapped_column(JSON, nullable=False)
-    react_trace: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    turn_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    react_trace: Mapped[list] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+        server_default=sa_text("'[]'::json"),
+    )
+    turn_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=sa_text("1"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

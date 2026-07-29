@@ -49,3 +49,25 @@ class AIPolicyDecision:
     operation: AIOperation
     classification: DataClassification
     reason_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class AIUsageMeasurement:
+    purpose: str
+    classification: DataClassification
+    operation: AIOperation
+    provider: str
+    model: str
+    input_units: int
+    output_units: int
+    cost_usd: Decimal | None
+    latency_ms: int
+    outcome: AIOutcome
+    query_id: str | None = None
+    user_id: str | None = None
+    job_id: str | None = None
+    source_document_id: str | None = None
+    correlation_id: str | None = None
+    redaction_applied: bool = False
+    excerpted: bool = False
+    error_code: str | None = None
