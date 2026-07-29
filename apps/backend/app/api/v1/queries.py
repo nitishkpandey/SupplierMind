@@ -124,7 +124,12 @@ async def submit_query(
     Returns immediately with query_id.
     Poll GET /{query_id} or stream GET /{query_id}/stream for results.
     """
-    logger.info("Received query submission from user_id=%s: %r", current_user.id, body.raw_query)
+    logger.info(
+        "Received query submission user_id=%s scope=%s query_length=%d",
+        current_user.id,
+        body.search_scope,
+        len(body.raw_query),
+    )
     # Validate query length
     if len(body.raw_query.strip()) < settings.QUERY_MIN_LENGTH:
         raise HTTPException(
@@ -151,9 +156,11 @@ async def submit_query(
     normalized_query = " ".join(body.raw_query.casefold().split())
     if any(p in normalized_query for p in injection_patterns):
         logger.warning(
-            "Prompt injection detected from user=%s: %r",
+            "Rejected query user_id=%s scope=%s query_length=%d "
+            "reason=prompt_injection_pattern",
             current_user.id,
-            body.raw_query[:100],
+            body.search_scope,
+            len(body.raw_query),
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -44,6 +44,7 @@ import time
 import uuid as _uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from decimal import Decimal
 from typing import Any, Literal
 
 from langgraph.graph import END, StateGraph
@@ -58,6 +59,10 @@ from app.agents.ranking_agent import RankingAgent
 from app.agents.state import AgentState, ParsedConstraints
 from app.agents.tools import build_user_registry
 from app.core.config import settings
+from app.db.repositories.ai_usage_repo import AIUsageRepository
+from app.db.session import SyncSessionLocal
+from app.platform.ai.context import ai_request_scope, new_query_ai_context
+from app.platform.ai.types import DataClassification
 
 logger = logging.getLogger(__name__)
 # Two workers keep one stuck memory write from blocking every later
@@ -66,6 +71,14 @@ _query_memory_executor = ThreadPoolExecutor(
     max_workers=2,
     thread_name_prefix="suppliermind-query-memory",
 )
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        _uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 def _create_initial_state(
@@ -518,8 +531,13 @@ async def run_pipeline(
         Final AgentState with ranked_suppliers and audit_log populated
     """
     logger.info(
-        "[orchestrator] Starting pipeline for query_id=%s, scope=%s, turn=%d: %r",
-        query_id, search_scope, turn_number, raw_query[:80],
+        "[orchestrator] Starting pipeline query_id=%s user_id=%s scope=%s "
+        "turn=%d query_length=%d",
+        query_id,
+        user_id,
+        search_scope,
+        turn_number,
+        len(raw_query),
     )
 
     initial_state = _create_initial_state(
@@ -534,13 +552,38 @@ async def run_pipeline(
     )
     pipeline = get_pipeline()
 
-    # The LangGraph pipeline uses synchronous tools and database access.
-    # To avoid blocking the FastAPI event loop or dealing with nested event loops,
-    # we run the entire graph in a thread pool executor.
-    def _run_sync():
-        return pipeline.invoke(initial_state)
+    def _load_known_spend() -> Decimal:
+        try:
+            _uuid.UUID(str(query_id))
+        except (TypeError, ValueError):
+            return Decimal("0")
+        with SyncSessionLocal() as db:
+            return AIUsageRepository.known_query_cost_sync(db, query_id)
 
-    final_state = await asyncio.get_running_loop().run_in_executor(None, _run_sync)
+    initial_spent_usd = await asyncio.to_thread(_load_known_spend)
+    context = new_query_ai_context(
+        purpose="query.pipeline",
+        classification=DataClassification.internal,
+        user_id=(
+            user_id
+            if _is_uuid(user_id)
+            else None
+        ),
+        query_id=(
+            query_id
+            if _is_uuid(query_id)
+            else None
+        ),
+        correlation_id=query_id,
+        initial_spent_usd=initial_spent_usd,
+    )
+    # asyncio.to_thread copies ContextVar state into the worker running the
+    # synchronous LangGraph pipeline.
+    with ai_request_scope(context):
+        final_state = await asyncio.to_thread(
+            pipeline.invoke,
+            initial_state,
+        )
 
     logger.info(
         "[orchestrator] Pipeline completed. status=%s, scope=%s, results=%d",

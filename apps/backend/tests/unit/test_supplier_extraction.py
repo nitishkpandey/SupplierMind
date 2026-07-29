@@ -1,5 +1,6 @@
 import json
 
+from app.platform.ai.context import current_ai_request_context
 from app.services import supplier_extraction as extraction_module
 from app.services.supplier_extraction import SupplierExtractionService
 
@@ -7,8 +8,10 @@ from app.services.supplier_extraction import SupplierExtractionService
 class _StubLLM:
     def __init__(self, payload: dict):
         self.payload = payload
+        self.contexts = []
 
     def complete_json(self, *args, **kwargs) -> str:
+        self.contexts.append(current_ai_request_context())
         return json.dumps(self.payload)
 
 
@@ -68,6 +71,53 @@ def test_stage2_normalises_literal_null_strings(monkeypatch):
     assert result["website"] == "https://acme.example"
     assert result["latitude"] is None
     assert result["longitude"] is None
+
+
+def test_stage2_uses_public_extraction_context(monkeypatch):
+    monkeypatch.setattr(
+        extraction_module,
+        "fetch_page_content",
+        lambda url: "Acme Metals GmbH manufactures precision metal parts.",
+    )
+    service = _service(_payload())
+
+    result = service.stage2_extract(
+        "https://acme.example",
+        query_id="22222222-2222-2222-2222-222222222222",
+        user_id="11111111-1111-1111-1111-111111111111",
+    )
+
+    assert result is not None
+    context = service.llm.contexts[0]
+    assert context.purpose == "discovery.extract_web_page"
+    assert context.classification.value == "public"
+    assert context.query_id == "22222222-2222-2222-2222-222222222222"
+    assert context.user_id == "11111111-1111-1111-1111-111111111111"
+
+
+def test_stage1_uses_public_classification_context() -> None:
+    service = _service(
+        {
+            "is_supplier": True,
+            "company_name": "Acme Metals GmbH",
+            "confidence": 0.9,
+            "rejection_reason": None,
+        }
+    )
+
+    result = service.stage1_classify(
+        "Acme Metals",
+        "https://acme.example",
+        "Industrial metal parts supplier",
+        query_id="22222222-2222-2222-2222-222222222222",
+        user_id="11111111-1111-1111-1111-111111111111",
+    )
+
+    assert result["is_supplier"] is True
+    context = service.llm.contexts[0]
+    assert context.purpose == "discovery.classify_web_page"
+    assert context.classification.value == "public"
+    assert context.excerpted is True
 
 
 def test_stage2_preserves_clean_location_text_for_geoapify(monkeypatch):

@@ -19,6 +19,12 @@ from urllib.parse import urljoin, urlparse
 
 from app.agents.compliance_agent import CERT_TAXONOMY
 from app.core.llm import complete_json_dict, get_llm_client
+from app.platform.ai.context import (
+    ai_request_scope,
+    current_ai_request_context,
+    derive_ai_request_context,
+)
+from app.platform.ai.types import DataClassification
 from app.services.page_fetcher import fetch_page_content
 from app.utils.text_normalization import clean_optional_text, clean_text_list
 
@@ -171,7 +177,13 @@ class SupplierExtractionService:
         self.llm = get_llm_client()
 
     def stage1_classify(
-        self, title: str, url: str, snippet: str
+        self,
+        title: str,
+        url: str,
+        snippet: str,
+        *,
+        query_id: str | None = None,
+        user_id: str | None = None,
     ) -> dict:
         """
         Stage 1: Cheap classification. SYNC.
@@ -180,20 +192,34 @@ class SupplierExtractionService:
         text = f"TITLE: {title}\nURL: {url}\nSNIPPET: {snippet[:500]}"
 
         try:
-            return complete_json_dict(
-                self.llm,
-                [
-                    {"role": "system", "content": STAGE_1_PROMPT},
-                    {"role": "user", "content": text},
-                ],
-                temperature=0.0,
-                max_tokens=200,
+            parent = current_ai_request_context()
+            context = derive_ai_request_context(
+                purpose="discovery.classify_web_page",
+                classification=DataClassification.public,
+                query_id=query_id or parent.query_id,
+                user_id=user_id or parent.user_id,
+                redaction_applied=False,
+                excerpted=True,
             )
+            with ai_request_scope(context):
+                return complete_json_dict(
+                    self.llm,
+                    [
+                        {"role": "system", "content": STAGE_1_PROMPT},
+                        {"role": "user", "content": text},
+                    ],
+                    temperature=0.0,
+                    max_tokens=200,
+                )
         except Exception as e:
             # LLM unavailable. Do NOT auto-reject —
             # that silently discards real suppliers when the API is throttled.
             # Fall back to a URL heuristic so only obvious directories drop.
-            logger.warning("[extraction] Stage 1 LLM failed, using URL heuristic: %s", e)
+            logger.warning(
+                "[extraction] Stage 1 LLM failed; using URL heuristic "
+                "reason=llm_failure error_type=%s",
+                type(e).__name__,
+            )
             is_directory = self._looks_like_directory(url)
             return {
                 "is_supplier": not is_directory,
@@ -223,6 +249,9 @@ class SupplierExtractionService:
         url: str,
         deadline_at: float | None = None,
         company_name_hint: str | None = None,
+        *,
+        query_id: str | None = None,
+        user_id: str | None = None,
     ) -> dict | None:
         """
         Stage 2: Rich extraction from full page content. SYNC.
@@ -249,17 +278,31 @@ class SupplierExtractionService:
         )
 
         try:
-            parsed = complete_json_dict(
-                self.llm,
-                [
-                    {"role": "system", "content": STAGE_2_PROMPT},
-                    {"role": "user", "content": text},
-                ],
-                temperature=0.0,
-                max_tokens=1500,
+            parent = current_ai_request_context()
+            context = derive_ai_request_context(
+                purpose="discovery.extract_web_page",
+                classification=DataClassification.public,
+                query_id=query_id or parent.query_id,
+                user_id=user_id or parent.user_id,
+                redaction_applied=False,
+                excerpted=len(full_content) > 8000,
             )
+            with ai_request_scope(context):
+                parsed = complete_json_dict(
+                    self.llm,
+                    [
+                        {"role": "system", "content": STAGE_2_PROMPT},
+                        {"role": "user", "content": text},
+                    ],
+                    temperature=0.0,
+                    max_tokens=1500,
+                )
         except Exception as e:
-            logger.warning("[extraction] Stage 2 LLM failed: %s", e)
+            logger.warning(
+                "[extraction] Stage 2 LLM failed reason=llm_failure "
+                "error_type=%s",
+                type(e).__name__,
+            )
             return None
 
         # Verification: hallucination guards

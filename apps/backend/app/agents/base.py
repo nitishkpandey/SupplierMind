@@ -16,11 +16,18 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 from app.agents.audit_log import append_audit_entry
 from app.agents.state import AgentState
 from app.core.llm import LLMClient, get_llm_client
+from app.platform.ai.context import (
+    ai_request_scope,
+    current_ai_request_context,
+    new_query_ai_context,
+)
+from app.platform.ai.types import DataClassification
 from app.utils.text_normalization import clean_optional_text
 
 logger = logging.getLogger(__name__)
@@ -49,7 +56,21 @@ class BaseAgent(ABC):
         start_time = time.time()
 
         try:
-            updated_state = self.execute(state)
+            parent = current_ai_request_context()
+            if parent.purpose == "unclassified":
+                parent = new_query_ai_context(
+                    purpose=f"agent.{self.agent_name}",
+                    classification=DataClassification.internal,
+                    user_id=state.get("user_id"),
+                    query_id=state.get("query_id"),
+                )
+            agent_context = replace(
+                parent,
+                purpose=f"agent.{self.agent_name}",
+                classification=DataClassification.internal,
+            )
+            with ai_request_scope(agent_context):
+                updated_state = self.execute(state)
             duration_ms = int((time.time() - start_time) * 1000)
             logger.info("[%s] Completed in %dms", self.agent_name, duration_ms)
             return updated_state
@@ -57,7 +78,12 @@ class BaseAgent(ABC):
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             error_msg = f"{self.agent_name} failed: {type(e).__name__}: {e}"
-            logger.error("[%s] %s", self.agent_name, error_msg)
+            logger.error(
+                "[%s] failed error_type=%s query_id=%s",
+                self.agent_name,
+                type(e).__name__,
+                state.get("query_id"),
+            )
 
             state["error"] = error_msg
             state["pipeline_status"] = "failed"

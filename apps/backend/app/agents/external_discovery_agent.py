@@ -128,6 +128,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                 title=result.title,
                 url=result.url,
                 snippet=result.snippet,
+                query_id=state.get("query_id"),
+                user_id=state.get("user_id"),
             )
 
             if not classification.get("is_supplier") or classification.get("confidence", 0) < 0.5:
@@ -153,6 +155,8 @@ class ExternalDiscoveryAgent(BaseAgent):
                 url=result.url,
                 deadline_at=deadline_at,
                 company_name_hint=company_name_hint,
+                query_id=state.get("query_id"),
+                user_id=state.get("user_id"),
             )
             if data:
                 extracted.append(data)
