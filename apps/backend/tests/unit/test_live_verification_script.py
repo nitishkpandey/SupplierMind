@@ -1,3 +1,6 @@
+import logging
+from decimal import Decimal
+
 import pytest
 
 
@@ -178,3 +181,103 @@ def test_persisted_payload_requires_complete_audit_chain():
             query_id="query-1",
             require_results=False,
         )
+
+
+def test_provider_check_persists_only_safe_gateway_usage(
+    monkeypatch,
+    caplog,
+) -> None:
+    from app.core import llm as llm_module
+    from app.core.llm import OpenAIProvider
+    from app.platform.ai.context import current_ai_request_context
+    from app.platform.ai.gateway import AIGateway
+    from app.platform.ai.policy import AIPolicyEngine
+    from app.platform.ai.types import (
+        AIOperation,
+        AIOutcome,
+        DataClassification,
+        ProviderUsage,
+    )
+    from app.platform.ai.usage import InMemoryAIUsageRecorder
+    from scripts import provider_integration_check
+
+    class FakeOpenAITransport(OpenAIProvider):
+        provider_name = "openai"
+        model_name = "gpt-4o-mini-2024-07-18"
+        total_cost_usd = 0.00000105
+
+        def __init__(self) -> None:
+            self.contexts = []
+            self._usage_callback = None
+
+        def set_usage_callback(self, callback) -> None:
+            self._usage_callback = callback
+
+        def complete(self, _messages, **_kwargs):
+            self.contexts.append(current_ai_request_context())
+            self._usage_callback(
+                ProviderUsage(
+                    provider=self.provider_name,
+                    model=self.model_name,
+                    operation=AIOperation.chat,
+                    input_units=3,
+                    output_units=1,
+                    cost_usd=Decimal("0.00000105"),
+                    latency_ms=2,
+                )
+            )
+            return "provider-ok"
+
+    transport = FakeOpenAITransport()
+    recorder = InMemoryAIUsageRecorder()
+    gateway = AIGateway(
+        transport,
+        AIPolicyEngine(
+            {
+                "openai": frozenset(
+                    {
+                        DataClassification.public,
+                        DataClassification.internal,
+                    }
+                )
+            }
+        ),
+        recorder,
+    )
+    observed_correlation_ids = []
+
+    def find_usage_event(correlation_id):
+        observed_correlation_ids.append(correlation_id)
+        return next(
+            (
+                event
+                for event in recorder.snapshot()
+                if event.correlation_id == correlation_id
+            ),
+            None,
+        )
+
+    monkeypatch.setattr(llm_module, "get_llm_client", lambda: gateway)
+    monkeypatch.setattr(
+        provider_integration_check,
+        "_find_usage_event",
+        find_usage_event,
+        raising=False,
+    )
+    caplog.set_level(logging.INFO)
+
+    provider_integration_check.check_provider()
+
+    assert isinstance(gateway, AIGateway)
+    assert isinstance(gateway.transport, OpenAIProvider)
+    assert len(recorder.snapshot()) == 1
+    event = recorder.snapshot()[0]
+    assert event.purpose == "provider.smoke_check"
+    assert event.classification is DataClassification.public
+    assert event.outcome is AIOutcome.success
+    assert "provider-ok" not in repr(event)
+    assert observed_correlation_ids == [event.correlation_id]
+    assert "provider-ok" not in caplog.text
+    assert "provider=openai" in caplog.text
+    assert "model=gpt-4o-mini-2024-07-18" in caplog.text
+    assert "cost_usd=0.00000105" in caplog.text

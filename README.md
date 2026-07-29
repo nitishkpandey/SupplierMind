@@ -79,6 +79,24 @@ React Frontend (TypeScript + Tailwind)
 - Python 3.11+, Node.js 20+, Docker Desktop, Git
 - API keys: OpenAI, Voyage AI, Tavily, Geoapify Geocoding, Geoapify Places, and OpenSanctions as configured in `.env.example`
 
+### AI policy configuration
+
+All model and embedding calls pass through a policy and budget gateway. These
+variables are required in every environment; the values shown are the safe
+defaults in `.env.example`:
+
+| Variable | Default | Purpose |
+|---|---:|---|
+| `AI_EXTERNAL_ALLOWED_CLASSIFICATIONS` | `public,internal` | Data classes that OpenAI and Voyage may receive |
+| `AI_MAX_CALL_TOKENS` | `32000` | Maximum estimated units for one text or embedding call |
+| `AI_MAX_CALL_COST_USD` | `0.10` | Maximum estimated cost for one text call |
+| `AI_MAX_QUERY_COST_USD` | `0.50` | Shared known-cost ceiling for a query, including resumed turns |
+
+Unbound calls are classified `restricted` and denied. Confidential processing
+must not be added to the allow list without documented Mercanis Security and
+Legal approval. See
+[ADR-003](docs/adr/ADR-003-ai-data-egress-and-usage.md).
+
 ### Quick Start
 
 ```bash
@@ -158,6 +176,53 @@ country-scope clarification, resume, supplier-result, and audit-trail checks:
 
 The live check uses the development login endpoint and does not print tokens or
 credentials.
+
+### AI provider and usage operations
+
+An admin can open `/admin/metrics` to inspect provider/model call counts,
+latency, known cost, unknown-cost calls, policy or budget denials, failures, and
+the highest-cost query links. The source of truth is PostgreSQL
+`ai_usage_events`; prompts, responses, document bodies, and credentials are not
+stored in that table.
+
+Run the credentialed provider smoke check without printing the API key or the
+model response:
+
+```bash
+cd apps/backend
+uv run python -c "from scripts.provider_integration_check import check_provider; check_provider()"
+```
+
+The check requires the current Alembic schema and writes one
+`public/provider.smoke_check` usage event. Keep credentials in `.env` or the
+deployment secret store; never pass them on the command line.
+
+For an incident, inspect the content-free rows and application logs using the
+event's `correlation_id`:
+
+```sql
+SELECT created_at, correlation_id, purpose, classification, operation,
+       provider, model, input_units, output_units, cost_usd, latency_ms,
+       outcome, error_code
+FROM ai_usage_events
+WHERE outcome <> 'success'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+- `classification_not_allowed`: confirm the call has the intended purpose and
+  classification. Do not broaden the allow list to bypass a missing or wrong
+  context; confidential external processing requires Security and Legal
+  approval.
+- `budget_exceeded`: inspect the call estimate and the query's accumulated known
+  spend. A resumed query is seeded from persisted spend, so retrying or
+  answering a clarification does not reset its budget. Raise a configured limit
+  only after validating the workload and cost impact.
+- `AI usage persistence failed`: treat the provider result as unaccounted
+  usage. Check database connectivity, run `uv run alembic current` (expected
+  head: `e2f4a9c1b7d8`), and restore writes before relying on dashboard totals.
+  The error log contains only provider, operation, outcome, correlation ID, and
+  exception type.
 
 ---
 

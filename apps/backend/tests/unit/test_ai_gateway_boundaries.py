@@ -211,6 +211,15 @@ def test_provider_check_binds_public_smoke_context(monkeypatch) -> None:
         "get_llm_client",
         lambda: gateway,
     )
+    monkeypatch.setattr(
+        provider_integration_check,
+        "_find_usage_event",
+        lambda correlation_id: next(
+            event
+            for event in gateway._recorder.snapshot()
+            if event.correlation_id == correlation_id
+        ),
+    )
 
     provider_integration_check.check_provider()
 

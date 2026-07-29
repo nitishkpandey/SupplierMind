@@ -48,6 +48,22 @@ Evaluator (accept / retry-with-feedback loop, bounded)
 finalize (write accepted query to per-user semantic memory in Milvus)
 ```
 
+Every model or embedding operation inside this flow crosses the AI policy
+gateway:
+
+```
+query / job / evaluation
+   -> bound AIRequestContext (purpose, classification, IDs, limits)
+   -> policy + per-call/per-query budget checks
+   -> AIGateway or EmbeddingGateway
+   -> OpenAI or Voyage transport
+   -> content-free ai_usage_events row in PostgreSQL
+   -> admin metrics API and dashboard
+```
+
+The transport is never invoked when classification or budget policy denies a
+call.
+
 ## The five agents
 
 | Agent | Role | LLM use |
@@ -120,25 +136,62 @@ retrieval. SQL baselines use `Supplier.id IN (...)`; Milvus/Chroma searches use
 the same optional allowlist before candidate ranking. This keeps SupplierBench
 metrics reproducible even after product-scale data is loaded.
 
-## Audit log
+## AI data egress and budgets
+
+SupplierMind classifies every provider-bound payload:
+
+| Classification | Product meaning | External default |
+|---|---|---|
+| `public` | Public supplier or web information | allowed |
+| `internal` | Ordinary Mercanis procurement queries and supplier metadata approved for the configured processors | allowed |
+| `confidential` | Customer-confidential documents, contracts, commercial terms, or personal data | denied |
+| `restricted` | Secrets, credentials, regulated/high-impact data, and the unbound fallback | denied |
+
+The allow list is configurable, but enabling confidential external processing
+requires documented Security and Legal approval. An unbound context is
+`restricted`, so a missed binding fails closed with
+`classification_not_allowed`.
+
+Text calls enforce a configurable 32,000-token and $0.10 per-call default.
+Calls in one query share a configurable $0.50 ledger. Estimated cost is reserved
+before the transport call and settled to actual cost afterward; concurrent
+calls cannot oversubscribe the ledger. A resumed clarification reloads known
+spend from `ai_usage_events`, so pausing does not reset the budget. Embeddings
+enforce the token limit. Voyage cost remains null until an authoritative price
+calculation exists and is reported as unknown rather than zero.
+
+See `docs/adr/ADR-003-ai-data-egress-and-usage.md` for the decision and approval
+rules.
+
+## Audit and AI usage records
 
 Every agent run writes an `audit_logs` row: agent, action, reasoning,
 input/output snapshots, duration. The Parser's snapshot carries the full
 ReAct trace; clarifications log under `clarification_handler`; memory writes
-under `memory_service`. `/admin/metrics` aggregates latency, throttle events,
-recent errors, and the active LLM provider with estimated spend.
+under `memory_service`.
+
+AI provider telemetry is separate and content-free. `ai_usage_events` contains
+purpose, classification, operation, provider/model, units, nullable cost,
+latency, outcome, redaction/excerpt flags, and correlation identifiers. It does
+not contain prompts, responses, or document excerpts. PostgreSQL is the source
+of truth for `/admin/metrics`, whose admin-only dashboard distinguishes known
+cost from unknown-cost calls and shows denials, failures, provider/purpose
+breakdowns, and links to the highest-cost authorized queries.
 
 ## LLM provider layer
 
-`apps/backend/app/core/llm.py`: `LLMProvider` protocol; `OpenAIProvider`
-(gpt-4o-mini-2024-07-18, pinned snapshot) is the only provider. The
-`LLMProvider` Protocol is retained for future portability — a different
-OpenAI-compatible backend (Azure OpenAI, etc.) can be swapped in without
-touching the agents — but there is no runtime fallback: an OpenAI failure that
-survives the per-provider tenacity retries propagates as a clear error;
-auth/quota errors surface immediately. See
+`apps/backend/app/platform/ai/gateway.py` is the mandatory policy and usage
+boundary. `apps/backend/app/core/llm.py` retains the `LLMProvider` protocol and
+the `OpenAIProvider` transport (gpt-4o-mini-2024-07-18, pinned snapshot).
+`build_llm_client()` returns an `AIGateway` wrapping that transport.
+
+The protocol is retained for future portability — a different OpenAI-compatible
+backend (Azure OpenAI, etc.) can be swapped in without touching the agents —
+but there is no runtime fallback: an OpenAI failure that survives the
+per-provider tenacity retries propagates as a clear error; auth/quota errors
+surface immediately. See
 `docs/adr/ADR-002-single-provider-deployment.md` for the architectural decision
-to retain the provider abstraction without a second provider wired. Per-call
-cost estimates accumulate into a
-process-wide total. Request pacing lives in `rate_limiter.py` (per-model
-sliding windows keyed by RPM + TPM).
+to retain the provider abstraction without a second provider wired and ADR-003
+for the gateway boundary. Request pacing lives in `rate_limiter.py` (per-model
+sliding windows keyed by RPM + TPM); durable cost and usage reporting comes from
+PostgreSQL rather than the transport's process-local diagnostic counter.

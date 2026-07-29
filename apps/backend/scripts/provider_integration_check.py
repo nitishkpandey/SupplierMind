@@ -2,7 +2,7 @@
 
 Runs the moment OPENAI_API_KEY lands in backend/.env:
 
-  1. Verifies provider selection (expects OpenAIProvider — single provider).
+  1. Verifies the AI policy gateway and its OpenAI transport.
   2. One end-to-end pipeline query (Parser -> Discovery -> Compliance ->
      Ranking) on GPT-4o-mini.
   3. Re-captures the Task 3.1 / 3.2 / 3.3 demo traces on GPT-4o-mini and
@@ -37,6 +37,22 @@ TRACES_DIR = BACKEND.parent / "traces" / "gpt4o_mini"
 EVAL_USER_ID = "00000000-0000-0000-0000-000000000000"
 
 
+def _find_usage_event(correlation_id: str):
+    """Load the exact content-free usage row written by the smoke call."""
+    from sqlalchemy import select
+
+    from app.db.models import AIUsageEvent
+    from app.db.session import SyncSessionLocal
+
+    with SyncSessionLocal() as session:
+        return session.scalar(
+            select(AIUsageEvent)
+            .where(AIUsageEvent.correlation_id == correlation_id)
+            .order_by(AIUsageEvent.created_at.desc())
+            .limit(1)
+        )
+
+
 def check_provider() -> None:
     from app.core.config import settings
     from app.core.llm import OpenAIProvider, get_llm_client
@@ -53,7 +69,6 @@ def check_provider() -> None:
             "and OPENAI_API_KEY in backend/.env first."
         )
     client = get_llm_client()
-    logger.info("Active client: %s", client.provider_name)
     assert isinstance(client, AIGateway), (
         "AI policy boundary missing: expected AIGateway, "
         f"got {type(client).__name__}"
@@ -63,12 +78,13 @@ def check_provider() -> None:
         f"transport, got {type(client.transport).__name__}"
     )
     # One trivial call proves auth + connectivity.
+    correlation_id = f"provider-check-{uuid.uuid4()}"
     context = new_query_ai_context(
         purpose="provider.smoke_check",
         classification=DataClassification.public,
         user_id=None,
         query_id=None,
-        correlation_id=f"provider-smoke-{uuid.uuid4()}",
+        correlation_id=correlation_id,
     )
     with ai_request_scope(context):
         out = client.complete(
@@ -76,8 +92,37 @@ def check_provider() -> None:
             max_tokens=8,
             temperature=0.0,
         )
-    logger.info("Smoke completion: %r (served by %s)", out.strip(),
-                getattr(client, "last_provider_used", client.provider_name))
+    if out.strip() != "provider-ok":
+        raise AssertionError("Provider smoke completion did not match")
+
+    event = _find_usage_event(correlation_id)
+    if event is None:
+        raise AssertionError(
+            "Provider call succeeded but its AI usage event was not persisted"
+        )
+    expected = {
+        "purpose": "provider.smoke_check",
+        "classification": "public",
+        "operation": "chat",
+        "provider": "openai",
+        "model": client.model_name,
+        "outcome": "success",
+        "correlation_id": correlation_id,
+    }
+    for field, value in expected.items():
+        if getattr(event, field) != value:
+            raise AssertionError(
+                f"Persisted AI usage field {field!r} did not match"
+            )
+    if event.cost_usd is None:
+        raise AssertionError("Provider smoke usage cost is unknown")
+
+    logger.info(
+        "Provider smoke check passed provider=%s model=%s cost_usd=%.8f",
+        event.provider,
+        event.model,
+        float(event.cost_usd),
+    )
 
 
 async def pipeline_run() -> dict:

@@ -45,6 +45,10 @@ mkdir -p "${UV_CACHE_DIR}"
 
 echo "Running backend tests and static checks..."
 cd "${BACKEND_DIR}"
+uv run --no-sync pytest \
+  tests/unit/test_ai_policy.py \
+  tests/unit/test_ai_gateway.py \
+  tests/unit/test_ai_gateway_boundaries.py
 uv run --no-sync pytest
 uv run --no-sync ruff check app tests scripts
 uv run --no-sync mypy app

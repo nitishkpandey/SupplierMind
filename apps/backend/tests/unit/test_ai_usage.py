@@ -1,5 +1,6 @@
 """Privacy and persistence tests for AI usage telemetry."""
 
+from dataclasses import replace
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -163,6 +164,26 @@ def test_database_recorder_logs_only_safe_failure_metadata(caplog) -> None:
     assert "openai" in caplog.text
     assert "request-1" in caplog.text
     assert "SQLAlchemyError" in caplog.text
+
+
+def test_database_recorder_does_not_break_provider_on_invalid_identifier(
+    caplog,
+) -> None:
+    recorder = DatabaseAIUsageRecorder()
+    measurement = replace(
+        _measurement(),
+        query_id="non-uuid-private-query-label",
+    )
+
+    with patch(
+        "app.platform.ai.usage.SyncSessionLocal",
+        return_value=MagicMock(),
+    ):
+        recorder.record(measurement)
+
+    assert "non-uuid-private-query-label" not in caplog.text
+    assert "ValueError" in caplog.text
+    assert "request-1" in caplog.text
 
 
 def test_voyage_provider_emits_usage_for_cache_miss_only() -> None:
