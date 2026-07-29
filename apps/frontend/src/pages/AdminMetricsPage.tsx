@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { RefreshCcw, Activity, AlertTriangle, Gauge, Users } from "lucide-react";
+import { AIUsagePanel } from "@/features/admin/AIUsagePanel";
 
 const WINDOW_OPTIONS: Array<{ label: string; hours: number }> = [
   { label: "Last 1h", hours: 1 },
@@ -168,6 +169,8 @@ export default function AdminMetricsPage() {
               icon={AlertTriangle}
             />
           </div>
+
+          <AIUsagePanel usage={data.ai_usage} />
 
           {/* Agent latency table */}
           <Card>

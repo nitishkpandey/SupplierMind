@@ -182,6 +182,41 @@ export interface AgentLatency {
   count: number;
 }
 
+export interface AIUsageMetrics {
+  summary: {
+    calls: number;
+    input_units: number;
+    output_units: number;
+    known_cost_usd: number;
+    unknown_cost_calls: number;
+    denied_calls: number;
+    failed_calls: number;
+  };
+  providers: Array<{
+    provider: string;
+    model: string;
+    operation: string;
+    calls: number;
+    p95_ms: number;
+    known_cost_usd: number;
+    unknown_cost_calls: number;
+  }>;
+  purposes: Array<{
+    purpose: string;
+    calls: number;
+    p95_ms: number;
+    known_cost_usd: number;
+    denied_calls: number;
+    failed_calls: number;
+  }>;
+  top_queries: Array<{
+    query_id: string;
+    calls: number;
+    known_cost_usd: number;
+    unknown_cost_calls: number;
+  }>;
+}
+
 export interface AdminMetrics {
   window_hours: number;
   as_of: string;
@@ -204,6 +239,13 @@ export interface AdminMetrics {
     query_id: string | null;
     reasoning: string;
   }>;
+  llm: {
+    provider: string;
+    model: string | null;
+    last_provider_used: string | null;
+    error_code: string | null;
+  };
+  ai_usage: AIUsageMetrics;
 }
 
 export const metricsService = {
