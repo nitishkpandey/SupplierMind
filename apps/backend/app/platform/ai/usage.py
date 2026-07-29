@@ -46,3 +46,11 @@ class DatabaseAIUsageRecorder:
                 measurement.correlation_id,
                 type(exc).__name__,
             )
+
+
+_PROCESS_AI_USAGE_RECORDER = DatabaseAIUsageRecorder()
+
+
+def get_ai_usage_recorder() -> AIUsageRecorder:
+    """Return the process-wide production recorder used by AI factories."""
+    return _PROCESS_AI_USAGE_RECORDER

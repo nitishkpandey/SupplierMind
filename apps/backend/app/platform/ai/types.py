@@ -52,6 +52,17 @@ class AIPolicyDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderUsage:
+    provider: str
+    model: str
+    operation: AIOperation
+    input_units: int
+    output_units: int
+    cost_usd: Decimal | None
+    latency_ms: int
+
+
+@dataclass(frozen=True, slots=True)
 class AIUsageMeasurement:
     purpose: str
     classification: DataClassification

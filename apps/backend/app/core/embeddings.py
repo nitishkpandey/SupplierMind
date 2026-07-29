@@ -16,6 +16,7 @@ embedding calls during discovery retries and benchmark runs.
 import hashlib
 import logging
 import time
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Protocol
 
@@ -32,6 +33,8 @@ from voyageai.error import RateLimitError
 from app.core.config import settings
 from app.platform.ai.gateway import EmbeddingGateway
 from app.platform.ai.policy import AIPolicyEngine
+from app.platform.ai.types import AIOperation, ProviderUsage
+from app.platform.ai.usage import get_ai_usage_recorder
 
 logger = logging.getLogger(__name__)
 
@@ -116,18 +119,28 @@ class EmbeddingClient:
     provider_name = "voyage"
     model_name = EMBEDDING_MODEL
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        usage_callback: Callable[[ProviderUsage], None] | None = None,
+    ) -> None:
         if not settings.VOYAGE_API_KEY:
             raise ValueError(
                 "VOYAGE_API_KEY is not set. "
                 "Get your free key at https://dash.voyageai.com"
             )
         self._client = voyageai.Client(api_key=settings.VOYAGE_API_KEY)
+        self._usage_callback = usage_callback
         logger.info(
             "Embedding client initialized (provider=voyage, model=%s, dim=%d)",
             EMBEDDING_MODEL,
             EMBEDDING_DIM,
         )
+
+    def set_usage_callback(
+        self,
+        callback: Callable[[ProviderUsage], None] | None,
+    ) -> None:
+        self._usage_callback = callback
 
     def _cache_key(self, text: str, input_type: str) -> str:
         """
@@ -148,7 +161,7 @@ class EmbeddingClient:
         self,
         texts: list[str],
         input_type: str,
-    ) -> list[list[float]]:
+    ) -> tuple[list[list[float]], int]:
         """
         Raw API call to Voyage AI.
 
@@ -180,7 +193,8 @@ class EmbeddingClient:
                 f"{0 if not vectors else len(vectors)} vectors for {len(texts)} "
                 f"texts (expected {len(texts)} vectors of dim {EMBEDDING_DIM})."
             )
-        return vectors
+        total_tokens = int(getattr(result, "total_tokens", 0) or 0)
+        return vectors, total_tokens
 
     def embed_batch(
         self,
@@ -225,15 +239,17 @@ class EmbeddingClient:
             fresh: list[list[float]] = []
             for i in range(0, len(miss_texts), MAX_BATCH_SIZE):
                 batch = miss_texts[i : i + MAX_BATCH_SIZE]
-                _t0 = time.time()
+                _t0 = time.monotonic()
                 try:
-                    vectors = self._call_api(batch, input_type)
+                    vectors, total_tokens = self._call_api(batch, input_type)
                 except BaseException as e:  # noqa: BLE001 — see EmbeddingFatal below
                     # Per-call latency line is still emitted for the failure so
                     # the throttle/failure distribution is complete in the log.
                     logger.info(
                         "[embed-latency] n=%d input_type=%s elapsed_ms=%d status=FAILED err=%s",
-                        len(batch), input_type, int((time.time() - _t0) * 1000),
+                        len(batch),
+                        input_type,
+                        int((time.monotonic() - _t0) * 1000),
                         type(e).__name__,
                     )
                     # Fail-fast (benchmark): convert any embedding failure into a
@@ -245,7 +261,22 @@ class EmbeddingClient:
                             f"({type(e).__name__}: {e}); aborting run."
                         ) from e
                     raise
-                _elapsed_ms = int((time.time() - _t0) * 1000)
+                _elapsed_ms = max(
+                    0,
+                    int((time.monotonic() - _t0) * 1000),
+                )
+                if self._usage_callback is not None:
+                    self._usage_callback(
+                        ProviderUsage(
+                            provider="voyage",
+                            model=EMBEDDING_MODEL,
+                            operation=AIOperation.embedding,
+                            input_units=total_tokens,
+                            output_units=0,
+                            cost_usd=None,
+                            latency_ms=_elapsed_ms,
+                        )
+                    )
                 # Throttle-distribution log (Methods transparency): elapsed
                 # includes any rate-limit retry waits inside _call_api.
                 logger.info(
@@ -323,4 +354,8 @@ def get_embedding_client() -> EmbeddingService:
     policy = AIPolicyEngine(
         {"voyage": settings.ai_external_allowed_classifications}
     )
-    return EmbeddingGateway(EmbeddingClient(), policy)
+    return EmbeddingGateway(
+        EmbeddingClient(),
+        policy,
+        get_ai_usage_recorder(),
+    )

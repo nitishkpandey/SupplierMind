@@ -29,6 +29,7 @@ from app.core.llm import (
     estimate_call_cost_usd,
 )
 from app.platform.ai.gateway import AIGateway
+from app.platform.ai.types import AIOperation
 
 
 def _openai_error(cls, status_code: int):
@@ -155,6 +156,76 @@ def test_openai_provider_passes_model_and_stop_through():
     kwargs = fake_sdk.chat.completions.create.call_args.kwargs
     assert kwargs["model"] == "gpt-4o-mini-2024-07-18"
     assert kwargs["stop"] == ["\nObservation:"]
+
+
+def test_openai_provider_emits_usage_without_content():
+    emitted = []
+    fake_completion = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="answer"))],
+        usage=SimpleNamespace(
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        ),
+    )
+    fake_sdk = MagicMock()
+    fake_sdk.chat.completions.create.return_value = fake_completion
+
+    with (
+        patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"),
+        patch("openai.OpenAI", MagicMock(return_value=fake_sdk)),
+    ):
+        provider = OpenAIProvider(usage_callback=emitted.append)
+        assert (
+            provider.complete(
+                [{"role": "user", "content": "sensitive input"}]
+            )
+            == "answer"
+        )
+
+    assert len(emitted) == 1
+    usage = emitted[0]
+    assert usage.operation is AIOperation.chat
+    assert usage.input_units == 10
+    assert usage.output_units == 5
+    assert usage.cost_usd is not None
+    assert usage.cost_usd > 0
+    assert "sensitive input" not in repr(usage)
+    assert "answer" not in repr(usage)
+
+
+def test_openai_json_provider_emits_json_operation_usage():
+    emitted = []
+    fake_completion = SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content='{"ok": true}'))
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=8,
+            completion_tokens=4,
+            total_tokens=12,
+        ),
+    )
+    fake_sdk = MagicMock()
+    fake_sdk.chat.completions.create.return_value = fake_completion
+
+    with (
+        patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"),
+        patch("openai.OpenAI", MagicMock(return_value=fake_sdk)),
+    ):
+        provider = OpenAIProvider(usage_callback=emitted.append)
+        assert (
+            provider.complete_json(
+                [{"role": "user", "content": "sensitive JSON input"}]
+            )
+            == '{"ok": true}'
+        )
+
+    assert len(emitted) == 1
+    assert emitted[0].operation is AIOperation.chat_json
+    assert emitted[0].input_units == 8
+    assert emitted[0].output_units == 4
+    assert "sensitive JSON input" not in repr(emitted[0])
 
 
 # -- 6. Cost estimation ----------------------------------------------------------

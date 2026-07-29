@@ -24,6 +24,8 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable
+from decimal import Decimal
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
@@ -39,6 +41,8 @@ from app.core.config import settings
 from app.core.rate_limiter import get_rate_limiter
 from app.platform.ai.gateway import AIGateway
 from app.platform.ai.policy import AIPolicyEngine
+from app.platform.ai.types import AIOperation, ProviderUsage
+from app.platform.ai.usage import get_ai_usage_recorder
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +160,13 @@ class _UsageTracking:
         self.total_calls: int = 0
         self._usage_lock = threading.Lock()
 
-    def _track(self, model: str, response: Any) -> None:
+    def _track(
+        self,
+        model: str,
+        response: Any,
+        operation: AIOperation,
+        latency_ms: int,
+    ) -> ProviderUsage:
         usage = getattr(response, "usage", None)
         prompt_t = int(getattr(usage, "prompt_tokens", 0) or 0)
         completion_t = int(getattr(usage, "completion_tokens", 0) or 0)
@@ -169,6 +179,15 @@ class _UsageTracking:
                 "[llm-cost] model=%s prompt=%d completion=%d est=$%.6f total=$%.4f",
                 model, prompt_t, completion_t, cost, self.total_cost_usd,
             )
+        return ProviderUsage(
+            provider="openai",
+            model=model,
+            operation=operation,
+            input_units=prompt_t,
+            output_units=completion_t,
+            cost_usd=Decimal(str(cost)),
+            latency_ms=latency_ms,
+        )
 
 
 def _is_retryable_openai_error(exc: BaseException) -> bool:
@@ -195,7 +214,11 @@ class OpenAIProvider(_UsageTracking):
 
     provider_name = "openai"
 
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        usage_callback: Callable[[ProviderUsage], None] | None = None,
+    ) -> None:
         super().__init__()
         if not settings.OPENAI_API_KEY:
             raise ValueError(
@@ -206,7 +229,14 @@ class OpenAIProvider(_UsageTracking):
         self._client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
         self._model = model or settings.OPENAI_MODEL_NAME
         self._rate_limiter = get_rate_limiter()
+        self._usage_callback = usage_callback
         logger.info("LLM client initialized (provider=openai, model=%s)", self._model)
+
+    def set_usage_callback(
+        self,
+        callback: Callable[[ProviderUsage], None] | None,
+    ) -> None:
+        self._usage_callback = callback
 
     @property
     def model_name(self) -> str:
@@ -230,7 +260,7 @@ class OpenAIProvider(_UsageTracking):
         timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
-        wait_started = time.monotonic()
+        call_started = time.monotonic()
         ts = self._rate_limiter.acquire(
             resolved_model,
             estimate_message_tokens(messages, max_tokens),
@@ -238,7 +268,10 @@ class OpenAIProvider(_UsageTracking):
         )
         request_timeout = timeout
         if timeout is not None:
-            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
+            request_timeout = max(
+                0.1,
+                timeout - (time.monotonic() - call_started),
+            )
         response = self._client.chat.completions.create(
             model=resolved_model,
             messages=messages,  # type: ignore[arg-type]
@@ -247,8 +280,15 @@ class OpenAIProvider(_UsageTracking):
             stop=stop,
             timeout=request_timeout,
         )
-        self._record_usage(resolved_model, ts, response)
-        return response.choices[0].message.content or ""
+        content = response.choices[0].message.content or ""
+        self._record_usage(
+            resolved_model,
+            ts,
+            response,
+            AIOperation.chat,
+            call_started,
+        )
+        return content
 
     @retry(
         retry=retry_if_exception(_is_retryable_openai_error),
@@ -267,7 +307,7 @@ class OpenAIProvider(_UsageTracking):
         timeout: float | None = None,
     ) -> str:
         resolved_model = model or self._model
-        wait_started = time.monotonic()
+        call_started = time.monotonic()
         ts = self._rate_limiter.acquire(
             resolved_model,
             estimate_message_tokens(messages, max_tokens),
@@ -275,7 +315,10 @@ class OpenAIProvider(_UsageTracking):
         )
         request_timeout = timeout
         if timeout is not None:
-            request_timeout = max(0.1, timeout - (time.monotonic() - wait_started))
+            request_timeout = max(
+                0.1,
+                timeout - (time.monotonic() - call_started),
+            )
         response = self._client.chat.completions.create(  # type: ignore[call-overload]  # messages are plain dicts; OpenAI SDK validates at runtime
             model=resolved_model,
             messages=messages,
@@ -284,15 +327,36 @@ class OpenAIProvider(_UsageTracking):
             response_format={"type": "json_object"},
             timeout=request_timeout,
         )
-        self._record_usage(resolved_model, ts, response)
-        return response.choices[0].message.content or "{}"
+        content = response.choices[0].message.content or "{}"
+        self._record_usage(
+            resolved_model,
+            ts,
+            response,
+            AIOperation.chat_json,
+            call_started,
+        )
+        return content
 
-    def _record_usage(self, model: str, ts: float, response: Any) -> None:
+    def _record_usage(
+        self,
+        model: str,
+        ts: float,
+        response: Any,
+        operation: AIOperation,
+        call_started: float,
+    ) -> None:
         usage = getattr(response, "usage", None)
         total = getattr(usage, "total_tokens", None)
         if total is not None:
             self._rate_limiter.update_actual_tokens(model, ts, int(total))
-        self._track(model, response)
+        provider_usage = self._track(
+            model,
+            response,
+            operation,
+            max(0, int((time.monotonic() - call_started) * 1000)),
+        )
+        if self._usage_callback is not None:
+            self._usage_callback(provider_usage)
 
 
 
@@ -316,7 +380,11 @@ def build_llm_client() -> AIGateway:
     policy = AIPolicyEngine(
         {"openai": settings.ai_external_allowed_classifications}
     )
-    return AIGateway(OpenAIProvider(), policy)
+    return AIGateway(
+        OpenAIProvider(),
+        policy,
+        get_ai_usage_recorder(),
+    )
 
 
 @lru_cache(maxsize=1)

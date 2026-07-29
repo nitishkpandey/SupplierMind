@@ -1,10 +1,13 @@
 """Privacy and persistence tests for AI usage telemetry."""
 
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core import embeddings as embeddings_mod
+from app.core.embeddings import EMBEDDING_DIM, EmbeddingClient
 from app.db.models import AIUsageEvent
 from app.db.repositories.ai_usage_repo import AIUsageRepository
 from app.platform.ai.types import (
@@ -125,3 +128,35 @@ def test_database_recorder_logs_only_safe_failure_metadata(caplog) -> None:
     assert "openai" in caplog.text
     assert "request-1" in caplog.text
     assert "SQLAlchemyError" in caplog.text
+
+
+def test_voyage_provider_emits_usage_for_cache_miss_only() -> None:
+    emitted = []
+    vector = [0.0] * EMBEDDING_DIM
+    fake_client = MagicMock()
+    fake_client.embed.return_value = SimpleNamespace(
+        embeddings=[vector],
+        total_tokens=7,
+    )
+    embeddings_mod._EMBED_CACHE.clear()
+
+    with (
+        patch.object(embeddings_mod.settings, "VOYAGE_API_KEY", "test-key"),
+        patch.object(
+            embeddings_mod.voyageai,
+            "Client",
+            return_value=fake_client,
+        ),
+    ):
+        client = EmbeddingClient(usage_callback=emitted.append)
+        assert client.embed_one("sensitive supplier text") == vector
+        assert client.embed_one("sensitive supplier text") == vector
+
+    assert fake_client.embed.call_count == 1
+    assert len(emitted) == 1
+    usage = emitted[0]
+    assert usage.operation is AIOperation.embedding
+    assert usage.input_units == 7
+    assert usage.output_units == 0
+    assert usage.cost_usd is None
+    assert "sensitive supplier text" not in repr(usage)
