@@ -173,6 +173,70 @@ taxonomy**, **tool-access** analysis, **prompt efficiency**, and **clean
 latency** — are reported in `findings_diagnostics.md`. They are cross-referenced
 from §4–§6 where relevant.
 
+### 2.1 Why each metric was chosen (selection rationale)
+
+A benchmarking thesis is only as credible as its choice of metrics, so this
+section states *why* each metric earns its place — separately from §4–§6, which
+explain what each one measures. The suite was not assembled by listing every
+metric that exists; each was chosen to serve one of five deliberate principles.
+
+1. **Paradigm-neutral fairness.** At least one headline number must be computed
+   *identically* for all three systems, so that no architecture is scored on its
+   own terms. This is why **Precision@5** is the primary headline (pure ID-vs-ID
+   matching, no system-specific scorer) and why **Harmonized CSR** exists at all.
+2. **Standard IR practice, for external credibility.** An examiner should
+   recognise the measures as the field's canonical ones, not bespoke inventions.
+   This is why **nDCG@5**, **MAP@5**, and **MRR** are included with their standard
+   definitions and citations (Järvelin and Kekäläinen, 2002; Smucker et al., 2007).
+3. **Procurement-domain fit.** Generic retrieval scores are not enough for a
+   sourcing task, so the suite adds measures that speak to the *decision*:
+   **CSR** (are the constraints actually met?), the **auditability rubric** and
+   **compliance-gate accuracy** (is the answer defensible and are its verdicts
+   true?), and **correct-abstention** (does it know when nothing qualifies?).
+4. **Complementarity — no single metric decides the outcome.** Each metric has a
+   blind spot; the suite is built so that another metric covers it. A conclusion
+   that survives Precision@5, MRR, nDCG@5, MAP@5, *and* Success@1 is far harder to
+   dismiss than one resting on a single figure.
+5. **Honesty.** Some metrics are included precisely because they can make the
+   agentic system look *worse* — **Recall@5**, **Harmonized CSR**, and
+   **correct-abstention** — and reporting them is what makes the favourable
+   results believable.
+
+The table below gives the one-line justification for each metric: why it is in the
+suite, and what the evaluation would be missing without it.
+
+| Metric | Why it was selected (its job in the suite) | What would be missing without it |
+|---|---|---|
+| **Precision@5** | The one headline number computed identically for all three paradigms; k=5 matches how many candidates a buyer actually inspects | No fair, scorer-neutral headline — every other number could be accused of favouring one architecture |
+| **MRR** | Procurement users read top-down; captures whether a *correct* supplier sits at the very top, which a set-based measure ignores | Cannot distinguish "correct but buried at rank 5" from "correct and first" |
+| **nDCG@5** | The field's canonical rank-aware measure; rewards ordering and lends external credibility | An examiner would rightly ask why the standard ranking metric is absent |
+| **MAP@5** | Single number that rewards finding *many* correct suppliers *and* finding them early; complements nDCG | No combined precision-across-ranks view |
+| **Success@1** | Models the real "trust the top pick" user — the strictest practical test | Miss the most decision-relevant behaviour (what happens if the buyer takes only the first result) |
+| **Recall@5** | Included for completeness and honesty, even though it is structurally low here; shows precision was not cherry-picked | Open to the charge of hiding poor coverage behind precision |
+| **Answer rate** | Separates "returned the wrong suppliers" from "returned nothing", so precision cannot be inflated by silently skipping hard queries | High precision could be gamed by quiet abstention |
+| **CSR (native)** | Answers the literal procurement question — do the returned suppliers meet the constraints? — using each system's own verdicts | No direct domain-level satisfaction measure |
+| **Harmonized CSR** | Re-scores every system (P3 included) with one field-comparison scorer, removing self-scoring bias; the key fairness fix | The CSR comparison would be indefensible — P3 grading its own homework |
+| **Auditability rubric** | Turns a governance property (traceability) into something measured, not asserted; directly operationalises RQ2 | RQ2 collapses into hand-waving |
+| **Evidence-link ratio** | Quantitative complement to the coarse 0–3 rubric — the fraction of claims tied to a record | Rubric alone is too blunt to be convincing |
+| **Compliance-gate accuracy** | Auditability is worthless if the recorded verdicts are wrong; validates the evidence trail is *trustworthy*, not merely present. The quantitative core of H2 | "Structured" would never be shown to equal "correct" |
+| **Entity-hallucination rate** | Quantifies the exact failure mode grounding is meant to fix, and shows P2/P3 are immune by construction | The thesis's central motivation (hallucination) would go unmeasured |
+| **Correct-abstention rate** | Tests "knowing when to say nothing", following the unanswerable-question method (Rajpurkar et al., 2018); surfaces the honest negative result | The one axis where P3 loses would be hidden |
+| **Precision@5 by difficulty tier** | The direct test of H1's "gap widens as constraints stack" claim, and the clearest single picture of RQ3 | H1's mechanism claim would be untested |
+| **Clarification (ask) rate** | Reports the genuinely agentic behaviour the other systems lack, and justifies "proceed-anyway" mode as the fair comparison setting | P3's questioning capability would be invisible |
+| **Cost per query / per correct supplier** | The whole thesis question is "is the agentic overhead worth it?" — this is the cost side of that trade-off | No basis for the "when is it worth paying" recommendation |
+| **Latency (pacing removed)** | Reports true compute cost, separated from the free-tier rate-limit artefact | The cost picture would be distorted by an infrastructure quirk |
+| **Run-to-run variance** | Shows the results are reproducible despite the stochastic parser | A headline could be dismissed as a lucky run |
+| **Paired significance test** | With only 25 queries a gap could be noise; the paired bootstrap (Smucker et al., 2007) tests that it is real | The headline P3 > P2 claim would not be defensible as statistically significant |
+| **Component ablation** *(companion file)* | The mechanistic "why" — attributes the advantage to the compliance gate specifically; the single most distinctive result | The thesis would stop at "the agent won" rather than explaining *why* |
+
+The short version: the retrieval-quality metrics establish *that* the agentic
+system is better and are cross-checked against each other; the constraint,
+auditability, and abstention metrics establish *whether the answer is defensible*,
+which is the procurement-specific contribution; the cost and latency metrics price
+the trade-off; and the significance test, variance, and ablation establish that
+the result is real, reproducible, and mechanistically explained rather than
+asserted.
+
 ## 3. Statistical treatment (how to read the numbers)
 
 With only 25 queries this is a **seed benchmark**, so results are reported as
