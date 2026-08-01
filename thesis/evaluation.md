@@ -159,6 +159,14 @@ links every suggestion to evidence and keeps a queryable reasoning log.
 
 *Table 5.3 — Auditability, verifiability, and hallucination.*
 
+![Bar chart of the 0-3 auditability rubric: P3 SupplierMind 3, P2 RAG 1, P1 single-prompt 0.](figures/figure_5_3_auditability_rubric.png)
+
+*Figure 5.3 — Auditability rubric (0–3) by architecture. Only the agentic system
+links every claim to evidence and keeps a queryable reasoning log (score 3); RAG is
+grounded but records no per-constraint trail (1); the single-prompt baseline produces
+unstructured prose (0). Vector version in
+`figures/figure_5_3_auditability_rubric.pdf`.*
+
 Two results stand out. First, the agentic system's compliance-gate accuracy is
 0.995: when it judges a constraint, that judgement is true against the corpus 99.5%
 of the time, with a PASS-verdict precision of 0.994 and a recall of 1.000. This
@@ -190,6 +198,13 @@ returned nothing.
 
 *Table 5.4 — Behaviour on impossible queries (five queries, single run; indicative).*
 
+![Grouped bar chart of behaviour on the five impossible queries: correct abstention versus returning a non-qualifying supplier, for P2 RAG (0.80/0.20), P3 SupplierMind (0.40/0.60), and P1 single-prompt (0.00/1.00).](figures/figure_5_4_abstention.png)
+
+*Figure 5.4 — Behaviour on the five unsatisfiable queries: correct abstention (green)
+versus returning a non-qualifying supplier (coral). RAG abstains best; the agentic
+system returns auditable near-misses rather than nothing — the study's honest negative
+result. Single run, indicative. Vector version in `figures/figure_5_4_abstention.pdf`.*
+
 This is the one axis on which the agentic system does not win. As expected, the
 single-prompt baseline invents a supplier every time. But the RAG pipeline's prompt
 often declines to select mismatched suppliers, so it correctly returns nothing on
@@ -218,12 +233,12 @@ benchmark re-run three times. Table 5.5 shows the resulting three-rung ladder.
 
 *Table 5.5 — Component ablation: Precision@5 across the three rungs.*
 
-![Grouped bar chart of the ablation ladder, overall and by tier: P2 RAG, P3 without the compliance gate (below RAG), and P3 full with the gate restored (highest); on hard queries the gate lifts precision from 0.076 to 0.577.](figures/figure_5_3_ablation_ladder.png)
+![Grouped bar chart of the ablation ladder, overall and by tier: P2 RAG, P3 without the compliance gate (below RAG), and P3 full with the gate restored (highest); on hard queries the gate lifts precision from 0.076 to 0.577.](figures/figure_5_5_ablation_ladder.png)
 
-*Figure 5.3 — Component ablation, Precision@5 overall and by difficulty tier.
+*Figure 5.5 — Component ablation, Precision@5 overall and by difficulty tier.
 Removing the compliance gate (violet) drops the agentic system below RAG; restoring
 it produces the advantage, concentrated on the hardest queries. Ablation over three
-runs; vector version in `figures/figure_5_3_ablation_ladder.pdf`.*
+runs; vector version in `figures/figure_5_5_ablation_ladder.pdf`.*
 
 The result is decisive and somewhat unexpected. Structured discovery and ranking
 *without* the verification gate are not enough — the ablated system (0.427) actually
@@ -310,7 +325,14 @@ recommendation: on simple queries, where the two systems are level, the addition
 cost buys little, whereas on multi-constraint queries and wherever auditability is
 required, it buys a substantial and significant improvement.
 
-> **📷 Figure 5.4 — [screenshot placeholder]**
+![Two-panel bar chart of the agentic cost: cost per query and compute latency for P3, P2, and P1. P3 is about 4.7 times RAG on both — $0.00140 versus $0.00030, and 13.2 versus 2.8 seconds.](figures/figure_5_6_cost_latency.png)
+
+*Figure 5.6 — The operational cost of the agentic approach: cost per query (left) and
+compute latency with provider pacing removed (right). The agentic system is roughly
+4.7× RAG on both, driven by its ~5 sequential model calls per query versus RAG's one.
+Mean of five runs; vector version in `figures/figure_5_6_cost_latency.pdf`.*
+
+> **📷 Figure 5.7 — [screenshot placeholder]**
 > **Attach:** the admin / metrics dashboard of the running application, showing
 > per-query latency and token or cost accounting.
 > **Relevance:** documents the cost and latency figures discussed in this section as

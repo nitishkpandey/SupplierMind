@@ -171,12 +171,23 @@ corpus, and those documents are supplied to the model as context, so that the
 model's answer is conditioned on real, current, checkable text.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "htmlLabels": true}}}%%
 flowchart LR
-    Q["User query"] --> E["Embed query"]
-    E --> R["Retrieve top-k similar<br/>documents from corpus"]
-    R --> C["Assemble query +<br/>retrieved documents"]
-    C --> L["Language model"]
-    L --> A["Grounded answer"]
+    Q["🔍 User query"] --> E["🧮 Embed query"]
+    E --> R["📚 Retrieve top-k similar<br/>documents from corpus"]
+    R --> C["🧩 Assemble query +<br/>retrieved documents"]
+    C --> L["🤖 Language model"]
+    L --> A["✅ Grounded answer"]
+
+    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
+    classDef proc fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
+    classDef api fill:#FBE0DE,stroke:#E15554,stroke-width:1.5px,color:#5A1E1E;
+    classDef done fill:#DCF0EA,stroke:#2A9D8F,stroke-width:1.5px,color:#14463F;
+    class Q io;
+    class E,R,C proc;
+    class L api;
+    class A done;
+    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
 ```
 *Figure 2.1 — The retrieval-augmented generation pattern.*
 
@@ -208,12 +219,23 @@ dissertation, because a multi-constraint procurement query needs both meaning
 (what kind of supplier) and exact thresholds (how much capacity, how fast).
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "htmlLabels": true}}}%%
 flowchart TD
-    Q["Query with constraints"] --> S["Semantic search<br/>(vector similarity)"]
-    Q --> F["Structured filter<br/>(SQL predicates, geospatial)"]
-    S --> M["Merge candidates"]
+    Q["🔍 Query with constraints"] --> S["🧠 Semantic search<br/>(vector similarity)"]
+    Q --> F["🗄️ Structured filter<br/>(SQL predicates, geospatial)"]
+    S --> M["🔗 Merge candidates"]
     F --> M
-    M --> O["Candidate set that is both<br/>relevant and constraint-consistent"]
+    M --> O["🎯 Candidate set that is both<br/>relevant and constraint-consistent"]
+
+    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
+    classDef proc fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
+    classDef store fill:#EBE4F7,stroke:#7B4FC0,stroke-width:1.5px,color:#2E1A4A;
+    classDef done fill:#DCF0EA,stroke:#2A9D8F,stroke-width:1.5px,color:#14463F;
+    class Q io;
+    class S,M proc;
+    class F store;
+    class O done;
+    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
 ```
 *Figure 2.2 — Hybrid retrieval fuses semantic and structured search.*
 
@@ -240,12 +262,21 @@ information it does not have — by calling a tool — before committing to an a
 and that its intermediate reasoning is made explicit and can be logged.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "htmlLabels": true}}}%%
 flowchart LR
-    T["Thought<br/>(reason about the query)"] --> Ac["Action<br/>(call a tool)"]
-    Ac --> O["Observation<br/>(tool result)"]
+    T["💭 Thought<br/><i>reason about the query</i>"] --> Ac["🛠️ Action<br/><i>call a tool</i>"]
+    Ac --> O["👁️ Observation<br/><i>tool result</i>"]
     O --> D{"Enough<br/>information?"}
     D -- "No" --> T
-    D -- "Yes" --> Fin["Finish<br/>(produce structured result)"]
+    D -- "Yes" --> Fin["✅ Finish<br/><i>produce structured result</i>"]
+
+    classDef proc fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
+    classDef decision fill:#FFF3CF,stroke:#C9971A,stroke-width:1.5px,color:#5A4708;
+    classDef done fill:#DCF0EA,stroke:#2A9D8F,stroke-width:1.5px,color:#14463F;
+    class T,Ac,O proc;
+    class D decision;
+    class Fin done;
+    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
 ```
 *Figure 2.3 — The ReAct reason–act–observe loop.*
 
