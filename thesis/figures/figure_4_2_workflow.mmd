@@ -1,0 +1,28 @@
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 40, "rankSpacing": 45, "htmlLabels": true}}}%%
+flowchart TD
+    A["📝 Query"] --> B["🧩 Parser<br/><i>Thought → Action → Observation</i>"]
+    B --> C{"Specific<br/>enough?"}
+    C -- "No" --> D["❓ Raise clarification<br/><i>persist pending row, pause</i>"]
+    D --> E["🙋 User answers → re-enter"]
+    E --> B
+    C -- "Yes" --> G["🔎 Internal Discovery<br/><i>semantic top-k + SQL filter</i>"]
+    G --> H["🛡️ Compliance<br/><b>PASS / PARTIAL / FAIL + evidence</b>"]
+    H --> I["📊 Ranking<br/><i>weighted score</i>"]
+    I --> J["⚖️ Evaluator<br/><i>judge quality</i>"]
+    J --> K{"Accept?"}
+    K -- "No (≤1 retry)" --> G
+    K -- "Yes" --> L["✅ Finalize + return<br/><i>ranked suppliers + evidence + audit</i>"]
+
+    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
+    classDef proc fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
+    classDef hero fill:#FBE7CC,stroke:#E9973F,stroke-width:3px,color:#5A3A12;
+    classDef decision fill:#FFF3CF,stroke:#C9971A,stroke-width:1.5px,color:#5A4708;
+    classDef pause fill:#FCE4DA,stroke:#E07A5F,stroke-width:1.5px,color:#5A2A18;
+    classDef done fill:#DCF0EA,stroke:#2A9D8F,stroke-width:1.5px,color:#14463F;
+    class A io;
+    class B,G,I,J proc;
+    class H hero;
+    class C,K decision;
+    class D,E pause;
+    class L done;
+    linkStyle default stroke:#7C8B98,stroke-width:1.5px;

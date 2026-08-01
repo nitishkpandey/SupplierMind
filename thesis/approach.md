@@ -63,60 +63,8 @@ described in Section 4.3. The key point of contrast with P2 is that P3 does not
 simply retrieve and let the model pick; it filters on hard constraints, checks
 each claim against quoted evidence, and ranks by an explicit, deterministic score.
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 45, "rankSpacing": 55, "htmlLabels": true}}}%%
-flowchart TB
-    UI["🖥️ Client / evaluation harness"]
-    API["⚙️ FastAPI backend<br/>REST + SSE"]
-    subgraph PIPE["🧠 LangGraph agent pipeline"]
-        direction TB
-        P["1 · Parser<br/><i>ReAct loop + 5 tools</i>"]
-        ED["2 · External Discovery<br/><i>web search, when requested</i>"]
-        ID["3 · Internal Discovery<br/><i>semantic + structured</i>"]
-        C["4 · Compliance<br/><b>quote-or-fail verification</b>"]
-        R["5 · Ranking<br/><i>deterministic weighted score</i>"]
-        E["6 · Evaluator<br/><i>accept / retry</i>"]
-        F["7 · Finalize<br/><i>write memory</i>"]
-        P --> ED --> ID --> C --> R --> E --> F
-        E -. "retry (bounded)" .-> ID
-    end
-    subgraph DATA["💾 Persistent stores"]
-        direction LR
-        PG[("🗄️ PostgreSQL<br/>+ PostGIS")]
-        MV[("🔎 Milvus<br/>vectors")]
-    end
-    subgraph MODELS["🤖 External model APIs"]
-        direction LR
-        OAI["OpenAI<br/>gpt-4o-mini"]
-        VOY["Voyage<br/>embeddings"]
-    end
-    UI <--> API
-    API --> P
-    ID --> DATA
-    C --> DATA
-    F --> DATA
-    P --> MODELS
-    ID --> MODELS
-    C --> MODELS
+![The SupplierMind (P3) architecture: the client and FastAPI backend feed a seven-step LangGraph agent pipeline (Parser, External and Internal Discovery, Compliance, Ranking, Evaluator, Finalize) backed by persistent stores and external model APIs.](figures/figure_4_1_architecture.png)
 
-    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
-    classDef agent fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
-    classDef hero fill:#FBE7CC,stroke:#E9973F,stroke-width:3px,color:#5A3A12;
-    classDef store fill:#EBE4F7,stroke:#7B4FC0,stroke-width:1.5px,color:#2E1A4A;
-    classDef api fill:#FBE0DE,stroke:#E15554,stroke-width:1.5px,color:#5A1E1E;
-
-    class UI,API io;
-    class P,ED,ID,R,E,F agent;
-    class C hero;
-    class PG,MV store;
-    class OAI,VOY api;
-
-    style PIPE fill:#F6FAFD,stroke:#B7C7D4,stroke-width:1.5px,color:#22303C;
-    style DATA fill:#FBFAFE,stroke:#C9BEE0,stroke-width:1.5px,color:#22303C;
-    style MODELS fill:#FEF6F5,stroke:#EBC4C2,stroke-width:1.5px,color:#22303C;
-
-    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
-```
 *Figure 4.1 — The SupplierMind (P3) architecture. The five reasoning agents (blue)
 run in a fixed LangGraph pipeline; the Compliance / quote-or-fail gate (amber) is the
 component the evaluation identifies as the source of the agentic advantage.
@@ -132,36 +80,8 @@ the system is agentic in its reasoning components and deterministic in its overa
 control flow. Figure 4.2 shows the query workflow, including the clarification
 pause and the evaluator retry.
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 40, "rankSpacing": 45, "htmlLabels": true}}}%%
-flowchart TD
-    A["📝 Query"] --> B["🧩 Parser<br/><i>Thought → Action → Observation</i>"]
-    B --> C{"Specific<br/>enough?"}
-    C -- "No" --> D["❓ Raise clarification<br/><i>persist pending row, pause</i>"]
-    D --> E["🙋 User answers → re-enter"]
-    E --> B
-    C -- "Yes" --> G["🔎 Internal Discovery<br/><i>semantic top-k + SQL filter</i>"]
-    G --> H["🛡️ Compliance<br/><b>PASS / PARTIAL / FAIL + evidence</b>"]
-    H --> I["📊 Ranking<br/><i>weighted score</i>"]
-    I --> J["⚖️ Evaluator<br/><i>judge quality</i>"]
-    J --> K{"Accept?"}
-    K -- "No (≤1 retry)" --> G
-    K -- "Yes" --> L["✅ Finalize + return<br/><i>ranked suppliers + evidence + audit</i>"]
+![The P3 query workflow: the parser with its clarification loop, internal discovery, the compliance gate, ranking, the bounded evaluator retry, and finalize.](figures/figure_4_2_workflow.png)
 
-    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
-    classDef proc fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
-    classDef hero fill:#FBE7CC,stroke:#E9973F,stroke-width:3px,color:#5A3A12;
-    classDef decision fill:#FFF3CF,stroke:#C9971A,stroke-width:1.5px,color:#5A4708;
-    classDef pause fill:#FCE4DA,stroke:#E07A5F,stroke-width:1.5px,color:#5A2A18;
-    classDef done fill:#DCF0EA,stroke:#2A9D8F,stroke-width:1.5px,color:#14463F;
-    class A io;
-    class B,G,I,J proc;
-    class H hero;
-    class C,K decision;
-    class D,E pause;
-    class L done;
-    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
-```
 *Figure 4.2 — The P3 query workflow.*
 
 ### 4.3.1 Parser

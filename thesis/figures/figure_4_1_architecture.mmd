@@ -1,0 +1,52 @@
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 45, "rankSpacing": 55, "htmlLabels": true}}}%%
+flowchart TB
+    UI["🖥️ Client / evaluation harness"]
+    API["⚙️ FastAPI backend<br/>REST + SSE"]
+    subgraph PIPE["🧠 LangGraph agent pipeline"]
+        direction TB
+        P["1 · Parser<br/><i>ReAct loop + 5 tools</i>"]
+        ED["2 · External Discovery<br/><i>web search, when requested</i>"]
+        ID["3 · Internal Discovery<br/><i>semantic + structured</i>"]
+        C["4 · Compliance<br/><b>quote-or-fail verification</b>"]
+        R["5 · Ranking<br/><i>deterministic weighted score</i>"]
+        E["6 · Evaluator<br/><i>accept / retry</i>"]
+        F["7 · Finalize<br/><i>write memory</i>"]
+        P --> ED --> ID --> C --> R --> E --> F
+        E -. "retry (bounded)" .-> ID
+    end
+    subgraph DATA["💾 Persistent stores"]
+        direction LR
+        PG[("🗄️ PostgreSQL<br/>+ PostGIS")]
+        MV[("🔎 Milvus<br/>vectors")]
+    end
+    subgraph MODELS["🤖 External model APIs"]
+        direction LR
+        OAI["OpenAI<br/>gpt-4o-mini"]
+        VOY["Voyage<br/>embeddings"]
+    end
+    UI <--> API
+    API --> P
+    ID --> DATA
+    C --> DATA
+    F --> DATA
+    P --> MODELS
+    ID --> MODELS
+    C --> MODELS
+
+    classDef io fill:#EDF0F2,stroke:#6B7785,stroke-width:1.5px,color:#22303C;
+    classDef agent fill:#DCE9F2,stroke:#2A6F97,stroke-width:1.5px,color:#12303F;
+    classDef hero fill:#FBE7CC,stroke:#E9973F,stroke-width:3px,color:#5A3A12;
+    classDef store fill:#EBE4F7,stroke:#7B4FC0,stroke-width:1.5px,color:#2E1A4A;
+    classDef api fill:#FBE0DE,stroke:#E15554,stroke-width:1.5px,color:#5A1E1E;
+
+    class UI,API io;
+    class P,ED,ID,R,E,F agent;
+    class C hero;
+    class PG,MV store;
+    class OAI,VOY api;
+
+    style PIPE fill:#F6FAFD,stroke:#B7C7D4,stroke-width:1.5px,color:#22303C;
+    style DATA fill:#FBFAFE,stroke:#C9BEE0,stroke-width:1.5px,color:#22303C;
+    style MODELS fill:#FEF6F5,stroke:#EBC4C2,stroke-width:1.5px,color:#22303C;
+
+    linkStyle default stroke:#7C8B98,stroke-width:1.5px;
