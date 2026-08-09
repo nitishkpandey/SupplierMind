@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root{--ink:#22303c;--mute:#5b6770;--line:#e6eaef;
+    --blue-bg:#e3eef7;--blue-bd:#2a6f97;--blue-tx:#1d4f6b;
+    --green-bg:#dcf1ea;--green-bd:#2a9d8f;--green-tx:#1c6b60;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff}
+  body{width:700px;font-family:"Helvetica Neue",Arial,sans-serif;color:var(--ink);
+    padding:40px;-webkit-font-smoothing:antialiased}
+  .title{font-size:24px;font-weight:800;letter-spacing:-.3px}
+  .subtitle{font-size:14px;color:var(--mute);margin-top:5px;margin-bottom:22px}
+  .loopbox{border:1.7px dashed #ecc79a;background:#fffaf3;border-radius:20px;padding:14px 18px 18px}
+  .looplabel{display:flex;align-items:center;justify-content:center;gap:9px;font-size:12px;font-weight:800;
+    letter-spacing:1px;text-transform:uppercase;color:#b07d33;margin-bottom:10px}
+  .looplabel svg{width:17px;height:17px}
+  .lbody{position:relative;width:624px;height:258px;margin:0 auto}
+  .lbody svg.wires{position:absolute;left:0;top:0;width:624px;height:258px;z-index:1}
+  .node{position:absolute;left:90px;width:530px;height:66px;background:#fff;border:1px solid var(--line);
+    border-radius:13px;box-shadow:0 1px 2px rgba(20,40,60,.05),0 5px 14px rgba(20,40,60,.05);
+    display:flex;align-items:center;gap:13px;padding:0 16px;z-index:2}
+  .badge{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 42px}
+  .badge svg{width:23px;height:23px}
+  .k{font-size:15px;font-weight:750;line-height:1.1}
+  .d{font-size:12.7px;color:var(--mute);margin-top:2px}
+  .r-blue .badge{background:var(--blue-bg);color:var(--blue-bd)} .r-blue .k{color:var(--blue-tx)}
+  .exit{display:flex;flex-direction:column;align-items:center}
+  .exitlab{font-size:13px;color:var(--mute);margin:10px 0 2px}
+  .dchev{color:#a7b3bf}.dchev svg{width:26px;height:26px}
+  .finish{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:2px;
+    box-shadow:0 1px 2px rgba(20,40,60,.05),0 5px 14px rgba(20,40,60,.05);display:flex;align-items:center;gap:13px;width:100%}
+  .chev{fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+  .foot{margin-top:22px;font-size:13px;color:var(--mute);text-align:center;font-style:italic;line-height:1.45}
+</style></head><body>
+  <div class="title">The ReAct reason–act–observe loop</div>
+  <div class="subtitle">The model gathers information with tools before it commits to an answer</div>
+
+  <div class="loopbox">
+    <div class="looplabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Repeat until the model has enough information</div>
+    <div class="lbody">
+      <svg class="wires" viewBox="0 0 624 258">
+        <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="6.5" refY="3.2" orient="auto"><path d="M0 0 L7 3.2 L0 6.4 Z" fill="#a7b3bf"/></marker>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="6.5" refY="3.2" orient="auto"><path d="M0 0 L7 3.2 L0 6.4 Z" fill="#e9973f"/></marker></defs>
+        <line x1="355" y1="66" x2="355" y2="94" stroke="#a7b3bf" stroke-width="2" marker-end="url(#ah)"/>
+        <line x1="355" y1="162" x2="355" y2="190" stroke="#a7b3bf" stroke-width="2" marker-end="url(#ah)"/>
+        <path d="M90 225 C 40 225, 30 200, 30 146 C 30 92, 40 33, 90 33" fill="none" stroke="#e9973f" stroke-width="2.1" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+        <text x="24" y="146" transform="rotate(-90 24 146)" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8a5316">iterate again</text>
+      </svg>
+      <div class="node r-blue" style="top:0px"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.1 14c.2-1 .7-1.7 1.4-2.5A4.7 4.7 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.8 1.2 1.5 1.4 2.5"/></svg></div><div><div class="k">Thought</div><div class="d">reason about what is still needed</div></div></div>
+      <div class="node r-blue" style="top:96px"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 4.6 6.3l-8 8a2.1 2.1 0 0 1-3-3l8-8a4 4 0 0 0 6.3 4.6"/><path d="M14.7 6.3 18 3l3 3-3.3 3.3"/></svg></div><div><div class="k">Action</div><div class="d">call a tool with arguments</div></div></div>
+      <div class="node r-blue" style="top:192px"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div><div><div class="k">Observation</div><div class="d">read the tool result</div></div></div>
+    </div>
+  </div>
+
+  <div class="exit">
+    <div class="exitlab"><b>Yes</b> — enough information</div>
+    <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+    <div class="finish"><div class="badge" style="background:var(--green-bg);color:var(--green-bd)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div><div class="k" style="color:var(--green-tx)">Finish</div><div class="d">produce the structured result</div></div></div>
+  </div>
+  <div class="foot">Interleaving reasoning with tool use lets the model gather what it lacks — and makes its intermediate steps loggable.</div>
+</body></html>

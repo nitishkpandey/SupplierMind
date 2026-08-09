@@ -134,7 +134,7 @@ Regenerate the figures from the frozen results:
 
 ```bash
 python thesis/scripts/make_figures.py            # Chapter 5 charts (5.1-5.6) from METRICS.json / ABLATION.txt / DIAGNOSTICS.txt
-bash   thesis/scripts/render_diagrams.sh         # mermaid diagrams (2.1-2.3, 4.1-4.2) to PNG + PDF
+python thesis/scripts/render_infographics.py     # HTML/CSS diagrams (Figs 1.1, 2.1-2.3, 4.1-4.2) to PNG (needs Google Chrome)
 ```
 
 Running the paradigms end-to-end (requires Docker and provider keys) executes the
@@ -154,9 +154,10 @@ required.
 
 ## Thesis documents
 
-- Dissertation chapters: [`thesis/`](thesis/) — `abstract.md`, `introduction.md`,
-  `foundation.md`, `related_work.md`, `approach.md`, `evaluation.md`,
-  `conclusion.md`, `references.md`, `appendices.md`
+- Dissertation chapters: [`thesis/`](thesis/) — `00-abstract.md`,
+  `01-introduction.md`, `02-foundations.md`, `03-related-work.md`,
+  `04-approach.md`, `05-evaluation-and-results.md`, `06-conclusion.md`,
+  `07-references.md`, `08-appendices.md`
 - [BENCHMARK.md](BENCHMARK.md) — SupplierBench-25, metrics, end-to-end reproduction
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the five agents, data flow, governance, audit log
 
@@ -173,7 +174,7 @@ branch; this segment documents its operational surface.
 
 ## Architecture
 
-![The SupplierMind architecture: client and FastAPI backend feeding a seven-step LangGraph agent pipeline backed by persistent stores and external model APIs.](thesis/figures/figure_4_1_architecture.png)
+![The SupplierMind layered architecture: a procurement user on top, then presentation, API, LangGraph orchestration, core-service, and data tiers, with an external-APIs column.](thesis/figures/figure_4_1_layered_architecture.png)
 
 ## Tech stack
 

@@ -80,10 +80,15 @@ that structured discovery and ranking *without* the verification gate score belo
 plain retrieval, and that restoring the gate more than doubles precision on the
 hardest queries. In other words, the value of the agentic design lies not in the
 retrieval machinery, nor in the agentic scaffolding in general, but specifically in
-the discipline of checking each claim against evidence. This reframes supplier
-discovery from a naming task, at which a plain model is already competent in the
-loose sense of producing plausible names, into a trust-and-governance task, and it
-identifies which architectural choice actually addresses it.
+the discipline of checking each claim against evidence. This same conclusion held when
+the agentic system was placed alongside two further, independently built retrieval
+baselines — a standard off-the-shelf RAG framework and a stronger re-ranked pipeline —
+both of which stayed close to the controlled RAG and well below the agentic system, so
+the advantage cannot be dismissed as the product of a weak baseline or explained away by
+better retrieval. This reframes supplier discovery from a naming task, at which a plain
+model is already competent in the loose sense of producing plausible names, into a
+trust-and-governance task, and it identifies which architectural choice actually
+addresses it.
 
 ## 6.4 Strengths of the approach
 

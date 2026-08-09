@@ -313,7 +313,7 @@ stable the estimate is without assuming the scores follow any particular
 distribution. A *paired significance test* asks whether one system genuinely
 outperforms another rather than doing so by luck: because both systems answer the
 same queries, the per-query differences are compared directly, which removes query
-difficulty as a confounding factor. Smucker et al. (2007) compared significance
+difficulty as a confounding factor. Smucker, Allan and Carterette (2007) compared significance
 tests for information retrieval and found the randomisation and bootstrap tests to
 be sound choices, and this dissertation follows that guidance by using a paired
 bootstrap test. The general problem of evaluating retrieval with a limited or

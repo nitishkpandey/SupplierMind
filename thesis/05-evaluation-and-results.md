@@ -5,9 +5,10 @@ setup — the datasets, the baselines, the metrics, and the conditions under whi
 everything was run — and then presents the results systematically: the headline
 comparison of the three paradigms, the breakdown by difficulty, the constraint,
 auditability, and hallucination findings, the abstention result, the component
-ablation, and a set of diagnostic analyses that look inside the agentic system.
-Each section interprets its results in relation to the research questions, and the
-chapter closes by answering RQ1 to RQ3 directly.
+ablation, a set of diagnostic analyses that look inside the agentic system, and a
+positioning against existing approaches. Each section interprets its results in
+relation to the research questions, and the chapter closes by answering RQ1 to RQ3
+directly.
 
 ## 5.1 Experimental setup
 
@@ -112,7 +113,7 @@ RAG's (0.877), but the native figure is read from the system's own verdicts. Und
 the harmonised scorer, which scores every system identically, the gap narrows to
 0.934 against 0.917. The honest reading is therefore that the large, reliable
 advantage is in precision and ranking, while on raw constraint counting the two
-systems are close — a distinction returned to in Section 5.9.
+systems are close — a distinction returned to in Section 5.10.
 
 ## 5.3 Degradation by difficulty (RQ1 and RQ3)
 
@@ -339,7 +340,86 @@ Mean of five runs; vector version in `figures/figure_5_6_cost_latency.pdf`.*
 > observed in the live system.
 > **Priority:** Medium.
 
-## 5.9 Interpretation and answers to the research questions
+## 5.9 Positioning against existing approaches
+
+Before drawing conclusions, it is worth asking a fair question: how does SupplierMind
+compare with the best systems that already exist? The honest starting point is that a
+direct, numbered comparison is only partly possible. There is no public benchmark and
+no open competitor system for this exact task — building one is part of the contribution
+— and the commercial sourcing tools that come closest are closed and run on private
+data, so they cannot be run on this corpus. The comparison therefore has two parts: real,
+measured runs against systems that could be built and run here, and a plainer,
+capability-level comparison against the approaches that could not.
+
+The fairest yardstick is retrieval-augmented generation, because it is what today's
+procurement-AI products actually use. To be sure the result did not rest on a single,
+possibly weak, RAG implementation, three separate RAG systems were run on the same
+corpus and the same twenty-five queries: the study's own minimal RAG (P2); a standard,
+off-the-shelf RAG built with the widely-used LlamaIndex framework and its default
+embeddings; and an advanced RAG ("RAG++") that retrieves a larger pool of candidates and
+then re-orders them with a cross-encoder, the usual way the field strengthens a RAG
+system. Table 5.8 sets all five systems side by side.
+
+| System | Precision@5 | Precision@5, hard queries |
+|---|---|---|
+| Single-prompt LLM (P1) | 0.000 | 0.000 |
+| Off-the-shelf RAG (LlamaIndex) | 0.480 | 0.171 |
+| Minimal RAG, controlled baseline (P2) | 0.504 | 0.229 |
+| Advanced RAG with re-ranker (RAG++) | 0.456 | 0.114 |
+| **SupplierMind (P3)** | **0.731** | **0.577** |
+
+*Table 5.8 — Measured Precision@5 on SupplierBench-25 for five systems run on the same
+corpus and the same queries. The three RAG systems cluster together and fall away on the
+hard queries; only the verification-based agentic system stays high.*
+
+The pattern is clear and, for this thesis, decisive. All three RAG systems land close
+together, between 0.46 and 0.50, and all three fall apart on the hardest queries. The
+off-the-shelf framework (0.480) does no better than the study's own P2 (0.504), which
+settles any worry that P2 was a weak baseline built to lose. The advanced re-ranker
+(0.456) does not help either — if anything it is slightly worse — because re-ordering
+suppliers by how similar their text looks does nothing to enforce a hard rule such as
+"capacity above 10,000 units per month". SupplierMind, at 0.731 overall and 0.577 on
+hard queries, sits well above all of them. This echoes the ablation of Section 5.6: the
+advantage does not come from better search or ranking, but from checking each claim
+against evidence.
+
+Some approaches could not be run head-to-head — a frontier chatbot with web access,
+general-purpose agent frameworks, and the classical operations-research methods for
+supplier selection — either because they cannot see the buyer's private data or because
+they solve a different shape of problem. For these, the comparison is on what each can
+and cannot do, set out in plain terms in Table 5.9. A frontier chatbot is very good at
+naming plausible suppliers, but it cannot search the buyer's own governed data (and often
+may not be sent it), it states facts rather than verifying them, and it leaves a chat
+transcript rather than an audit trail. General agent frameworks offer the same building
+blocks SupplierMind uses, but they are built for tasks such as software engineering and
+do not treat auditability as something to measure. The classical ranking methods are
+rigorous but assume a clean table of candidates is already in hand, with no language
+understanding and no discovery. SupplierMind is the only one of these that does all the
+things a governed procurement decision needs at once.
+
+| Approach | What it does well | What it lacks for this task |
+|---|---|---|
+| Frontier chatbot (with web search) | Names plausible suppliers fluently | Cannot use the buyer's private data; no verification; no audit trail |
+| Retrieval-augmented generation (RAG) | Grounded in real records; cheap and fast | Cannot enforce hard constraints; no per-claim verification |
+| General agent frameworks | Powerful reasoning and tool use | Built for other tasks; auditability not measured |
+| Classical supplier selection (operations research) | Rigorous, transparent ranking | Needs a ready-made table; no language understanding or discovery |
+| **SupplierMind** | Grounds, verifies every claim, and logs a full audit trail | Higher cost; weaker at refusing impossible queries |
+
+*Table 5.9 — A plain-language comparison with the approaches that could not be run
+head-to-head.*
+
+In short, SupplierMind is not claimed to be state of the art in the leaderboard sense,
+because no leaderboard exists for this task. What the evidence shows is concrete and
+honest: against three independent RAG systems — including a standard off-the-shelf one
+and a stronger re-ranked one — it is substantially more accurate, and against the
+approaches that could not be run it is the only one that combines language understanding,
+private-data grounding, evidence-based verification, and a full audit trail. Its costs
+are real: it is slower and dearer, and it refuses impossible queries less reliably. The
+one comparison still worth running is against a frontier model in place of the pinned
+one, to confirm the finding is about the architecture and not the model; that is left as
+future work.
+
+## 5.10 Interpretation and answers to the research questions
 
 **RQ1 — how do the paradigms compare on satisfying multi-constraint queries?** The
 agentic system is significantly more precise than RAG (Precision@5 of 0.731 against

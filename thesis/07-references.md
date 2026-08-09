@@ -18,7 +18,8 @@ on Research and Development in Information Retrieval (SIGIR)*. New York: ACM, pp
 
 Es, S. et al. (2024) 'RAGAs: automated evaluation of retrieval augmented
 generation', in *Proceedings of the 18th Conference of the European Chapter of the
-Association for Computational Linguistics (EACL)*.
+Association for Computational Linguistics (EACL): System Demonstrations*, pp.
+150–158.
 
 European Union (2024) *Regulation (EU) 2024/1689 of the European Parliament and of
 the Council of 13 June 2024 laying down harmonised rules on artificial intelligence
@@ -82,7 +83,7 @@ of information retrieval models', in *Advances in Neural Information Processing
 Systems 34 (NeurIPS), Datasets and Benchmarks Track*.
 
 Wang, L. et al. (2024) 'A survey on large language model based autonomous agents',
-*Frontiers of Computer Science*, 18(6).
+*Frontiers of Computer Science*, 18(6), article 186345.
 
 Wu, Q. et al. (2024) 'AutoGen: enabling next-gen LLM applications via multi-agent
 conversation', in *Conference on Language Modeling (COLM)*.

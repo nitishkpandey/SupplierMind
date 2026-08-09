@@ -1,0 +1,363 @@
+{
+  "system": "rag_rerank",
+  "pool": 30,
+  "cross_encoder": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "precision_at_5": 0.456,
+  "precision_at_5_by_tier": {
+    "simple": 1.0,
+    "medium": 0.26,
+    "hard": 0.114
+  },
+  "per_query": [
+    {
+      "raw_query": "metals suppliers in Germany",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "01b5c876-25e2-0097-1a81-65254368b649",
+        "8ed5d125-2796-e547-48c2-044b581ff6dd",
+        "ce330cb8-0991-9656-13b0-b7dce76e4a97",
+        "339302a5-b56b-478e-30da-e68668da6ad5",
+        "a64954c1-4b8a-2e9e-6c04-abf9ac73a208"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified electronics suppliers",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "e2829077-4d83-758e-f252-bff3c92f0826",
+        "78832718-3253-33c2-5173-b2a6e46d875c",
+        "12bb0968-59f0-570c-8eaa-c46a966b427c",
+        "25307638-18f3-dc39-23e6-496db0e1f3f5",
+        "ceb3d70d-fa1a-7520-d057-837f0cd13384"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "logistics suppliers in Germany",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "e1616e35-a02f-5493-6774-655dcb04ce57",
+        "806af617-40e0-492b-cdbd-7a0eb16ae717",
+        "0f90f3a1-c9f8-892c-f9c9-68ff9c6ecbd2",
+        "ed655325-56a4-d44d-e8a4-5b00d8af8a55",
+        "405c1d50-a356-2ae7-40d9-45ad3dafc664"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "software services suppliers in Germany",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "57b75676-ffd3-af32-d10a-b4cbeab471de",
+        "197b8c84-8b41-77cb-9b82-cd4e696c3907",
+        "2b5725a9-1a9a-baca-534b-a8005173abb7",
+        "e81a56eb-784f-24d0-d6d9-8d55e778541f",
+        "87029a7f-d83f-b965-10f7-9542ec4da086"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 14001 certified textiles suppliers",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "7751fa1d-e69b-b09a-da3b-b42c114b648d",
+        "51db41ea-216f-2c1c-7e82-80afec51c6f8",
+        "d48516eb-cfe3-e6e4-7e04-dc216e2f7f71",
+        "faa8f4b6-87b2-7ee4-c780-792cac881080",
+        "c21bed3a-419f-180a-834d-8df1e9d29aba"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "REACH certified chemicals suppliers",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "b4f52d44-910e-9484-01a9-2f51eede7e78",
+        "f9426735-518f-d341-ea08-6523f31a595a",
+        "0e78d12f-9055-fa80-a796-8d4c0d0ba5eb",
+        "bbec5c3a-74e2-52df-229c-63e4badb7017",
+        "614f1583-3383-a9c6-f215-7da750976783"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "packaging suppliers in Germany",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "b9a501ff-8fc5-afb7-07fb-089abc69afad",
+        "25629cd6-4a02-7e64-90dc-33eb65a079a0",
+        "8f3817bb-fb89-17c4-c7de-60bd83c8ef16",
+        "9a40564a-7340-8445-710f-16b9f6919464",
+        "2d641d71-52d6-b008-8a9c-5cbac3a596a5"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 22000 certified food ingredients suppliers",
+      "difficulty": "simple",
+      "retrieved_ids": [
+        "88cda011-1001-5582-ab51-247bf4b21532",
+        "33a49e08-3c93-6d9d-5988-907a0757b3a6",
+        "23e93c21-b89d-70fc-0a67-cdeb9b8c6793",
+        "540e52d4-143c-e563-948a-5af8598dcb68",
+        "b1c50945-a6c6-081e-bf6a-92b4f279fd07"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified metals suppliers in Germany with capacity over 10,000 kg/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "a64954c1-4b8a-2e9e-6c04-abf9ac73a208",
+        "e7f11795-88ac-5d13-3667-88b523354b53",
+        "b819929c-0082-81e3-0dcc-5d19403b8556",
+        "ce330cb8-0991-9656-13b0-b7dce76e4a97",
+        "0f259811-4dec-88a6-42af-17575f2e9a3d"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 0.25,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified electronics suppliers in Germany lead time under 14 days",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "2c445e5f-e08a-8205-6de4-edba20fa6f11",
+        "6c4f5bc2-f5fa-4ec6-c70d-ee6e2e318de5",
+        "5499ea14-b435-59e0-97ec-e6686598656c",
+        "d308ae10-0889-7b62-fc6f-d1c8b717cd92",
+        "4b6cd4e8-ee91-d95d-b60b-63bb973aae21"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "logistics suppliers in Germany with capacity over 50,000 tonnes/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "0f90f3a1-c9f8-892c-f9c9-68ff9c6ecbd2",
+        "806af617-40e0-492b-cdbd-7a0eb16ae717",
+        "e1616e35-a02f-5493-6774-655dcb04ce57",
+        "c1d5ca4f-5927-e266-2754-ea3637d068e3",
+        "405c1d50-a356-2ae7-40d9-45ad3dafc664"
+      ],
+      "precision_at_5": 0.4,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 27001 certified software services suppliers in Germany",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "814712ec-7866-d9f4-3a9c-a653f0aec299",
+        "21b75a0a-ec84-a555-94b4-fbdd34f67a00",
+        "f9735b17-b76a-3673-0733-75546a244912",
+        "cf97e07f-515c-3e55-ef1a-2da4d88b2fb8",
+        "197b8c84-8b41-77cb-9b82-cd4e696c3907"
+      ],
+      "precision_at_5": 0.8,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "REACH certified chemicals suppliers in Germany with capacity over 100,000 kg/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "0ec05c83-a1c4-b5c6-677d-8ee7a7315640",
+        "aae4364f-936e-ab3c-7a6b-baf33e0c8682",
+        "b4f52d44-910e-9484-01a9-2f51eede7e78",
+        "53008018-b2e5-e431-b1f3-46ca5ea7dab1",
+        "51c470db-73c5-847a-61c4-b6653584b6f2"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "packaging suppliers in Germany with capacity over 100,000 units/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "25629cd6-4a02-7e64-90dc-33eb65a079a0",
+        "9a28832d-ae0b-b337-c965-5d760f051e1b",
+        "1b9ece19-d08d-4d68-fb2a-c0f8e5582934",
+        "b7f50fbe-2fb1-eb30-5061-77d2a0e6a938",
+        "8f3817bb-fb89-17c4-c7de-60bd83c8ef16"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "CE certified machinery suppliers in Germany lead time under 14 days",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "ca10d197-8040-1b0a-1825-a2f3d5676738",
+        "8b340b54-a6c3-92be-bea8-b32fd6b50f28",
+        "bfbf1eb5-a25a-2760-dc03-14f9ba4c750b",
+        "35783a44-9611-116b-a54b-ddbb7c56ea1b",
+        "e42610bf-bae8-2801-effd-f95ba2051bc4"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified textiles suppliers in Germany",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "75e52a70-03ed-31a1-6b0d-cd47b7f4a875",
+        "bda60360-ba56-fe5c-2109-b6143cf7541e",
+        "0e898f36-aca0-5633-c8ce-a36bdbd0c831",
+        "f373947a-9477-250d-ebc8-6a12a2284afe",
+        "4d9faa83-d7dc-a1ed-9264-1c4e0d29829e"
+      ],
+      "precision_at_5": 1.0,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 22000 certified food ingredients suppliers with capacity over 200,000 tonnes/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "33a49e08-3c93-6d9d-5988-907a0757b3a6",
+        "540e52d4-143c-e563-948a-5af8598dcb68",
+        "520b7513-631d-46cd-e90e-b94b62ff60a8",
+        "d6d48e19-9002-c719-0b98-f99ced2e495e",
+        "23e93c21-b89d-70fc-0a67-cdeb9b8c6793"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "CE certified construction materials suppliers in Germany with capacity over 20,000 tonnes/month",
+      "difficulty": "medium",
+      "retrieved_ids": [
+        "09a69783-971c-cd01-4cbc-7263a0307a29",
+        "5636d3b7-c069-47d3-72cd-fdd02e616bd7",
+        "7e67433a-1c2d-79b0-3ff6-d59a634aeb83",
+        "478b2f00-87d7-5309-de77-21561f76043f",
+        "0cfe7bb4-7153-ace6-aaf0-b2ed145915ae"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 1.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified metals suppliers in Germany with capacity over 50,000 kg/month",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "a64954c1-4b8a-2e9e-6c04-abf9ac73a208",
+        "b819929c-0082-81e3-0dcc-5d19403b8556",
+        "ce330cb8-0991-9656-13b0-b7dce76e4a97",
+        "e7f11795-88ac-5d13-3667-88b523354b53",
+        "6957597b-dd26-0497-b9e1-550dec74352d"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 0.3333333333333333,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified electronics suppliers in Germany with capacity over 100,000 units/month lead time under 60 days",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "6c4f5bc2-f5fa-4ec6-c70d-ee6e2e318de5",
+        "1884480f-bcc8-8ad2-354d-803aea3a9ba5",
+        "c9e438ad-6e7c-1ca3-f2af-966448064ae7",
+        "d308ae10-0889-7b62-fc6f-d1c8b717cd92",
+        "5499ea14-b435-59e0-97ec-e6686598656c"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 27001 certified software services suppliers in Germany lead time under 21 days",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "f9735b17-b76a-3673-0733-75546a244912",
+        "26ce1945-89da-5a8a-384f-f1fb97e30a26",
+        "bc2c74d9-3a8d-661f-8e06-9a35b42a5780",
+        "87029a7f-d83f-b965-10f7-9542ec4da086",
+        "cf97e07f-515c-3e55-ef1a-2da4d88b2fb8"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "REACH certified chemicals suppliers in Germany with capacity over 100,000 kg/month",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "0ec05c83-a1c4-b5c6-677d-8ee7a7315640",
+        "aae4364f-936e-ab3c-7a6b-baf33e0c8682",
+        "b4f52d44-910e-9484-01a9-2f51eede7e78",
+        "53008018-b2e5-e431-b1f3-46ca5ea7dab1",
+        "51c470db-73c5-847a-61c4-b6653584b6f2"
+      ],
+      "precision_at_5": 0.0,
+      "reciprocal_rank": 0.0,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified packaging suppliers in Germany with capacity over 5,000 units/month lead time under 30 days",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "f3dcd91d-8132-efc4-d652-93a7b968ba9b",
+        "e4eec67c-1a57-f9e4-c5f8-e2f8414f4994",
+        "8fa8f692-57a2-d1dc-caa8-d15fcd30d38d",
+        "b29b12e7-0e16-ebc6-2630-d00093ad9d27",
+        "1ef2514f-1ff9-7aa7-41ec-d5e526608709"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 0.5,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "ISO 9001 certified textiles suppliers in Germany with capacity over 100,000 meters/month",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "d0b6f394-af07-4e46-98ff-38481319e9dd",
+        "0e898f36-aca0-5633-c8ce-a36bdbd0c831",
+        "bda60360-ba56-fe5c-2109-b6143cf7541e",
+        "75e52a70-03ed-31a1-6b0d-cd47b7f4a875",
+        "6c1f775d-9859-806d-a250-0d7c596f692e"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 0.2,
+      "pool_size": 30
+    },
+    {
+      "raw_query": "food ingredients suppliers in Germany with capacity over 100,000 tonnes/month lead time under 45 days",
+      "difficulty": "hard",
+      "retrieved_ids": [
+        "0447c6c3-0ac1-1397-a81d-5fd2b44395f8",
+        "84e2a017-e53e-0663-6296-4968e160179e",
+        "6fd64bb2-114f-689d-941d-1a49a0d2d777",
+        "defb7e28-3306-c8e9-60a5-18ae501d2e33",
+        "b34b88b7-0cc2-8d42-1e55-6090ddb5784a"
+      ],
+      "precision_at_5": 0.2,
+      "reciprocal_rank": 0.3333333333333333,
+      "pool_size": 30
+    }
+  ]
+}

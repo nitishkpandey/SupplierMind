@@ -108,7 +108,7 @@ information-retrieval methodology: the nDCG measure of ranked-retrieval quality
 (Järvelin and Kekäläinen, 2002), the analysis of evaluation under incomplete
 relevance judgements (Buckley and Voorhees, 2004), and the comparison of
 significance tests that supports the use of a bootstrap test on a small benchmark
-(Smucker et al., 2007).
+(Smucker, Allan and Carterette, 2007).
 
 The LLM-as-a-judge paradigm deserves particular attention because it shapes a
 methodological choice made here. Zheng et al. (2023) showed that a strong model can
@@ -147,7 +147,7 @@ framing underlies the way hallucination is measured in this dissertation, both a
 the invention of a non-existent supplier and as the false attribution of a property
 to a real one. A closely related capability is *abstention* — a system correctly
 declining to answer when no correct answer exists. The methodology for testing this
-originates in question answering, where Rajpurkar et al. (2018) extended the SQuAD
+originates in question answering, where Rajpurkar, Jia and Liang (2018) extended the SQuAD
 reading-comprehension benchmark with deliberately unanswerable questions in order
 to test whether a system knows what it does not know. The abstention set used in
 this dissertation follows this methodology, presenting queries that have no
@@ -168,7 +168,7 @@ The final body of work is the application domain itself. Supplier selection has 
 long and rigorous history in operations research and classical machine learning,
 where it is generally framed as a multi-criteria decision problem over a fixed set
 of candidate suppliers and criteria. Representative and widely cited examples
-include the fuzzy VIKOR group-decision method of Sanayei et al. (2010) and the
+include the fuzzy VIKOR group-decision method of Sanayei, Mousavi and Yazdankhah (2010) and the
 hybrid system of Kar (2015), which combines the analytic hierarchy process, fuzzy
 set theory, and a neural network to rank suppliers. This literature established the
 criteria and the evaluation vocabulary — price, quality, delivery, capacity,
@@ -215,9 +215,9 @@ positioning.
 | Language agents, tools, multi-agent | Yao et al. (2023); Schick et al. (2023); Qin et al. (2024); Shinn et al. (2023); Hong et al. (2024); Wu et al. (2024); Wang et al. (2024) | Mechanisms: reason–act loops, tool use, self-reflection, multi-agent decomposition | Not applied to procurement; auditability not measured |
 | RAG and retrieval | Lewis et al. (2020); Karpukhin et al. (2020); Asai et al. (2024) | Grounding generation in retrieved documents; dense and self-reflective retrieval | No enforcement of hard multi-constraint satisfaction; no per-claim verification |
 | Evaluation of LLM / agentic systems | Thakur et al. (2021); Es et al. (2024); Zheng et al. (2023); Jimenez et al. (2024); Mialon et al. (2024); Liu et al. (2024) | Benchmarks and metrics for retrieval, faithfulness, and agent competence | No procurement benchmark; auditability not a scored dimension; rarely component-level |
-| Hallucination and abstention | Ji et al. (2023); Rajpurkar et al. (2018) | Vocabulary for hallucination; methodology for testing abstention | Not applied to governed supplier discovery |
-| IR evaluation methodology | Järvelin and Kekäläinen (2002); Buckley and Voorhees (2004); Smucker et al. (2007) | Ranked-retrieval metrics; sound treatment of small/incomplete-judgement benchmarks | Methodology only; not tied to this task |
-| Supplier selection / procurement AI | Sanayei et al. (2010); Kar (2015) | Mature multi-criteria and classical-ML supplier ranking | Predates LLMs; assumes structured input; no language parsing, verification, or auditability; LLM-agentic work is preprint-only |
+| Hallucination and abstention | Ji et al. (2023); Rajpurkar, Jia and Liang (2018) | Vocabulary for hallucination; methodology for testing abstention | Not applied to governed supplier discovery |
+| IR evaluation methodology | Järvelin and Kekäläinen (2002); Buckley and Voorhees (2004); Smucker, Allan and Carterette (2007) | Ranked-retrieval metrics; sound treatment of small/incomplete-judgement benchmarks | Methodology only; not tied to this task |
+| Supplier selection / procurement AI | Sanayei, Mousavi and Yazdankhah (2010); Kar (2015) | Mature multi-criteria and classical-ML supplier ranking | Predates LLMs; assumes structured input; no language parsing, verification, or auditability; LLM-agentic work is preprint-only |
 
 *Table 3.1 — How the reviewed literature relates to this dissertation, and the gap
 each theme leaves open.*

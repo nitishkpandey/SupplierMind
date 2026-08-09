@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root{--ink:#22303c;--mute:#5b6770;--line:#e6eaef;
+    --slate:#64748b;--sky:#3a7fa6;--blue:#2a6f97;--teal:#2a9d8f;--violet:#7b4fc0;--red:#e15554;--amber:#e9973f;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff}
+  body{width:720px;font-family:"Helvetica Neue",Arial,sans-serif;color:var(--ink);
+    padding:40px;-webkit-font-smoothing:antialiased}
+  .title{font-size:24px;font-weight:800;letter-spacing:-.3px}
+  .subtitle{font-size:14px;color:var(--mute);margin-top:5px;margin-bottom:20px}
+  .actor{display:flex;justify-content:center}
+  .who{display:inline-flex;align-items:center;gap:10px;background:#fff;border:1.6px solid #cbd5e0;border-radius:999px;
+    padding:9px 20px 9px 13px;box-shadow:0 1px 2px rgba(20,40,60,.05),0 5px 14px rgba(20,40,60,.06);font-weight:750;font-size:14.5px}
+  .who .ic{width:32px;height:32px;border-radius:50%;background:#eef2f6;color:var(--slate);display:flex;align-items:center;justify-content:center}
+  .who .ic svg{width:19px;height:19px}
+  .who .sub{font-weight:500;font-size:12.5px;color:var(--mute)}
+  .dchev{display:flex;justify-content:center;color:#b4c0cc;margin:2px 0}
+  .dchev svg{width:24px;height:24px}
+  .tier{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-left-width:6px;
+    border-radius:14px;padding:13px 16px;box-shadow:0 1px 2px rgba(20,40,60,.05),0 5px 14px rgba(20,40,60,.05)}
+  .badge{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 42px}
+  .badge svg{width:23px;height:23px}
+  .body1{flex:1;min-width:0}
+  .tl{font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:#aab4bf}
+  .tn{font-size:15.5px;font-weight:760;line-height:1.1;margin-top:1px}
+  .tc{font-size:12.3px;color:var(--mute);margin-top:3px;line-height:1.35}
+  .L-slate{border-left-color:var(--slate)} .L-slate .badge{background:#eef2f6;color:var(--slate)} .L-slate .tn{color:#3f4c5a}
+  .L-sky{border-left-color:var(--sky)} .L-sky .badge{background:#e4eff6;color:var(--sky)} .L-sky .tn{color:#265773}
+  .L-blue{border-left-color:var(--blue)} .L-blue .badge{background:#e0edf6;color:var(--blue)} .L-blue .tn{color:#1d4f6b}
+  .L-teal{border-left-color:var(--teal)} .L-teal .badge{background:#dbf1eb;color:var(--teal)} .L-teal .tn{color:#1c6b60}
+  .L-violet{border-left-color:var(--violet)} .L-violet .badge{background:#ece4f7;color:var(--violet)} .L-violet .tn{color:#553a8a}
+  .chips{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .chip{font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px;background:#e6f0f8;color:#1d4f6b;border:1px solid #cfe0ee;display:inline-flex;align-items:center;gap:5px}
+  .chip .n{font-weight:800;color:#7ea3bd}
+  .chip.hot{background:#fdeccf;color:#8a5316;border-color:var(--amber);font-weight:750}.chip.hot .n{color:#c9871f}
+  .ext{margin-top:16px;background:#fdf0ef;border:1.5px solid #f2c4c2;border-radius:16px;padding:14px 16px}
+  .ext .hh{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:750;color:#9a2f2e}
+  .ext .hh .ic{width:30px;height:30px;border-radius:9px;background:#fbe0de;color:var(--red);display:flex;align-items:center;justify-content:center}
+  .ext .hh .ic svg{width:18px;height:18px}
+  .ext .note{font-size:11.5px;color:#b06b6a;font-weight:500;margin-left:auto}
+  .apis{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+  .api{font-size:12px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid #f0cecc;color:#7a3b3a;display:inline-flex;align-items:center;gap:7px}
+  .api .dot{width:6px;height:6px;border-radius:50%;background:var(--red)}
+  .api b{color:#5f2a29;font-weight:700}
+  .foot{margin-top:18px;font-size:12.5px;color:var(--mute);text-align:center;font-style:italic;line-height:1.45}
+</style></head><body>
+  <div class="title">System architecture</div>
+  <div class="subtitle">A layered, n-tier view — each tier depends only on the one below it</div>
+
+  <div class="actor"><div class="who"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Procurement user <span class="sub">· browser</span></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="18"/><polyline points="6 13 12 19 18 13"/></svg></div>
+
+  <div class="tier L-slate"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div class="body1"><div class="tl">Tier 1 · Presentation</div><div class="tn">Web application</div><div class="tc">React 19 + TypeScript + Vite · Tailwind / shadcn-ui · Leaflet maps · i18n (EN / DE)</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="18"/><polyline points="6 13 12 19 18 13"/></svg></div>
+
+  <div class="tier L-sky"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="6" y1="17" x2="6.01" y2="17"/></svg></div><div class="body1"><div class="tl">Tier 2 · API</div><div class="tn">FastAPI backend</div><div class="tc">REST + Server-Sent-Events streaming · OAuth2 (Google / GitHub) + JWT</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="18"/><polyline points="6 13 12 19 18 13"/></svg></div>
+
+  <div class="tier L-blue"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M18 6a3 3 0 0 0-3 3v6a3 3 0 0 1-3 3"/><circle cx="18" cy="6" r="3"/></svg></div><div class="body1"><div class="tl">Tier 3 · Orchestration</div><div class="tn">Agent pipeline — LangGraph</div><div class="chips"><span class="chip"><span class="n">1</span>Parser</span><span class="chip"><span class="n">2</span>Discovery</span><span class="chip hot"><span class="n">3</span>Compliance</span><span class="chip"><span class="n">4</span>Ranking</span><span class="chip"><span class="n">5</span>Evaluator</span></div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="18"/><polyline points="6 13 12 19 18 13"/></svg></div>
+
+  <div class="tier L-teal"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><div class="body1"><div class="tl">Tier 4 · Core services</div><div class="tn">Shared services</div><div class="tc">LLM provider abstraction · Embeddings · Proactive rate limiter · Location enrichment · Query memory</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="18"/><polyline points="6 13 12 19 18 13"/></svg></div>
+
+  <div class="tier L-violet"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></div><div class="body1"><div class="tl">Tier 5 · Data &amp; persistence</div><div class="tn">Stores</div><div class="tc">PostgreSQL 16 + PostGIS · Milvus 2.4 (vectors) · Redis (cache, in-memory fallback)</div></div></div>
+
+  <div class="ext">
+    <div class="hh"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span> External APIs <span class="note">called by the orchestration &amp; core-service tiers</span></div>
+    <div class="apis">
+      <span class="api"><span class="dot"></span><b>OpenAI</b> gpt-4o-mini</span>
+      <span class="api"><span class="dot"></span><b>Voyage</b> voyage-3-lite</span>
+      <span class="api"><span class="dot"></span><b>Nominatim</b> / OSM</span>
+      <span class="api"><span class="dot"></span><b>Tavily</b></span>
+      <span class="api"><span class="dot"></span><b>Geoapify</b></span>
+      <span class="api"><span class="dot"></span><b>OpenSanctions</b></span>
+      <span class="api"><span class="dot"></span><b>OpenCorporates</b></span>
+    </div>
+  </div>
+  <div class="foot">The Compliance gate (amber) within the orchestration tier is the component the evaluation identifies as the source of the agentic advantage.</div>
+</body></html>

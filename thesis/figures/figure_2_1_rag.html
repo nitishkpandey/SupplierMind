@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root{--ink:#22303c;--mute:#5b6770;--line:#e6eaef;
+    --slate-bg:#eef2f6;--slate-bd:#64748b;--slate-tx:#3f4c5a;
+    --blue-bg:#e3eef7;--blue-bd:#2a6f97;--blue-tx:#1d4f6b;
+    --red-bg:#fbe0de;--red-bd:#e15554;--red-tx:#9a2f2e;
+    --green-bg:#dcf1ea;--green-bd:#2a9d8f;--green-tx:#1c6b60;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff}
+  body{width:700px;font-family:"Helvetica Neue",Arial,sans-serif;color:var(--ink);
+    padding:40px;-webkit-font-smoothing:antialiased}
+  .title{font-size:24px;font-weight:800;letter-spacing:-.3px}
+  .subtitle{font-size:14px;color:var(--mute);margin-top:5px;margin-bottom:22px}
+  .node{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;box-shadow:0 1px 2px rgba(20,40,60,.05),0 5px 14px rgba(20,40,60,.05)}
+  .badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 44px}
+  .badge svg{width:24px;height:24px}
+  .k{font-size:15.5px;font-weight:750;line-height:1.15}
+  .d{font-size:13px;color:var(--mute);margin-top:2px;line-height:1.35}
+  .r-slate .badge{background:var(--slate-bg);color:var(--slate-bd)} .r-slate .k{color:var(--slate-tx)}
+  .r-blue .badge{background:var(--blue-bg);color:var(--blue-bd)} .r-blue .k{color:var(--blue-tx)}
+  .r-red .badge{background:var(--red-bg);color:var(--red-bd)} .r-red .k{color:var(--red-tx)}
+  .r-green .badge{background:var(--green-bg);color:var(--green-bd)} .r-green .k{color:var(--green-tx)}
+  .dchev{display:flex;justify-content:center;color:#a7b3bf;margin:6px 0}
+  .dchev svg{width:26px;height:26px}
+  .chev{fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+  .foot{margin-top:22px;font-size:13px;color:var(--mute);text-align:center;font-style:italic;line-height:1.45}
+</style></head><body>
+  <div class="title">Retrieval-augmented generation (RAG)</div>
+  <div class="subtitle">Grounding a language model's answer in documents retrieved from a corpus</div>
+
+  <div class="node r-slate"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><div><div class="k">User query</div><div class="d">a natural-language request</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+  <div class="node r-blue"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg></div><div><div class="k">Embed query</div><div class="d">encode the text as a vector</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+  <div class="node r-blue"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></div><div><div class="k">Retrieve top-k documents</div><div class="d">the most similar records from the corpus</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+  <div class="node r-blue"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg></div><div><div class="k">Assemble prompt</div><div class="d">query + retrieved documents as context</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+  <div class="node r-red"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div><div><div class="k">Language model</div><div class="d">conditions its answer on the retrieved documents</div></div></div>
+  <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+  <div class="node r-green"><div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div><div class="k">Grounded answer</div><div class="d">based on real, checkable text</div></div></div>
+
+  <div class="foot">Retrieval replaces the model's parametric memory with real documents, removing the most flagrant hallucinations.</div>
+</body></html>

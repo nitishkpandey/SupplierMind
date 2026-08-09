@@ -58,17 +58,21 @@ the agentic machinery rather than to a different retriever.
 The agentic system, SupplierMind, is a pipeline of five specialised agents that
 parse the query, retrieve candidates, verify each constraint against evidence,
 rank the survivors deterministically, and judge the result, while recording an
-audit trail throughout. Its architecture is shown in Figure 4.1, and each agent is
+audit trail throughout. Its place in the overall system architecture is shown in
+Figure 4.1 (the five agents form the orchestration tier), and each agent is
 described in Section 4.3. The key point of contrast with P2 is that P3 does not
 simply retrieve and let the model pick; it filters on hard constraints, checks
 each claim against quoted evidence, and ranks by an explicit, deterministic score.
 
-![The SupplierMind (P3) architecture: the client and FastAPI backend feed a seven-step LangGraph agent pipeline (Parser, External and Internal Discovery, Compliance, Ranking, Evaluator, Finalize) backed by persistent stores and external model APIs.](figures/figure_4_1_architecture.png)
+![Layered technology architecture: a procurement user at the top, then a presentation layer (React/TypeScript), an API layer (FastAPI, OAuth2/JWT), a LangGraph agent-orchestration layer (Parser, Discovery, Compliance, Ranking, Evaluator), a core-services layer (LLM abstraction, embeddings, rate limiter, location enrichment, query memory), and a data layer (PostgreSQL/PostGIS, Milvus, Redis), with an external-APIs column (OpenAI, Voyage, Nominatim, Tavily, Geoapify, OpenSanctions, OpenCorporates).](figures/figure_4_1_layered_architecture.png)
 
-*Figure 4.1 — The SupplierMind (P3) architecture. The five reasoning agents (blue)
-run in a fixed LangGraph pipeline; the Compliance / quote-or-fail gate (amber) is the
-component the evaluation identifies as the source of the agentic advantage.
-Persistent stores are shown in violet and external model APIs in red.*
+*Figure 4.1 — The system architecture as a layered, n-tier stack. The procurement
+user sits at the top; each tier depends only on the one below it. The five-agent P3
+pipeline is the orchestration tier, in which the Compliance / quote-or-fail gate
+(amber) is the component the evaluation identifies as the source of the agentic
+advantage. External model and data APIs are called from the orchestration and
+core-service tiers. The specific technologies in each tier are detailed in
+Section 4.7.*
 
 ## 4.3 The SupplierMind agent pipeline
 
@@ -358,7 +362,7 @@ Alongside the twenty-five satisfiable queries, a five-query **abstention set**
 contains requests that have no correct answer by construction — for example, an
 aerospace certification requested of a logistics provider, or an impossible
 capacity threshold — each verified to match zero suppliers. Following the
-unanswerable-question methodology of Rajpurkar et al. (2018), these queries are not
+unanswerable-question methodology of Rajpurkar, Jia and Liang (2018), these queries are not
 scored on precision; they test whether a system correctly returns nothing rather
 than inventing a match.
 
@@ -397,7 +401,7 @@ returned suppliers that do not exist in the corpus) and a compliance-gate accura
 (the fraction of the agentic system's own PASS/FAIL verdicts that are true against
 the corpus). Results are reported with 95% bootstrap confidence intervals over the
 queries and, for the headline comparison, a paired bootstrap significance test on
-the per-query Precision@5 differences, following the guidance of Smucker et al.
+the per-query Precision@5 differences, following the guidance of Smucker, Allan and Carterette
 (2007).
 
 ## 4.6 Design choices and assumptions
@@ -432,6 +436,10 @@ containers, and the experiments were run from a local development machine on App
 Silicon (macOS). Dependencies are pinned with the `uv` package manager, database
 schema is versioned with Alembic migrations, and the code base includes an
 extensive suite of deterministic unit tests that require no live language model.
+These technologies map onto the layered architecture of Figure 4.1: the frontend is
+the presentation tier, FastAPI the API tier, LangGraph the orchestration tier, the
+provider and service abstractions the core-service tier, and PostgreSQL, Milvus, and
+Redis the data tier.
 
 Beyond the model and the databases, the system integrates a number of external
 APIs, listed in Table 4.1. It is important to distinguish those exercised by the

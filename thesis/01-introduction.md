@@ -86,7 +86,18 @@ The third is an **agentic system with verification**. Here a set of specialised
 components reason about the query, retrieve candidates, verify each constraint
 against quoted evidence, and produce a structured, ranked, and logged result. This
 is considerably more complex to build, but it is designed from the outset to be
-auditable.
+auditable. This third paradigm is realised in this dissertation as **SupplierMind**;
+Figure 1.1 shows what it does at a glance, and the full design is developed in
+Chapter 4.
+
+![SupplierMind at a glance: a multi-constraint procurement query passes through four stages — understand, retrieve, verify, rank — to produce an auditable shortlist, underpinned by three properties: grounded in governed data, evidence-verified, and fully auditable.](figures/figure_1_1_at_a_glance.png)
+
+*Figure 1.1 — SupplierMind at a glance. A procurement query with stacked constraints
+is parsed into machine-checkable fields, matched against the buyer's governed data,
+verified constraint-by-constraint against quoted evidence, and ranked
+deterministically into an auditable shortlist. The lower panel summarises the three
+properties — grounded, verified, auditable — that turn a list of names into a
+defensible procurement decision.*
 
 The gap this dissertation addresses is that, to the best of my knowledge, no
 published study has compared all three of these architectures head to head on the
@@ -105,7 +116,7 @@ retrieval literature and its evaluation frameworks, such as BEIR (Thakur et al.,
 faithfulness in open-domain question answering, but not the simultaneous
 satisfaction of several hard, structured constraints that defines a procurement
 query. And the mature literature on supplier selection in operations research and
-classical machine learning (Sanayei et al., 2010; Kar, 2015) predates large
+classical machine learning (Sanayei, Mousavi and Yazdankhah, 2010; Kar, 2015) predates large
 language models and treats the problem as ranking over a clean, structured table
 rather than as a natural-language discovery task with evidence-based verification.
 The three bodies of work that bear on this problem, in other words, do not meet at
@@ -185,7 +196,7 @@ agentic advantage to a specific mechanism rather than to the architecture as an
 undifferentiated whole, which is a more useful and more falsifiable form of
 result than "the agent won". The evaluation follows established
 information-retrieval practice for small, curated benchmarks (Järvelin and
-Kekäläinen, 2002; Buckley and Voorhees, 2004; Smucker et al., 2007), which makes
+Kekäläinen, 2002; Buckley and Voorhees, 2004; Smucker, Allan and Carterette, 2007), which makes
 the comparison defensible rather than anecdotal.
 
 ## 1.5 Scope and key challenges
@@ -264,7 +275,7 @@ The specific contributions of this dissertation are the following.
    satisfaction score that removes self-scoring bias, hallucination and abstention
    measures, parser intent-resolution accuracy, and clean latency and prompt-
    efficiency measurements, all reported with bootstrap confidence intervals and a
-   paired significance test (Smucker et al., 2007). The study also reports a
+   paired significance test (Smucker, Allan and Carterette, 2007). The study also reports a
    genuine negative result: on impossible queries the agentic system abstains less
    reliably than RAG, which is discussed openly rather than omitted.
 

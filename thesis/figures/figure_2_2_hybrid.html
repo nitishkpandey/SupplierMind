@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root{--ink:#22303c;--mute:#5b6770;--line:#e6eaef;
+    --slate-bg:#eef2f6;--slate-bd:#64748b;--slate-tx:#3f4c5a;
+    --blue-bg:#e3eef7;--blue-bd:#2a6f97;--blue-tx:#1d4f6b;
+    --violet-bg:#ece4f7;--violet-bd:#7b4fc0;--violet-tx:#553a8a;
+    --green-bg:#dcf1ea;--green-bd:#2a9d8f;--green-tx:#1c6b60;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff}
+  body{width:700px;font-family:"Helvetica Neue",Arial,sans-serif;color:var(--ink);
+    padding:40px;-webkit-font-smoothing:antialiased}
+  .title{font-size:24px;font-weight:800;letter-spacing:-.3px}
+  .subtitle{font-size:14px;color:var(--mute);margin-top:5px;margin-bottom:24px}
+  .wrap{display:flex;flex-direction:column;align-items:center}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 17px;
+    box-shadow:0 1px 2px rgba(20,40,60,.05),0 6px 16px rgba(20,40,60,.05);
+    display:flex;align-items:flex-start;gap:13px}
+  .card.center{width:100%;max-width:420px}
+  .badge{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 42px}
+  .badge svg{width:23px;height:23px}
+  .k{font-size:15px;font-weight:750;line-height:1.15}
+  .d{font-size:12.7px;color:var(--mute);line-height:1.4;margin-top:3px}
+  .r-slate .badge{background:var(--slate-bg);color:var(--slate-bd)} .r-slate .k{color:var(--slate-tx)}
+  .r-blue .badge{background:var(--blue-bg);color:var(--blue-bd)} .r-blue .k{color:var(--blue-tx)}
+  .r-violet .badge{background:var(--violet-bg);color:var(--violet-bd)} .r-violet .k{color:var(--violet-tx)}
+  .r-green .badge{background:var(--green-bg);color:var(--green-bd)} .r-green .k{color:var(--green-tx)}
+  .dchev{color:#a7b3bf;display:flex;justify-content:center;margin:7px 0}
+  .dchev svg{width:26px;height:26px}
+  .pbox{border:1.6px dashed #ccd6de;border-radius:20px;padding:16px 16px 18px;background:#fafbfc;width:100%;max-width:720px}
+  .plab{font-size:11px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:#93a1ae;text-align:center;margin-bottom:13px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .two .card{box-shadow:0 1px 2px rgba(20,40,60,.05),0 4px 12px rgba(20,40,60,.05)}
+  .foot{margin-top:24px;font-size:12.5px;color:var(--mute);text-align:center;font-style:italic}
+  .chev{fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+</style></head><body>
+  <div class="title">Hybrid retrieval</div>
+  <div class="subtitle">Fusing semantic search with structured filtering so each covers the other's weakness</div>
+  <div class="wrap">
+    <div class="card center r-slate">
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg></div>
+      <div><div class="k">Query with constraints</div><div class="d">meaning + hard thresholds (certification, capacity, location)</div></div>
+    </div>
+
+    <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+
+    <div class="pbox">
+      <div class="plab">Two strategies run in parallel</div>
+      <div class="two">
+        <div class="card r-blue">
+          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+          <div><div class="k">Semantic search</div><div class="d">vector similarity — captures meaning, but has no notion of a numeric threshold</div></div>
+        </div>
+        <div class="card r-violet">
+          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
+          <div><div class="k">Structured filter</div><div class="d">SQL predicates + geospatial — exact, but does not understand meaning</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+
+    <div class="card center r-blue">
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v3a6 6 0 0 0 6 6h3"/></svg></div>
+      <div><div class="k">Merge candidates</div><div class="d">combine both result sets</div></div>
+    </div>
+
+    <div class="dchev"><svg viewBox="0 0 24 24"><polyline class="chev" points="6 9 12 15 18 9"/></svg></div>
+
+    <div class="card center r-green">
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+      <div><div class="k">Candidate set — relevant and constraint-consistent</div><div class="d">both topically on-target and within the hard limits</div></div>
+    </div>
+  </div>
+  <div class="foot">Neither strategy suffices alone: similarity ignores thresholds, and filters ignore meaning.</div>
+</body></html>

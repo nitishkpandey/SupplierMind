@@ -42,7 +42,7 @@ constraint filtering, verifies each constraint against quoted evidence, ranks th
 survivors deterministically, and records a full audit trail of every decision.
 All three paradigms are measured on retrieval quality, constraint satisfaction,
 verifiability, and auditability, and the results are reported with bootstrap
-confidence intervals and a paired significance test (Smucker et al., 2007).
+confidence intervals and a paired significance test (Smucker, Allan and Carterette, 2007).
 
 The agentic architecture is significantly more precise than RAG, reaching a
 Precision@5 of 0.731 against 0.504 (a paired difference of +0.227 with a 95%
@@ -50,9 +50,12 @@ confidence interval of [0.126, 0.330]), and its advantage widens as queries stac
 more constraints. A component ablation localises this advantage to a single part
 of the system, the per-constraint verification gate: with the gate removed, the
 agentic pipeline scores below plain RAG, and restoring it raises Precision@5 by
-0.305, almost entirely on the hardest queries. The single-prompt baseline returns
-a supplier that does not exist in the corpus on every query, even when the request
-is fully specified. These gains are not free: the agentic system makes roughly
+0.305, almost entirely on the hardest queries. The same advantage holds against two
+further, independently built RAG baselines — a standard off-the-shelf framework and a
+stronger re-ranked pipeline — which both land close to the controlled RAG and well below
+the agentic system, confirming that the gain comes from verification rather than from a
+weak baseline or a better retriever. The single-prompt baseline returns a supplier that
+does not exist in the corpus on every query, even when the request is fully specified. These gains are not free: the agentic system makes roughly
 five times as many language-model calls and is several times slower than RAG. The
 study also reports an honest negative result — on impossible queries the agentic
 system abstains less reliably than RAG, returning near-misses rather than nothing.
