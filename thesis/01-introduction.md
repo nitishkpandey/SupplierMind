@@ -228,9 +228,13 @@ procedurally with documented parameters and a fixed seed, which yields exact,
 uncontestable ground truth but does not capture the messiness of real company
 data. The queries are in English, and the domain is procurement supplier
 discovery specifically. The primary language model is a single pinned model
-(OpenAI's gpt-4o-mini), chosen so that results are reproducible. These limits mean
-the work is best understood as a rigorous, reproducible case study rather than a
-universal claim about agents, and Chapter 6 returns to them in detail.
+(OpenAI's gpt-4o-mini), chosen so that results are reproducible. On the technical
+side, the study uses pretrained deep-learning models — transformer-based language and
+embedding models — as components; it does not train or design neural networks, and
+image-oriented architectures such as convolutional neural networks are out of scope,
+since the task is text-based rather than visual. These limits mean the work is best
+understood as a rigorous, reproducible case study rather than a universal claim about
+agents, and Chapter 6 returns to them in detail.
 
 ## 1.6 Contributions
 

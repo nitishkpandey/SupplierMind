@@ -119,26 +119,56 @@ bootstrap confidence intervals and a paired significance test.
 
 ## Reproduce the results
 
-The deterministic analyses need **no API keys and no cost** — they rebuild and
-verify the benchmark and recompute every metric from the archived run outputs:
+### For an examiner — see every result in one command (no API keys, no Docker, no cost)
+
+All five benchmark runs are committed to this repository, and the analysis is
+deterministic, so the entire results table can be recomputed from the archived
+outputs with nothing more than Python:
 
 ```bash
-python thesis/scripts/build_benchmark_10k.py     # build and verify the benchmark
-python thesis/scripts/compute_all_metrics.py     # headline metrics, CIs, significance test
-python thesis/scripts/analyze_diagnostics.py     # intent resolution, error taxonomy, tools, latency
+git clone https://github.com/nitishkpandey/SupplierMind.git
+cd SupplierMind
+pip install numpy
+
+python thesis/scripts/compute_all_metrics.py     # headline P1/P2/P3 table: P@5, MRR, nDCG, CSR, cost, latency, significance test
 python thesis/scripts/analyze_ablation.py        # the component-ablation ladder
 python thesis/scripts/analyze_abstention.py      # abstention scoring
+python thesis/scripts/analyze_diagnostics.py     # intent resolution, error taxonomy, tool use, latency
+python thesis/scripts/build_benchmark_10k.py     # rebuild and verify the benchmark from the fixed seed
 ```
 
-Regenerate the figures from the frozen results:
+`compute_all_metrics.py` prints the single-prompt (P1), RAG (P2), and SupplierMind
+(P3) comparison exactly as reported in Chapter 5, and writes `thesis/results/10k/METRICS.json`.
+
+### A note on P1 and P2 — there is no separate UI
+
+P1 (single-prompt LLM) and P2 (RAG) are **command-line baselines**, not interactive
+apps; the web interface is the P3 product (SupplierMind). Their numbers are what the
+analysis scripts above reproduce. To watch a baseline answer a single query live
+(this needs provider keys), run it from `apps/backend`:
+
+```bash
+cd apps/backend
+cp .env.example .env                   # add OPENAI_API_KEY  (P2 also needs VOYAGE_API_KEY + the vector store)
+
+# P1 — single-prompt, needs only OPENAI_API_KEY:
+uv run python -m experiments.paradigm1_singleprompt "ISO 9001 certified packaging supplier in Germany"
+
+# P2 — RAG, also needs the vector store up (docker compose ... up -d) and VOYAGE_API_KEY:
+uv run python -m experiments.paradigm2_rag "ISO 9001 certified packaging supplier in Germany"
+```
+
+### Regenerate the figures
 
 ```bash
 python thesis/scripts/make_figures.py            # Chapter 5 charts (5.1-5.6) from METRICS.json / ABLATION.txt / DIAGNOSTICS.txt
 python thesis/scripts/render_infographics.py     # HTML/CSS diagrams (Figs 1.1, 2.1-2.3, 4.1-4.2) to PNG (needs Google Chrome)
 ```
 
-Running the paradigms end-to-end (requires Docker and provider keys) executes the
-full benchmark five times, then the ablation, then the abstention set:
+### Run the full pipeline live (requires Docker + provider keys)
+
+This executes the full benchmark five times, then the ablation, then the abstention
+set:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml up -d
@@ -149,8 +179,18 @@ uv run python ../../thesis/scripts/run_10k_benchmark.py --p1 --p2 --p3 --abstent
 ```
 
 The embedding provider's free tier is auto-paced to 3 requests/minute by the rate
-limiter, so runs are stable but slow (~15–25 min each). No payment method is
-required.
+limiter, so runs are stable but slow (~15–25 min each). No payment method is required.
+
+### State-of-the-art baselines (Chapter 5, §5.9)
+
+The two additional RAG baselines are reproducible too. The off-the-shelf one is
+self-contained (only an OpenAI key; it builds its own index):
+
+```bash
+python -m pip install "llama-index-core>=0.11" llama-index-embeddings-openai
+OPENAI_API_KEY=... python thesis/scripts/run_offtheshelf_rag.py        # standard LlamaIndex RAG → Precision@5
+# RAG++ (dense pool + cross-encoder rerank) needs the live stack + keys; see thesis/scripts/run_rag_rerank.py
+```
 
 ## Thesis documents
 
