@@ -66,7 +66,11 @@ agentic paradigms for multi-constraint procurement supplier discovery. Second, i
 delivers a public, reproducible benchmark with baseline implementations of all
 three paradigms. Third, through the ablation, it provides evidence — rather than
 assertion — of exactly where and why the agentic overhead is justified, and where
-it is not. The significance of the work is that it reframes supplier discovery
+it is not. As a small methodological addition, the study introduces Verified
+Precision@k, which counts a returned supplier only when it is both correct and backed
+by verifiable evidence, and on which the agentic system scores 0.731 while RAG scores
+0.000 — a single number that captures the difference between a correct answer and a
+provable one. The significance of the work is that it reframes supplier discovery
 from a naming task, at which a chatbot is already competent, into a
 trust-and-governance task, and shows empirically that the verification layer,
 rather than retrieval or the agentic scaffolding in general, is what makes the

@@ -131,6 +131,7 @@ cd SupplierMind
 pip install numpy
 
 python thesis/scripts/compute_all_metrics.py     # headline P1/P2/P3 table: P@5, MRR, nDCG, CSR, cost, latency, significance test
+python thesis/scripts/compute_extra_metrics.py   # Verified Precision@5 and bpref (§5.2, §5.4)
 python thesis/scripts/analyze_ablation.py        # the component-ablation ladder
 python thesis/scripts/analyze_abstention.py      # abstention scoring
 python thesis/scripts/analyze_diagnostics.py     # intent resolution, error taxonomy, tool use, latency

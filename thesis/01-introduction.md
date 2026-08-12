@@ -279,9 +279,13 @@ The specific contributions of this dissertation are the following.
    satisfaction score that removes self-scoring bias, hallucination and abstention
    measures, parser intent-resolution accuracy, and clean latency and prompt-
    efficiency measurements, all reported with bootstrap confidence intervals and a
-   paired significance test (Smucker, Allan and Carterette, 2007). The study also reports a
-   genuine negative result: on impossible queries the agentic system abstains less
-   reliably than RAG, which is discussed openly rather than omitted.
+   paired significance test (Smucker, Allan and Carterette, 2007). It also introduces
+   **Verified Precision@k**, a small metric that counts a supplier only when it is both
+   correct and fully evidence-verified, so that correctness and provability are captured
+   in one number, and it adopts bpref (Buckley and Voorhees, 2004) to prepare the
+   evaluation for the incomplete relevance judgments of open-web discovery. The study
+   also reports a genuine negative result: on impossible queries the agentic system
+   abstains less reliably than RAG, which is discussed openly rather than omitted.
 
 The complete implementation, the benchmark and its baselines, and the scripts that
 reproduce every reported number are available in the project's public GitHub

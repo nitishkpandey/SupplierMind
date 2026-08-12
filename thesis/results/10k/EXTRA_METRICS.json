@@ -1,0 +1,33 @@
+{
+  "corpus_size": 10000,
+  "n_runs": 5,
+  "systems": {
+    "suppliermind": {
+      "verified_precision_at_5": 0.7312,
+      "bpref": 0.3445,
+      "bpref_by_tier": {
+        "simple": 0.071,
+        "medium": 0.397,
+        "hard": 0.582
+      }
+    },
+    "p2_rag": {
+      "verified_precision_at_5": 0.0,
+      "bpref": 0.1405,
+      "bpref_by_tier": {
+        "simple": 0.071,
+        "medium": 0.157,
+        "hard": 0.197
+      }
+    },
+    "p1_singleprompt": {
+      "verified_precision_at_5": 0.0,
+      "bpref": 0.0,
+      "bpref_by_tier": {
+        "simple": 0.0,
+        "medium": 0.0,
+        "hard": 0.0
+      }
+    }
+  }
+}

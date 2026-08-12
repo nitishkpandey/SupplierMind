@@ -135,7 +135,11 @@ find, validate, and screen new suppliers from the web is its most distinctive
 capability and the one the current benchmark does not measure, and an evaluation that
 scores web-discovered suppliers on verifiability — a real source, a validated
 address, a sanctions clearance — would turn an architectural argument into measured
-evidence. The third is to **scale the benchmark**: a larger, multi-annotator query
+evidence. Because the open web cannot be exhaustively labelled, that experiment should
+be scored with bpref (Buckley and Voorhees, 2004), the binary-preference metric already
+introduced in Section 5.2, which judges a system on labelled documents only and so does
+not penalise a genuinely qualified but unlabelled supplier — the pitfall that standard
+precision and recall fall into under incomplete judgments. The third is to **scale the benchmark**: a larger, multi-annotator query
 set with inter-annotator agreement, and ideally a real rather than synthetic corpus,
 would raise the external validity of the findings. The fourth is a concrete
 engineering fix suggested directly by the abstention result: a **hard-abstain

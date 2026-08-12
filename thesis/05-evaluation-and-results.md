@@ -108,6 +108,30 @@ recall figures are low for both systems by construction, because a simple query 
 this corpus can have more than a hundred correct answers, so five slots cannot cover
 many of them; this is why precision, not recall, is the measure to rely on here.
 
+That recall limitation is worth pinning down with one further metric, because it also
+signals how the evaluation will have to change once discovery moves to the open web.
+**bpref** (Buckley and Voorhees, 2004) is a binary-preference metric built for exactly
+this situation: it scores a system on judged documents only, counting how often a
+judged-relevant supplier is ranked above a judged-non-relevant one, so that
+relevant-but-unjudged results are not punished. With $R$ judged-relevant and $N$
+judged-non-relevant documents for a query,
+
+$$\text{bpref} = \frac{1}{R}\sum_{r}\left(1 - \frac{|\{n \text{ ranked above } r\}|}{\min(R,N)}\right),$$
+
+where $r$ ranges over the retrieved relevant suppliers and $n$ over the retrieved
+non-relevant ones. On this benchmark the agentic system scores 0.344 against RAG's
+0.140 and the single-prompt baseline's 0.000, so bpref agrees with the headline result
+that the agentic system is clearly ahead, and the gap is widest on the medium and hard
+queries (0.397 against 0.157, and 0.582 against 0.197) where the constraints bite. The
+scores are low on simple queries (0.071 for both) for the same structural reason recall
+is low — a query with more than a hundred correct answers cannot be covered by a
+five-supplier shortlist. bpref is reported for two reasons: it confirms the ranking
+result with a metric drawn from the incomplete-judgments literature, and it is the
+metric intended for the future web-discovery experiment (Section 6.6), where the corpus
+is the open web, relevance judgments are necessarily incomplete, and a metric that
+treated every unjudged supplier as wrong would unfairly penalise a system that finds a
+genuinely qualified but unlabelled supplier.
+
 The two CSR figures deserve comment. The agentic system's native CSR (0.954) exceeds
 RAG's (0.877), but the native figure is read from the system's own verdicts. Under
 the harmonised scorer, which scores every system identically, the gap narrows to
@@ -157,6 +181,7 @@ links every suggestion to evidence and keeps a queryable reasoning log.
 | Evidence-link ratio | 1.0 | 1.0 | 0.0 |
 | Compliance-gate accuracy | 0.995 (PASS precision 0.994, recall 1.000) | — | — |
 | Entity-hallucination rate | ~0 | ~0 | 1.000 |
+| Verified Precision@5 | 0.731 | 0.000 | 0.000 |
 
 *Table 5.3 — Auditability, verifiability, and hallucination.*
 
@@ -184,6 +209,30 @@ better prompting. The retrieval and agentic systems are immune to this failure m
 by construction, since they can only return real corpus suppliers. Together these
 findings support hypothesis H2: auditability and verifiability are highest for the
 agentic system, lowest for the single-prompt approach, with RAG in between.
+
+The last row of Table 5.3 ties the two threads of this section — correctness and
+verifiability — into a single number. Ordinary precision asks only whether a returned
+supplier is correct; it says nothing about whether that supplier's claims can be
+proven. Because a procurement decision has to be defensible, this dissertation also
+reports **Verified Precision@k**, which counts a returned supplier only if it is *both*
+relevant *and* fully evidence-verified — that is, only if every one of its constraints
+passed the quote-or-fail gate with a valid quotation. Writing $\mathrm{rel}_i$ for
+whether the item at rank $i$ is relevant and $\mathrm{ver}_i$ for whether it is fully
+verified,
+
+$$\text{Verified Precision@}k = \frac{1}{k}\sum_{i=1}^{k}\mathrm{rel}_i \cdot \mathrm{ver}_i .$$
+
+The effect is stark. The agentic system reaches a Verified Precision@5 of 0.731 —
+identical to its ordinary precision, because everything it returns is also proven —
+while RAG drops from 0.504 to 0.000 and the single-prompt baseline stays at 0.000.
+The reading is deliberately blunt, and it is important to be clear about why RAG scores
+zero: it is not that its suppliers are wrong, but that RAG produces no per-constraint
+verification at all, so none of its answers arrives with evidence a buyer could show an
+auditor. In a governed setting an unprovable answer cannot be used, which is exactly
+what the metric records. Verified Precision@k is thus the single number that expresses
+the central argument of the thesis — that being correct is not the same as being
+provable — and, to the best of my knowledge, folding per-claim verification into a
+retrieval precision in this way is a small metric contribution of this work.
 
 ## 5.5 Abstention: an honest negative result (RQ2 and RQ3)
 
