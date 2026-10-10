@@ -129,12 +129,15 @@ The product application can search every active supplier row: approved
 database suppliers, the 10k synthetic scale set, personal saves, and eligible
 pending-review web discoveries when the user chooses web discovery.
 
-The thesis evaluator intentionally does not use that dynamic corpus. It loads
-the frozen IDs from `apps/backend/data/suppliers_synthetic.json` through
-`app.evaluation.corpus.benchmark_supplier_ids()` and passes them into P1/P2/P3
-retrieval. SQL baselines use `Supplier.id IN (...)`; Milvus/Chroma searches use
-the same optional allowlist before candidate ranking. This keeps SupplierBench
-metrics reproducible even after product-scale data is loaded.
+The current application evaluator uses the curated demonstration corpus from
+`apps/backend/data/suppliers_synthetic.json`. It is useful for local regression
+checks but is not the source of the published thesis numbers.
+
+The published thesis analysis is isolated under `thesis/`. SupplierBench-24
+uses the frozen 10,000-supplier synthetic corpus and sanitized archived outputs
+from the historical experimental implementation. Its offline scripts recompute
+metrics and figures without reading the live database or vector index, so
+product data cannot contaminate the reported results.
 
 ## AI data egress and budgets
 

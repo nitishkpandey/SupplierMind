@@ -19,13 +19,15 @@ the final benchmark. Treat later exploratory analysis as exploratory.
 
 ### Track A: frozen thesis benchmark
 
-Use the committed SupplierBench corpus and query set. Freeze the commit, model,
-prompt versions, tool configuration, corpus version, temperature, random seed
-where supported, and evaluation code. Compare P1, P2, and P3 on the same inputs
-and ground truth.
+The published study uses SupplierBench-24 under `thesis/benchmark/` with the
+frozen 10,000-supplier synthetic corpus. The public package freezes source
+commits, model identifiers, run archives, corpus and benchmark hashes, and
+analysis code. It compares P1, P2, and P3 on the same inputs and ground truth.
 
-This track supports causal comparison, reproducibility, confidence intervals,
-and thesis claims.
+This track supports paired comparison, offline reproducibility, confidence
+intervals, and thesis claims. It does not establish a fully controlled causal
+effect for query difficulty because tier labels combine constraint count and
+selectivity.
 
 ### Track B: live production validation
 

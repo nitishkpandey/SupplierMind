@@ -1,0 +1,240 @@
+{
+  "runs": [
+    "run_20260723T160111_r1.json",
+    "run_20260723T162433_r2.json",
+    "run_20260723T163443_r3.json",
+    "run_20260723T164314_r4.json",
+    "run_20260723T165120_r5.json"
+  ],
+  "n_runs": 5,
+  "systems": {
+    "suppliermind": {
+      "p5": {
+        "mean": 0.7467,
+        "sd": 0.2795,
+        "ci95": [
+          0.6333,
+          0.8533
+        ]
+      },
+      "mrr": {
+        "mean": 0.9833,
+        "sd": 0.0816,
+        "ci95": [
+          0.95,
+          1.0
+        ]
+      },
+      "csr": {
+        "mean": 0.9569,
+        "sd": 0.055,
+        "ci95": [
+          0.934,
+          0.9772
+        ]
+      },
+      "hcsr": {
+        "mean": 0.9353,
+        "sd": 0.0891,
+        "ci95": [
+          0.8967,
+          0.9663
+        ]
+      },
+      "answer": {
+        "mean": 0.9833,
+        "sd": 0.0816
+      },
+      "recall5": {
+        "mean": 0.353,
+        "sd": 0.286
+      },
+      "recall10": {
+        "mean": 0.353,
+        "sd": 0.286
+      },
+      "ndcg5": {
+        "mean": 0.8067,
+        "sd": 0.225
+      },
+      "map5": {
+        "mean": 0.7464,
+        "sd": 0.2871
+      },
+      "succ1": {
+        "mean": 0.9833,
+        "sd": 0.0816
+      },
+      "cost": {
+        "mean": 0.0014,
+        "sd": 0.0003
+      },
+      "latency_ms_raw": 21548.0,
+      "latency_ms_pacing_min": 11227.0,
+      "cost_per_correct": 0.000375,
+      "p5_by_tier": {
+        "simple": 0.95,
+        "medium": 0.664,
+        "hard": 0.6133
+      }
+    },
+    "p2_rag": {
+      "p5": {
+        "mean": 0.5167,
+        "sd": 0.404,
+        "ci95": [
+          0.3583,
+          0.675
+        ]
+      },
+      "mrr": {
+        "mean": 0.7847,
+        "sd": 0.3946,
+        "ci95": [
+          0.6181,
+          0.9306
+        ]
+      },
+      "csr": {
+        "mean": 0.8719,
+        "sd": 0.1763,
+        "ci95": [
+          0.8003,
+          0.9372
+        ]
+      },
+      "hcsr": {
+        "mean": 0.9135,
+        "sd": 0.1179,
+        "ci95": [
+          0.8656,
+          0.9569
+        ]
+      },
+      "answer": {
+        "mean": 1.0,
+        "sd": 0.0
+      },
+      "recall5": {
+        "mean": 0.1494,
+        "sd": 0.1349
+      },
+      "recall10": {
+        "mean": 0.1494,
+        "sd": 0.1349
+      },
+      "ndcg5": {
+        "mean": 0.5679,
+        "sd": 0.382
+      },
+      "map5": {
+        "mean": 0.5021,
+        "sd": 0.4115
+      },
+      "succ1": {
+        "mean": 0.75,
+        "sd": 0.4423
+      },
+      "cost": {
+        "mean": 0.0003,
+        "sd": 0.0
+      },
+      "latency_ms_raw": 2876.0,
+      "latency_ms_pacing_min": 2253.0,
+      "cost_per_correct": 0.000116,
+      "p5_by_tier": {
+        "simple": 0.95,
+        "medium": 0.34,
+        "hard": 0.2333
+      }
+    },
+    "p1_singleprompt": {
+      "p5": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "mrr": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "csr": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "hcsr": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "answer": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "recall5": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "recall10": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "ndcg5": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "map5": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "succ1": {
+        "mean": 0.0,
+        "sd": 0.0
+      },
+      "cost": {
+        "mean": 0.0002,
+        "sd": 0.0
+      },
+      "latency_ms_raw": 3479.0,
+      "latency_ms_pacing_min": 2865.0,
+      "p5_by_tier": {
+        "simple": 0.0,
+        "medium": 0.0,
+        "hard": 0.0
+      }
+    }
+  },
+  "p3_gate_accuracy": 0.995,
+  "p3_gate_pass_precision": 0.9932,
+  "p3_gate_pass_recall": 1.0,
+  "p3_ask_rate": 0.3583,
+  "p3_ask_rate_by_tier": {
+    "simple": "38/40",
+    "medium": "5/50",
+    "hard": "0/30"
+  },
+  "p1_entity_hallucination": 1.0,
+  "sig_p3_vs_p2_p5": {
+    "n_queries": 24,
+    "mean_diff": 0.23,
+    "ci95": [
+      0.1233,
+      0.3367
+    ],
+    "bootstrap_p": 0.0
+  }
+}

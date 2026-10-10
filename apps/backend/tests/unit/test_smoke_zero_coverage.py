@@ -4,6 +4,7 @@
 Goal is breakage-detection before later refactors, not full coverage: one
 happy-path each, all external services mocked, each well under 5s.
 """
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -28,15 +29,46 @@ async def test_inmemory_cache_set_get_delete_roundtrip():
 
 # ── app/evaluation/report.py ─────────────────────────────────────────
 def test_generate_thesis_report_smoke(tmp_path, monkeypatch):
-    """generate_thesis_report builds a report dict from real results JSON.
-
-    Uses the committed evaluation_results.json (schema-stable) as input and
-    redirects the output file to tmp so the real thesis_report.json is not
-    overwritten.
-    """
+    """generate_thesis_report builds a report from a schema-valid result."""
     from app.evaluation import report
 
-    results_path = BACKEND / "data" / "evaluation_results.json"
+    results_path = tmp_path / "evaluation_results.json"
+    results_path.write_text(
+        json.dumps(
+            {
+                "run_id": "smoke-run",
+                "timestamp": "2026-09-02T00:00:00Z",
+                "query_count": 1,
+                "aggregated": {
+                    "suppliermind": {
+                        "mean_precision_at_5": 1.0,
+                        "std_precision_at_5": 0.0,
+                        "mean_csr": 1.0,
+                        "std_csr": 0.0,
+                        "mean_reciprocal_rank": 1.0,
+                        "std_mrr": 0.0,
+                        "mean_execution_time_ms": 1000.0,
+                        "std_execution_time_ms": 0.0,
+                        "simple_p5": 1.0,
+                        "medium_p5": 0.0,
+                        "hard_p5": 0.0,
+                    }
+                },
+                "per_query_metrics": {
+                    "suppliermind": [
+                        {
+                            "query_number": 1,
+                            "difficulty": "simple",
+                            "precision_at_5": 1.0,
+                            "constraint_satisfaction_rate": 1.0,
+                            "execution_time_ms": 1000,
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(report, "REPORT_FILE", tmp_path / "thesis_report.json")
 
     out = report.generate_thesis_report(results_path)

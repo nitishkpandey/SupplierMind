@@ -4,7 +4,7 @@
 
 This record closes the AI data-egress, budget, durable usage, admin metrics, and
 dashboard slice described by
-`docs/superpowers/plans/2026-07-29-ai-gateway-and-usage-observability.md`.
+`docs/adr/ADR-003-ai-data-egress-and-usage.md`.
 
 ## Verification evidence
 

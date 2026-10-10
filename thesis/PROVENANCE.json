@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "study": "SupplierBench-24 on the 10,000-supplier synthetic corpus",
+  "analysis_type": "Post hoc removal of one exact duplicate query followed by offline recomputation",
+  "source_repository_commit": "9820863add00c82515d53b3537a562a707123913",
+  "production_base_commit": "d7db1d39f29539fda3190b93dd3456147dc6fd77",
+  "excluded_query_id": "49554c47-ef51-554a-8404-be6b6761b6ca",
+  "duplicate_of_query_id": "56c444e6-f04e-5334-a964-dfb03810507a",
+  "model_identifiers": {
+    "language_model": "gpt-4o-mini-2024-07-18",
+    "embedding_model": "voyage-3-lite"
+  },
+  "archive_counts": {
+    "main_runs": 5,
+    "ablation_runs": 3,
+    "abstention_runs": 1
+  },
+  "files": {
+    "apps/backend/data/suppliers_synthetic_10k.json": {
+      "sha256": "5cb80e154378e7839a8d5b91b12021f66d1d6ca5f868a0ce7044fd7a871ad962",
+      "bytes": 11680663
+    },
+    "thesis/benchmark/abstention5_10k.json": {
+      "sha256": "91d5e8cb3ce8566504699c1f7d5e963bfd08f0403b81cfb08ea9ddc98cd1733b",
+      "bytes": 2088
+    },
+    "thesis/benchmark/supplierbench24_10k.json": {
+      "sha256": "06ef055883b49fecb780ebba7a220ed8852ad6c0df5f58595aec7e1d70bd1da9",
+      "bytes": 80738
+    },
+    "thesis/EXCLUSION.json": {
+      "sha256": "cac35f39e7996c32927878b67da14d06e81f1a90bf1eb65c6b3b5207ec9de0d2",
+      "bytes": 832
+    },
+    "thesis/results/main/run_20260723T160111_r1.json": {
+      "sha256": "13ea12fd63cf435f9c4b7528349196593ad3cdc295b7ef2ff53923c7a4859a7d",
+      "bytes": 774059
+    },
+    "thesis/results/main/run_20260723T162433_r2.json": {
+      "sha256": "2f6a6a959400f32e0286e25080eee3bed4fd46314d56265031335b9afc36d668",
+      "bytes": 787044
+    },
+    "thesis/results/main/run_20260723T163443_r3.json": {
+      "sha256": "a36820fd7dd62ec29f2194fbe485f5f1d5b85142ae2472c5a397386f94ff708d",
+      "bytes": 789213
+    },
+    "thesis/results/main/run_20260723T164314_r4.json": {
+      "sha256": "a3096a6b8275eab5089dc2ed3e35688d06c739fe9593f5a555b0c8a300e35658",
+      "bytes": 781599
+    },
+    "thesis/results/main/run_20260723T165120_r5.json": {
+      "sha256": "4a82650b1f9bb55de2ba2169ad9dd5760a79565353f11a7f51ef73cf4e2352c1",
+      "bytes": 786141
+    },
+    "thesis/results/ablation/run_20260723T165906_r1.json": {
+      "sha256": "4ad81236b14b4aac8fdc130c5ec8bd85fc801942c114d7fbd091818c39f9f84e",
+      "bytes": 253569
+    },
+    "thesis/results/ablation/run_20260723T172124_r2.json": {
+      "sha256": "91e694fdd99aaf328f26fbf6374b2076a469f654344ca60e505bec964d394971",
+      "bytes": 260808
+    },
+    "thesis/results/ablation/run_20260723T173001_r3.json": {
+      "sha256": "875f277930fb711e82fcfdfdcd852fcd0de2a238bdae37e2e54cdc442abab204",
+      "bytes": 256483
+    },
+    "thesis/results/abstention/run_20260723T150831_r1.json": {
+      "sha256": "0dd6a3425670d8642500762a0ed83a355f4e68bbb9f9f7184aaffbfcd6a2b022",
+      "bytes": 65380
+    },
+    "thesis/results/METRICS.json": {
+      "sha256": "f65f00ea4b33507b2927cff74fccd350a76113e902cc509aaad28cb7f5e962c3",
+      "bytes": 4276
+    },
+    "thesis/results/EXTRA_METRICS.json": {
+      "sha256": "9bb69c01415f3f46e823c477304b3189420edd26d3a8cd7f2103740a7d718f04",
+      "bytes": 636
+    },
+    "thesis/results/DIAGNOSTICS.txt": {
+      "sha256": "def71d9b71d5faf7427c0e9676a95e04693212544fda01b4823e983074b52e4b",
+      "bytes": 1725
+    },
+    "thesis/results/ABLATION.txt": {
+      "sha256": "ec43d5385a3a9e12c4fcca398592c090d016b7ecc71ae630aadec2a0757b30fc",
+      "bytes": 740
+    },
+    "thesis/results/ABSTENTION.txt": {
+      "sha256": "519cf7645ae2db7357c8f4ccd21bdf205f965ce3ebe796d67d392c0a6892bf9c",
+      "bytes": 703
+    },
+    "thesis/scripts/analyze_ablation.py": {
+      "sha256": "fbf2748048311be04e6c3ef6d9b9993e47b158f8c42fafe32ae579af38044226",
+      "bytes": 3791
+    },
+    "thesis/scripts/analyze_abstention.py": {
+      "sha256": "6a50a5e671cebf2735d8f217a0122f355d6c354cab10bdef2dbb33bdcd45af01",
+      "bytes": 2735
+    },
+    "thesis/scripts/analyze_diagnostics.py": {
+      "sha256": "f3c89e1eede27024b1c48f9adebe5909c39c7b0c99328a838b33ee867d456ec2",
+      "bytes": 7762
+    },
+    "thesis/scripts/build_provenance.py": {
+      "sha256": "b2e210f64a36fc237720aedd3a6d01b4a8a39c671fb337386c29ee4a2e7092d4",
+      "bytes": 2363
+    },
+    "thesis/scripts/compute_all_metrics.py": {
+      "sha256": "141a3371ad14bfe6ae8a41e8ec4058fcaef1704ff332ec5e66b6c52e0433bd6c",
+      "bytes": 16172
+    },
+    "thesis/scripts/compute_extra_metrics.py": {
+      "sha256": "0636f10484c200960eda42338dfb3c3b5f48b6fbff0bc936fc1c0479066d835f",
+      "bytes": 4188
+    },
+    "thesis/scripts/make_figures.py": {
+      "sha256": "599f52718a65c4c622c40758a879882dbd660dce36cc506cbd22144292165ca6",
+      "bytes": 15153
+    },
+    "thesis/scripts/prepare_reproduction.py": {
+      "sha256": "1374b86b9e5db0b8873a0a643c315ca150a6f535502593d6d8a507d04371fad7",
+      "bytes": 6201
+    },
+    "thesis/scripts/reproduce.py": {
+      "sha256": "732003dcc6ec78b445fb625e95758b9bba607db7ae5f8b902fcd2551634da4b7",
+      "bytes": 2769
+    },
+    "thesis/scripts/verify_reproduction.py": {
+      "sha256": "863d12a1b6c3ffb6ac6d1cdb5a91d688765f79001e2008f40c8c8652ca73c3d3",
+      "bytes": 4103
+    }
+  }
+}

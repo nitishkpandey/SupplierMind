@@ -1,0 +1,13 @@
+==================================================================
+Abstention-5 (unsatisfiable queries) — 1 run(s), 5 queries each
+==================================================================
+
+system                correct-abstention   hallucination
+------------------------------------------------------------------
+P3 SupplierMind                    0.40            0.60   (wanted to clarify 0/5)
+P2 RAG                             0.80            0.20
+P1 single-prompt                   0.00            1.00
+
+Reading: higher correct-abstention = better; RAG cannot abstain (always
+returns its top-k), single-prompt invents names, the agentic gate should
+reject everything and return nothing.

@@ -7,6 +7,10 @@ Documents/
 
 # --- DEMO / SMOKE-TEST OUTPUT (local only, portable path) ---
 demo_output/
+/results/
+apps/backend/data/evaluation_checkpoint.json
+apps/backend/data/evaluation_results.json
+apps/backend/data/thesis_report.json
 
 # --- SECRETS (NEVER commit these) ---
 .env
@@ -72,6 +76,7 @@ docs/verification/07_*
 docs/verification/08_*
 docs/verification/09_*
 docs/superpowers/
+docs/supervisor/
 codebase_walkthrough.md
 known_bugs_to_triage.md
 *_sprint_plan.md

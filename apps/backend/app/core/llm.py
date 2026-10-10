@@ -272,6 +272,7 @@ class OpenAIProvider(_UsageTracking):
                 0.1,
                 timeout - (time.monotonic() - call_started),
             )
+        # pyrefly: ignore [no-matching-overload]
         response = self._client.chat.completions.create(
             model=resolved_model,
             messages=messages,  # type: ignore[arg-type]

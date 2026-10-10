@@ -1,0 +1,27 @@
+{
+  "reason": "Exact duplicate query removed before analysis",
+  "excluded_query_id": "49554c47-ef51-554a-8404-be6b6761b6ca",
+  "excluded_source_query_number": 22,
+  "duplicate_of_query_id": "56c444e6-f04e-5334-a964-dfb03810507a",
+  "duplicate_of_source_query_number": 13,
+  "original_query_count": 25,
+  "corrected_query_count": 24,
+  "renumbering": "Source queries 23 to 25 become corrected queries 22 to 24",
+  "runs": {
+    "main": [
+      "run_20260723T160111_r1.json",
+      "run_20260723T162433_r2.json",
+      "run_20260723T163443_r3.json",
+      "run_20260723T164314_r4.json",
+      "run_20260723T165120_r5.json"
+    ],
+    "ablation": [
+      "run_20260723T165906_r1.json",
+      "run_20260723T172124_r2.json",
+      "run_20260723T173001_r3.json"
+    ],
+    "abstention": [
+      "run_20260723T150831_r1.json"
+    ]
+  }
+}

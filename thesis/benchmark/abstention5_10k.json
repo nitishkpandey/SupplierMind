@@ -1,0 +1,80 @@
+[
+  {
+    "id": "f23c3798-05d3-506f-85a9-f5a46d89a531",
+    "query_number": 1,
+    "raw_query": "AS9100 aerospace-certified logistics providers in Germany",
+    "difficulty": "unsatisfiable",
+    "constraints": {
+      "category": "logistics",
+      "country": "Germany",
+      "certs": [
+        "AS9100"
+      ]
+    },
+    "ground_truth_supplier_ids": [],
+    "ground_truth_count": 0
+  },
+  {
+    "id": "b1324440-c198-5027-940f-8525c7d917e6",
+    "query_number": 2,
+    "raw_query": "ISO 27001 and IATF 16949 automotive-certified software services in Germany",
+    "difficulty": "unsatisfiable",
+    "constraints": {
+      "category": "software_services",
+      "country": "Germany",
+      "certs": [
+        "ISO 27001",
+        "IATF 16949"
+      ]
+    },
+    "ground_truth_supplier_ids": [],
+    "ground_truth_count": 0
+  },
+  {
+    "id": "a53855b1-b852-5271-8524-45e431bfe5ac",
+    "query_number": 3,
+    "raw_query": "IATF 16949 automotive-certified food ingredient suppliers in Germany",
+    "difficulty": "unsatisfiable",
+    "constraints": {
+      "category": "food_ingredients",
+      "country": "Germany",
+      "certs": [
+        "IATF 16949"
+      ]
+    },
+    "ground_truth_supplier_ids": [],
+    "ground_truth_count": 0
+  },
+  {
+    "id": "18f3c31e-dcb8-5d7e-8f16-71599c07f7b1",
+    "query_number": 4,
+    "raw_query": "ISO 9001 metal suppliers in Germany with capacity over 999,999,999 kg/month",
+    "difficulty": "unsatisfiable",
+    "constraints": {
+      "category": "metals",
+      "country": "Germany",
+      "certs": [
+        "ISO 9001"
+      ],
+      "min_cap": 999999999,
+      "cap_unit": "kg/month"
+    },
+    "ground_truth_supplier_ids": [],
+    "ground_truth_count": 0
+  },
+  {
+    "id": "eb8018f8-92ba-52ea-ae8d-a1959d1af688",
+    "query_number": 5,
+    "raw_query": "ISO 14001 certified textile suppliers in Iceland",
+    "difficulty": "unsatisfiable",
+    "constraints": {
+      "category": "textiles",
+      "country": "Iceland",
+      "certs": [
+        "ISO 14001"
+      ]
+    },
+    "ground_truth_supplier_ids": [],
+    "ground_truth_count": 0
+  }
+]

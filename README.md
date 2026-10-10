@@ -2,7 +2,8 @@
 
 > **Multi-Agent LLM-Based Supplier Discovery for Procurement Under Multi-Constraint Requirements**
 
-**Master's Thesis** | Gisma University of Applied Sciences | Mercanis GmbH  
+**Master's Thesis** | Gisma University of Applied Sciences | Mercanis (Cdc3 GmbH)
+
 **Author:** Nitish Kumar Pandey | Student ID: GH1039520
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
@@ -116,7 +117,7 @@ cd apps/backend
 pip install uv
 uv sync
 uv run alembic upgrade head
-# Load the small SupplierBench-25 demo corpus:
+# Load the small local demonstration corpus. This is not the published thesis benchmark:
 uv run python scripts/ingest_suppliers.py
 
 # Load the full synthetic 10k corpus into the active Postgres database.
@@ -142,6 +143,8 @@ npm run dev
 ```
 
 ### Run Evaluation
+
+The application evaluator below is intended for local product experiments. Its generated files under `apps/backend/data/` are runtime outputs and are not the evidence package used for the published thesis results.
 
 ```bash
 cd apps/backend
@@ -245,13 +248,13 @@ Design decisions and the shared output contract are documented in
 
 SupplierMind is maintained for two related but separate goals:
 
-| Mode | Branch intent | Supplier corpus |
+| Mode | Purpose | Supplier corpus |
 |---|---|---|
-| Product / production | Active product UX and company-ready discovery workflow | All active suppliers in PostgreSQL, including the 10k synthetic scale set and eligible web-discovered pending-review rows |
-| Master's thesis | Reproducible P1/P2/P3 evaluation | Frozen curated SupplierBench supplier IDs from `apps/backend/data/suppliers_synthetic.json` |
+| Product application | Active product UX and company-ready discovery workflow | Active PostgreSQL suppliers, including synthetic scale data and eligible reviewed discoveries |
+| Local evaluator | Development checks for current application behavior | Curated local demonstration corpus |
+| Published thesis | Offline reproduction of the reported P1, P2, and P3 comparison | Frozen 10,000-supplier synthetic corpus and SupplierBench-24 archives under `thesis/` |
 
-The evaluation runner enforces the curated thesis corpus explicitly, so loading
-the 10k product corpus does not silently contaminate benchmark metrics.
+The published thesis package is deliberately isolated from the current application evaluator. Running the product evaluator cannot overwrite or silently change the archived thesis observations.
 
 ## Repository Map
 
@@ -265,7 +268,7 @@ SupplierMind/
 |  |  |  |- api/v1/            REST + SSE endpoints (queries, clarifications, admin)
 |  |  |  |- core/              LLM providers, embeddings, vector store, rate limiter
 |  |  |  |- db/                SQLAlchemy models, repositories, Alembic migrations
-|  |  |  |- evaluation/        SupplierBench-25 harness, metrics, report
+|  |  |  |- evaluation/        Local evaluation harness, metrics, report
 |  |  |  '- services/          Geoapify location enrichment, ingestion, query memory
 |  |  |- experiments/          P1 + P2 baseline paradigms
 |  |  |- data/                 Synthetic corpus generators (fixed seed 42) + benchmark queries
@@ -277,21 +280,30 @@ SupplierMind/
 |  '- k8s/                  Kubernetes manifests (namespace, deployments, secrets example)
 |- docs/
 |  |- adr/                  Architecture decision records
-|  |- supervisor/           Thesis materials for the supervisor
-|  '- verification/         Verification record (provider, traces, benchmark lock)
-|- results/                 Current benchmark archives + diagnostics
-|- scripts/                 reproduce_benchmark.ps1 — repo-level benchmark runner
+|  |- research/             Evaluation protocol
+|  '- verification/         Production release verification
+|- thesis/                  Published offline reproduction package
+|- scripts/                 Release and local evaluation helpers
 '- root files               README, ARCHITECTURE, BENCHMARK, CONTRIBUTING, LICENSE, package.json
 ```
 
 ## Thesis
 
-Link to the thesis document: _placeholder — added on submission._
+The public evidence package is documented in [thesis/README.md](thesis/README.md). It contains SupplierBench-24, sanitized archived observations, provenance, deterministic analysis scripts, generated figures, and integrity tests.
+
+Reproduce and verify the thesis results without API credentials or running services:
+
+```bash
+npm run thesis:reproduce
+```
+
+This reproduces the analysis from archived observations. It is intentionally different from a paid live rerun of stochastic model calls.
 
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the five agents, data flow, three-tier governance, audit log
-- [BENCHMARK.md](BENCHMARK.md) — SupplierBench-25, metrics, end-to-end reproduction
+- [BENCHMARK.md](BENCHMARK.md) — SupplierBench-24 protocol, correction, metrics, and reproduction
+- [thesis/README.md](thesis/README.md) — public thesis evidence and provenance
 - [docs/agentic-e2e-test-plan.md](docs/agentic-e2e-test-plan.md) — 25-query acceptance matrix for agentic behavior, retrieval, web discovery, compliance, and known index health checks
 - [CONTRIBUTING.md](CONTRIBUTING.md) — code style, tests, commit conventions
 - [LICENSE](LICENSE) — MIT

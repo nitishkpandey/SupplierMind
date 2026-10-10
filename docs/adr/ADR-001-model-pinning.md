@@ -20,9 +20,9 @@ Audit H also found two brittle couplings that make a naive pin dangerous:
    silently dropped from 400 RPM / 180K TPM to 30 RPM / 6K TPM — over-throttling
    the benchmark.
 
-The 2026-06-13 benchmark (`results/run_20260613/`) was executed against the
-alias, which resolved to `gpt-4o-mini-2024-07-18` (verified against the live API
-— the only gpt-4o-mini snapshot OpenAI publishes).
+The historical benchmark was executed against the alias, which resolved to
+`gpt-4o-mini-2024-07-18`. The published thesis archive records that model
+identifier and its source commit in `thesis/PROVENANCE.json`.
 
 ## Decision
 
@@ -47,8 +47,8 @@ alias, which resolved to `gpt-4o-mini-2024-07-18` (verified against the live API
 - **Negative / maintenance:** upgrading to a newer snapshot is a deliberate,
   manual step — update the pin, add a cost-table entry if pricing changes, and
   re-run the benchmark. This is intended friction.
-- The historical verification records (`docs/verification/04`,`05`,`06`) keep
-  the run-time string they were written with; they are timestamps, not config.
+- The public thesis package preserves the archived model identifier and file
+  hashes independently of the active production configuration.
 
 ## Alternatives considered
 

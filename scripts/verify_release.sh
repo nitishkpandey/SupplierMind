@@ -14,8 +14,7 @@ PROTECTED_PATHS=(
   "apps/backend/data/suppliers_synthetic.json"
   "apps/backend/data/suppliers_synthetic_10k.json"
   "apps/backend/data/generate_dataset.py"
-  "apps/backend/data/thesis_report.json"
-  "results"
+  "thesis"
 )
 
 usage() {
@@ -33,7 +32,6 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 cd "${REPO_ROOT}"
-THESIS_BEFORE="$(git rev-parse thesis-experiments)"
 
 if [[ -n "$(git status --porcelain -- "${PROTECTED_PATHS[@]}")" ]]; then
   echo "Protected benchmark or thesis-result paths have working-tree changes." >&2
@@ -70,11 +68,6 @@ if [[ "${LIVE}" == true ]]; then
   cd "${REPO_ROOT}"
 fi
 
-THESIS_AFTER="$(git rev-parse thesis-experiments)"
-if [[ "${THESIS_BEFORE}" != "${THESIS_AFTER}" ]]; then
-  echo "The thesis-experiments branch moved during verification." >&2
-  exit 1
-fi
 if [[ -n "$(git status --porcelain -- "${PROTECTED_PATHS[@]}")" ]]; then
   echo "Verification modified protected benchmark or thesis-result paths." >&2
   git status --short -- "${PROTECTED_PATHS[@]}" >&2

@@ -1,6 +1,6 @@
 # Contributing
 
-Research artefact for a master's thesis; light process, strict hygiene.
+Production application and research artefact with strict repository hygiene.
 
 ## Code style
 
@@ -32,5 +32,7 @@ Atomic commits at each working state. Milestone tags:
 
 ## Benchmark discipline
 
-Locked results are never overwritten — archive under `results/run_YYYYMMDD/`.
+Published thesis evidence under `thesis/` is immutable except for an explicitly
+documented correction. New live experiments belong outside the published
+archive until their provenance, sanitization, and interpretation are reviewed.
 Negative results are reported unchanged.

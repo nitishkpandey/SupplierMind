@@ -1,7 +1,7 @@
 """Step-8 sanity checks on the locked benchmark results.
 
 Reads the archived run directory + the raw run log and writes
-docs/verification/06_sanity_checks.md. Pure analysis, no API calls.
+Pure analysis with no API calls. Output is written to the selected local run directory.
 
 Run from backend/:
     uv run python scripts/sanity_check_benchmark.py results/run_YYYYMMDD [path/to/run.log]
